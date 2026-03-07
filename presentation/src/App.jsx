@@ -5,6 +5,7 @@ import ContextDensity from "./components/ContextDensity";
 import DissociatingViz from "./components/DissociatingViz";
 import FeatureGrid3D from "./components/FeatureGrid3D";
 import LandscapeOutput from "./components/LandscapeOutput";
+import HallucinationMap from "./components/HallucinationMap";
 
 const SLIDES = [
   {
@@ -24,6 +25,7 @@ const SLIDES = [
       { label: "Context Density", desc: "Why how you write a prompt matters as much as what you write" },
       { label: "Feature Activation Landscape", desc: "3D view of how specific tokens create sharp peaks while vague tokens stay flat" },
       { label: "How Landscape Impacts Output", desc: "Training defaults, sampling variance, and confabulation from unresolved dimensions" },
+      { label: "Hallucination Map", desc: "Token-by-token trace showing exactly where the model executes vs invents" },
       { label: "Language vs. Thought", desc: "Understanding where LLMs excel and where they fall short" },
     ],
   },
@@ -96,6 +98,20 @@ const SLIDES = [
     type: "component",
     component: "LandscapeOutput",
     instructions: "Explore three tabs: see how vague prompts mirror training frequency, how Top-K sampling interacts with flat vs peaked distributions, and how each unresolved dimension becomes a confabulation pathway.",
+  },
+  {
+    id: "hallucination-intro",
+    type: "text",
+    title: "Hallucination Map",
+    subtitle: "Where exactly do hallucinations enter the output?",
+    body: "Every token the model generates is either grounded in your prompt, logically inferred from it, defaulted from training data patterns, or outright confabulated to fill a gap. By tracing the output token-by-token and inspecting the logit distribution at each position, we can see exactly where the model was executing versus gambling.",
+    keyTakeaway: "Hallucinations aren't random failures -- they occur at specific, predictable positions where the prompt left a dimension unresolved. Dense specs close these gaps before the model reaches them.",
+  },
+  {
+    id: "hallucination-demo",
+    type: "component",
+    component: "HallucinationMap",
+    instructions: "Switch between Vague and Dense prompts, then click any token to see its logit distribution. Red tokens are confabulated, gold are defaults, green are grounded. Notice how the vague output is littered with red while the dense output is almost entirely green.",
   },
   {
     id: "dissociating-intro",
@@ -261,6 +277,7 @@ function ComponentSlide({ slide }) {
     DissociatingViz,
     FeatureGrid3D,
     LandscapeOutput,
+    HallucinationMap,
   };
   const Component = components[slide.component];
 
