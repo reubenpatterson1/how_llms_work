@@ -100,7 +100,7 @@ const CONFAB_DIMENSIONS = [
       "I'll build a custom HTML/CSS site with a simple checkout page.",
     ],
     riskLevel: 0.9,
-    icon: "\u2699",
+    icon: "⚙",
     desc: "Without a framework specified, the model picks one based on training frequency. Different runs may choose different frameworks, producing inconsistent results.",
   },
   {
@@ -115,7 +115,7 @@ const CONFAB_DIMENSIONS = [
       "Let me set up a Firebase Realtime Database for the product catalog.",
     ],
     riskLevel: 0.85,
-    icon: "\u{1F4BE}",
+    icon: "💾",
     desc: "The prompt says 'sells shoes' but never mentions data storage. The model must invent a database choice — and each invention cascades into different ORMs, schemas, and query patterns.",
   },
   {
@@ -130,7 +130,7 @@ const CONFAB_DIMENSIONS = [
       "Let me integrate Firebase Auth with Google sign-in.",
     ],
     riskLevel: 0.75,
-    icon: "\u{1F512}",
+    icon: "🔒",
     desc: "Does the store need user accounts? Guest checkout? Social login? The vague prompt doesn't say, so the model guesses — and each guess shapes the entire user flow.",
   },
   {
@@ -145,7 +145,7 @@ const CONFAB_DIMENSIONS = [
       "The design uses a classic e-commerce grid with sidebar filters.",
     ],
     riskLevel: 0.7,
-    icon: "\u{1F3A8}",
+    icon: "🎨",
     desc: "Design is inherently open-ended, but the vague prompt gives zero visual direction. The model fills in aesthetics from the most common patterns in its training data.",
   },
   {
@@ -160,7 +160,7 @@ const CONFAB_DIMENSIONS = [
       "Performance will be fine with a CDN.",
     ],
     riskLevel: 0.5,
-    icon: "\u26A1",
+    icon: "⚡",
     desc: "Without a measurable target, the model generates vague performance claims that can't be tested. 'Fast' is a hallucination if there's no threshold to verify against.",
   },
   {
@@ -168,14 +168,14 @@ const CONFAB_DIMENSIONS = [
     label: "Price Range",
     vagueStatus: "unresolved",
     denseStatus: "locked",
-    denseValue: "$80\u2013200",
+    denseValue: "$80–200",
     confabExamples: [
       "Products range from $29.99 to $149.99...",
       "We'll position these as premium shoes starting at $200...",
       "The budget-friendly collection starts under $50.",
     ],
     riskLevel: 0.65,
-    icon: "\u{1F4B0}",
+    icon: "💰",
     desc: "Price range determines UX (filter ranges, sort defaults), design (luxury vs budget aesthetic), and even copy tone. The model fabricates a price tier and designs around it.",
   },
 ];
@@ -260,7 +260,7 @@ function FillingGaps() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
         {/* Vague distribution */}
         <Box>
-          <Label color={RED}>Vague Prompt \u2192 Output Logits</Label>
+          <Label color={RED}>Vague Prompt → Output Logits</Label>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 160, marginBottom: 8 }}>
             {sorted.map((t, i) => {
               const h = t.vagueProb * 600;
@@ -290,13 +290,13 @@ function FillingGaps() {
           <div style={{ display: "flex", gap: 12 }}>
             <Metric label="Entropy" value={vagueEntropy.toFixed(2)} accent={RED} sub={`Max: ${Math.log2(sorted.length).toFixed(2)}`} />
             <Metric label="Top Token" value="18%" accent={GOLD} sub="Shopify" />
-            <Metric label="Gap 1st\u21922nd" value="2%" accent={RED} sub="Nearly tied" />
+            <Metric label="Gap 1st→2nd" value="2%" accent={RED} sub="Nearly tied" />
           </div>
         </Box>
 
         {/* Dense distribution */}
         <Box>
-          <Label color={GREEN}>Dense Spec \u2192 Output Logits</Label>
+          <Label color={GREEN}>Dense Spec → Output Logits</Label>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 160, marginBottom: 8 }}>
             {[...FRAMEWORK_CANDIDATES].sort((a, b) => b.denseProb - a.denseProb).map((t) => {
               const h = t.denseProb * 200;
@@ -324,7 +324,7 @@ function FillingGaps() {
           <div style={{ display: "flex", gap: 12 }}>
             <Metric label="Entropy" value={denseEntropy.toFixed(2)} accent={GREEN} sub={`Max: ${Math.log2(sorted.length).toFixed(2)}`} />
             <Metric label="Top Token" value="82%" accent={GREEN} sub="Next" />
-            <Metric label="Gap 1st\u21922nd" value="76%" accent={GREEN} sub="Dominant" />
+            <Metric label="Gap 1st→2nd" value="76%" accent={GREEN} sub="Dominant" />
           </div>
         </Box>
       </div>
@@ -336,7 +336,7 @@ function FillingGaps() {
             <Label color={GOLD}>Training Data Frequency Overlay</Label>
             <div style={{ fontSize: 12, color: "#99aabb", lineHeight: 1.6 }}>
               Toggle to see how closely the vague prompt's logit distribution mirrors the frequency of
-              framework mentions in training data. The correlation is <strong style={{ color: GOLD }}>r = {correlation.toFixed(3)}</strong> \u2014
+              framework mentions in training data. The correlation is <strong style={{ color: GOLD }}>r = {correlation.toFixed(3)}</strong> —
               the model is essentially <em>reproducing its training distribution</em> because the prompt
               provides no signal to deviate from it.
             </div>
@@ -355,10 +355,10 @@ function FillingGaps() {
         <Label color={ACCENT}>Why This Matters</Label>
         <div style={{ fontSize: 13, color: "#99aabb", lineHeight: 1.7 }}>
           <strong style={{ color: "#e8c4b8" }}>When the feature landscape is flat, the model defaults to its priors.</strong>{" "}
-          The vague prompt produces a logit distribution that is almost a mirror of training data frequency \u2014 Shopify
+          The vague prompt produces a logit distribution that is almost a mirror of training data frequency — Shopify
           leads because it appeared most often in "website that sells" contexts, not because it matches your intent.
           The dense spec overrides these priors entirely: "React/Next.js 14" creates such a sharp feature peak that
-          the logit distribution collapses to a single dominant token. The model doesn't guess \u2014 it executes.
+          the logit distribution collapses to a single dominant token. The model doesn't guess — it executes.
         </div>
       </Box>
     </div>
@@ -430,7 +430,7 @@ function SamplingWindow() {
 
       {/* Distribution visualization */}
       <Box style={{ marginBottom: 20 }}>
-        <Label>Logit Distribution \u2014 Top-{topK} Window Highlighted</Label>
+        <Label>Logit Distribution — Top-{topK} Window Highlighted</Label>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 180, marginBottom: 12, position: "relative" }}>
           {tokens.map((t, i) => {
             const inWindow = i < topK;
@@ -519,8 +519,8 @@ function SamplingWindow() {
         </div>
         <div style={{ fontSize: 12, color: "#778899", lineHeight: 1.6 }}>
           {mode === "vague"
-            ? "Notice the variety \u2014 the same prompt produces different framework choices each time. This is non-determinism caused by a flat logit distribution giving the sampler too many viable options."
-            : "Nearly every sample is the same token. The peaked distribution means Top-K barely matters \u2014 even K=10 produces consistent output because one token dominates so heavily."}
+            ? "Notice the variety — the same prompt produces different framework choices each time. This is non-determinism caused by a flat logit distribution giving the sampler too many viable options."
+            : "Nearly every sample is the same token. The peaked distribution means Top-K barely matters — even K=10 produces consistent output because one token dominates so heavily."}
         </div>
       </Box>
 
@@ -528,9 +528,9 @@ function SamplingWindow() {
       <Box accent={PURPLE}>
         <Label color={PURPLE}>The Key Insight</Label>
         <div style={{ fontSize: 13, color: "#99aabb", lineHeight: 1.7 }}>
-          <strong style={{ color: "#e8c4b8" }}>Top-K doesn't fix a flat distribution \u2014 it just limits the damage.</strong>{" "}
+          <strong style={{ color: "#e8c4b8" }}>Top-K doesn't fix a flat distribution — it just limits the damage.</strong>{" "}
           With the vague prompt at K=5, you're choosing among Shopify (18%), WordPress (16%), React (14%),
-          HTML (9%), and Next (8%). After renormalization these become ~28%, 25%, 22%, 14%, 12% \u2014 still
+          HTML (9%), and Next (8%). After renormalization these become ~28%, 25%, 22%, 14%, 12% — still
           essentially a coin flip. With the dense spec at K=5, the renormalized window is 93% "Next" and scraps.
           The distribution shape, set by the input landscape, determines whether sampling is a focused selection or a lottery.
         </div>
@@ -557,7 +557,7 @@ function ConfabulationPathways() {
           Confabulation: When the Model Must Invent
         </div>
         <div style={{ fontSize: 13, color: "#bfc8d0", lineHeight: 1.7, fontFamily: FS }}>
-          Each unresolved dimension in the prompt is a <em>confabulation pathway</em> \u2014 a point where the model
+          Each unresolved dimension in the prompt is a <em>confabulation pathway</em> — a point where the model
           must generate information that wasn't grounded in the input. Click each dimension below to see the
           competing outputs the model might produce and why each one is technically a hallucination.
         </div>
@@ -616,7 +616,7 @@ function ConfabulationPathways() {
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: FM, color: "#e8c4b8" }}>{dim.label}</div>
               <div style={{ fontSize: 11, fontFamily: FM, color: showDense ? GREEN : RED }}>
-                {showDense ? (dim.denseStatus === "locked" ? `Locked: ${dim.denseValue}` : `Partial: ${dim.denseValue}`) : "Unresolved \u2014 model must invent"}
+                {showDense ? (dim.denseStatus === "locked" ? `Locked: ${dim.denseValue}` : `Partial: ${dim.denseValue}`) : "Unresolved — model must invent"}
               </div>
             </div>
           </div>
@@ -640,7 +640,7 @@ function ConfabulationPathways() {
               </div>
               <div style={{ fontSize: 11, color: "#778899", marginTop: 10, lineHeight: 1.5 }}>
                 Each output sounds confident and competent. None is "wrong" in isolation. But they're
-                mutually exclusive \u2014 the model chose differently each time because the flat logit distribution
+                mutually exclusive — the model chose differently each time because the flat logit distribution
                 gave the sampler room to wander.
               </div>
             </>
@@ -654,7 +654,7 @@ function ConfabulationPathways() {
               <div style={{ fontSize: 13, color: "#99aabb", lineHeight: 1.6 }}>
                 The constraint <strong style={{ color: "#e8c4b8" }}>"{dim.denseValue}"</strong> in the spec
                 collapses the logit distribution for this dimension to a single option. The model doesn't need
-                to sample \u2014 the constraint eliminates all competing tokens. No sampling variance means no confabulation.
+                to sample — the constraint eliminates all competing tokens. No sampling variance means no confabulation.
               </div>
             </Box>
           )}
@@ -674,9 +674,9 @@ function ConfabulationPathways() {
         <Label color={RED}>The Confabulation Principle</Label>
         <div style={{ fontSize: 13, color: "#99aabb", lineHeight: 1.7 }}>
           <strong style={{ color: "#e8c4b8" }}>Every unresolved dimension is a hallucination waiting to happen.</strong>{" "}
-          The model <em>must</em> generate something for each open question \u2014 it can't leave blanks. So it fills
+          The model <em>must</em> generate something for each open question — it can't leave blanks. So it fills
           gaps with training-frequency defaults, producing output that sounds authoritative but is ungrounded.
-          The dense spec doesn't make the model "smarter" \u2014 it eliminates the <em>need</em> to confabulate by
+          The dense spec doesn't make the model "smarter" — it eliminates the <em>need</em> to confabulate by
           pre-answering the questions the model would otherwise have to invent answers for. Each specific token
           in your prompt is a closed door through which hallucination cannot pass.
         </div>
@@ -689,9 +689,9 @@ function ConfabulationPathways() {
 //  MAIN SHELL
 // ============================================================
 const TABS = [
-  { id: "gaps",    label: "Filling in the Gaps",   sub: "Training data defaults", accent: ACCENT, icon: "\u{1F4CA}" },
-  { id: "sampling", label: "Sampling Window",       sub: "Top-K interaction",      accent: PURPLE, icon: "\u{1F3B2}" },
-  { id: "confab",  label: "Confabulation Pathways", sub: "Hallucination anatomy",  accent: RED,    icon: "\u{1F6A8}" },
+  { id: "gaps",    label: "Filling in the Gaps",   sub: "Training data defaults", accent: ACCENT, icon: "📊" },
+  { id: "sampling", label: "Sampling Window",       sub: "Top-K interaction",      accent: PURPLE, icon: "🎲" },
+  { id: "confab",  label: "Confabulation Pathways", sub: "Hallucination anatomy",  accent: RED,    icon: "🚨" },
 ];
 
 export default function LandscapeOutput() {
@@ -750,21 +750,21 @@ export default function LandscapeOutput() {
             gap: 20, fontSize: 13, color: "#99aabb", lineHeight: 1.7,
           }}>
             <div>
-              <strong style={{ color: "#e8c4b8" }}>Flat landscape \u2192 training defaults.</strong>{" "}
+              <strong style={{ color: "#e8c4b8" }}>Flat landscape → training defaults.</strong>{" "}
               When features are diffuse, the model's output distribution mirrors what it saw most often in pre-training.
-              Your vague prompt doesn't override these priors \u2014 it surrenders to them. The most popular framework
+              Your vague prompt doesn't override these priors — it surrenders to them. The most popular framework
               in training data becomes the model's "choice," regardless of your actual needs.
             </div>
             <div>
-              <strong style={{ color: "#e8c4b8" }}>Flat distribution \u2192 sampling lottery.</strong>{" "}
+              <strong style={{ color: "#e8c4b8" }}>Flat distribution → sampling lottery.</strong>{" "}
               Top-K and temperature settings exist to manage output diversity, but they can't create clarity from
               confusion. When 6 tokens are all within 5% of each other, any sampling strategy produces inconsistent
               results. The variance is in the input, not the sampler.
             </div>
             <div>
-              <strong style={{ color: "#e8c4b8" }}>Open dimensions \u2192 forced confabulation.</strong>{" "}
+              <strong style={{ color: "#e8c4b8" }}>Open dimensions → forced confabulation.</strong>{" "}
               The model must generate <em>something</em> for every unspecified dimension. Each generation is
-              ungrounded \u2014 plausible but invented. Dense specs close these pathways before the model reaches
+              ungrounded — plausible but invented. Dense specs close these pathways before the model reaches
               them, converting "guess" into "execute." Every constraint token is a hallucination prevented.
             </div>
           </div>

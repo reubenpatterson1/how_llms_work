@@ -6,6 +6,7 @@ import DissociatingViz from "./components/DissociatingViz";
 import FeatureGrid3D from "./components/FeatureGrid3D";
 import LandscapeOutput from "./components/LandscapeOutput";
 import HallucinationMap from "./components/HallucinationMap";
+import ConfidenceLandscape3D from "./components/ConfidenceLandscape3D";
 
 const SLIDES = [
   {
@@ -26,6 +27,7 @@ const SLIDES = [
       { label: "Feature Activation Landscape", desc: "3D view of how specific tokens create sharp peaks while vague tokens stay flat" },
       { label: "How Landscape Impacts Output", desc: "Training defaults, sampling variance, and confabulation from unresolved dimensions" },
       { label: "Hallucination Map", desc: "Token-by-token trace showing exactly where the model executes vs invents" },
+      { label: "Confidence Landscape", desc: "3D view of certainty vs doubt across every generated token" },
       { label: "Language vs. Thought", desc: "Understanding where LLMs excel and where they fall short" },
     ],
   },
@@ -112,6 +114,20 @@ const SLIDES = [
     type: "component",
     component: "HallucinationMap",
     instructions: "Switch between Vague and Dense prompts, then click any token to see its logit distribution. Red tokens are confabulated, gold are defaults, green are grounded. Notice how the vague output is littered with red while the dense output is almost entirely green.",
+  },
+  {
+    id: "confidence-intro",
+    type: "text",
+    title: "Confidence Landscape",
+    subtitle: "Seeing certainty and doubt in three dimensions",
+    body: "The Hallucination Map labels each token, but the 3D Confidence Landscape makes the mechanism physical. Each output token becomes a column: the tall front bar is the winning candidate, the bars behind it are runners-up. When the front bar towers alone, the model knew the answer. When it barely rises above the crowd behind it, the model was gambling. Sort by confidence, entropy, or grounding status to watch the pattern separate.",
+    keyTakeaway: "Grounded tokens produce solitary peaks. Confabulated tokens produce crowds of near-equals. The 3D shape of the landscape is a direct readout of how much your prompt constrained the output.",
+  },
+  {
+    id: "confidence-demo",
+    type: "component",
+    component: "ConfidenceLandscape3D",
+    instructions: "Drag to orbit, scroll to zoom. Switch prompts and sort modes. Click tokens below the grid to see their logit distributions. Sort by 'By Grounding' to see all hallucination points clustered together.",
   },
   {
     id: "dissociating-intro",
@@ -278,6 +294,7 @@ function ComponentSlide({ slide }) {
     FeatureGrid3D,
     LandscapeOutput,
     HallucinationMap,
+    ConfidenceLandscape3D,
   };
   const Component = components[slide.component];
 

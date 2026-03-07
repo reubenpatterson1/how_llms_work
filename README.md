@@ -10,6 +10,7 @@ An interactive, locally-hosted presentation that walks through the core concepts
 - **Feature Activation Landscape** - 3D rotatable grid showing how specific tokens create sharp activation peaks while vague tokens stay flat across layers
 - **How Landscape Impacts Output** - Three-part exploration of training data defaults, Top-K sampling interaction, and confabulation pathways from unresolved prompt dimensions
 - **Hallucination Map** - Token-by-token trace of generated output, color-coded by grounding status, with clickable logit distributions at each position
+- **Confidence Landscape** - 3D rotatable grid showing winner vs runner-up token probabilities, sortable by confidence, entropy, and grounding status
 - **Language vs. Thought** - Explore the distinction between formal competence (grammar, syntax) and functional competence (reasoning, world knowledge)
 
 ## Prerequisites
@@ -46,6 +47,7 @@ Open http://localhost:5173 in your browser.
 │           ├── FeatureGrid3D.jsx        # 3D feature activation landscape
 │           ├── LandscapeOutput.jsx      # How landscape impacts output
 │           ├── HallucinationMap.jsx     # Token-by-token hallucination trace
+│           ├── ConfidenceLandscape3D.jsx # 3D confidence vs grounding grid
 │           └── DissociatingViz.jsx      # Language vs. thought explorer
 ├── attention_animation (1).jsx          # Original source files
 ├── attention_dilution (1).jsx
