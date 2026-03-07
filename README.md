@@ -7,6 +7,7 @@ An interactive, locally-hosted presentation that walks through the core concepts
 - **Self-Attention** - Step through the Query/Key/Value computation that lets transformers understand word relationships
 - **Attention Dilution** - See how noise tokens steal probability mass from meaningful words
 - **Context Density** - Compare three versions of the same prompt and learn why token-level information density matters
+- **Feature Activation Landscape** - 3D rotatable grid showing how specific tokens create sharp activation peaks while vague tokens stay flat across layers
 - **Language vs. Thought** - Explore the distinction between formal competence (grammar, syntax) and functional competence (reasoning, world knowledge)
 
 ## Prerequisites
@@ -40,6 +41,7 @@ Open http://localhost:5173 in your browser.
 │           ├── AttentionAnimation.jsx   # Self-attention step-through
 │           ├── AttentionDilution.jsx    # Noise vs. signal demo
 │           ├── ContextDensity.jsx       # Prompt comparison tool
+│           ├── FeatureGrid3D.jsx        # 3D feature activation landscape
 │           └── DissociatingViz.jsx      # Language vs. thought explorer
 ├── attention_animation (1).jsx          # Original source files
 ├── attention_dilution (1).jsx

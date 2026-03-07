@@ -3,6 +3,7 @@ import AttentionAnimation from "./components/AttentionAnimation";
 import AttentionDilution from "./components/AttentionDilution";
 import ContextDensity from "./components/ContextDensity";
 import DissociatingViz from "./components/DissociatingViz";
+import FeatureGrid3D from "./components/FeatureGrid3D";
 
 const SLIDES = [
   {
@@ -64,6 +65,20 @@ const SLIDES = [
     type: "component",
     component: "ContextDensity",
     instructions: "Compare three versions of the same prompt. Click individual tokens to see their density scores and what dimensions they resolve. Notice how the dense spec resolves nearly every ambiguity.",
+  },
+  {
+    id: "features-intro",
+    type: "text",
+    title: "Feature Activation Landscape",
+    subtitle: "How tokens light up internal feature dimensions across layers",
+    body: "Transformers don't classify tokens into simple categories like 'noun' or 'verb.' Instead, each token activates thousands of learned features simultaneously -- entity type, action, spatial, temporal, technical, domain, and more. Vague words activate many features weakly (broad, flat). Specific words activate few features strongly (tall, narrow). As the signal passes through layers, context from surrounding tokens sharpens the peaks and suppresses the noise.",
+    keyTakeaway: "Specific tokens create sharp, narrow activation peaks that compound through layers. Vague tokens create broad, flat activations that the model struggles to disambiguate -- wasting attention budget on competing interpretations.",
+  },
+  {
+    id: "features-demo",
+    type: "component",
+    component: "FeatureGrid3D",
+    instructions: "Switch between Vague and Dense prompts, then animate through layers. Drag to orbit, scroll to zoom. Watch how dense spec tokens grow into towering peaks while vague tokens stay flat.",
   },
   {
     id: "dissociating-intro",
@@ -226,6 +241,7 @@ function ComponentSlide({ slide }) {
     AttentionDilution,
     ContextDensity,
     DissociatingViz,
+    FeatureGrid3D,
   };
   const Component = components[slide.component];
 
