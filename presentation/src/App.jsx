@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import AttentionAnimation from "./components/AttentionAnimation";
+import WeightOrigins from "./components/WeightOrigins";
 import AttentionDilution from "./components/AttentionDilution";
 import ContextDensity from "./components/ContextDensity";
 import DissociatingViz from "./components/DissociatingViz";
@@ -7,6 +8,7 @@ import FeatureGrid3D from "./components/FeatureGrid3D";
 import LandscapeOutput from "./components/LandscapeOutput";
 import HallucinationMap from "./components/HallucinationMap";
 import ConfidenceLandscape3D from "./components/ConfidenceLandscape3D";
+import EngineeringProfQuiz from "./components/EngineeringProfQuiz";
 
 const SLIDES = [
   {
@@ -22,6 +24,7 @@ const SLIDES = [
     title: "What We'll Cover",
     bullets: [
       { label: "Self-Attention", desc: "The core mechanism that lets transformers understand relationships between words" },
+      { label: "Where Weights Come From", desc: "How billions of training sentences forge the 3x3 attention matrix" },
       { label: "Attention Dilution", desc: "What happens when noise competes with signal for the model's focus" },
       { label: "Context Density", desc: "Why how you write a prompt matters as much as what you write" },
       { label: "Feature Activation Landscape", desc: "3D view of how specific tokens create sharp peaks while vague tokens stay flat" },
@@ -44,6 +47,20 @@ const SLIDES = [
     type: "component",
     component: "AttentionAnimation",
     instructions: 'Click any word to start, then step through the attention computation. Try clicking "it" to see how it resolves coreference back to "animal".',
+  },
+  {
+    id: "weights-intro",
+    type: "text",
+    title: "Where Weights Come From",
+    subtitle: "How billions of training sentences forge the attention matrix",
+    body: "The attention weights we just visualized weren't programmed by hand -- they were learned from training data. Every time two words appeared together in a meaningful context across billions of web pages, the gradient update nudged their Q/K dot product a tiny bit higher. Billions of nudges later, the 3x3 matrix encodes the statistical relationships of human language.",
+    keyTakeaway: "Weights are crystallized co-occurrence. Words that frequently appeared together in predictively useful contexts develop strong mutual attention. This is both the model's strength and its limitation -- it can only attend to patterns it has seen.",
+  },
+  {
+    id: "weights-demo",
+    type: "component",
+    component: "WeightOrigins",
+    instructions: "Choose a 3-word sentence, then click any cell in the matrix to see the training sentences that built that weight. Use 'Animate Training' or the slider to watch weights grow from zero.",
   },
   {
     id: "dilution-intro",
@@ -162,6 +179,20 @@ const SLIDES = [
     title: "Thank You",
     subtitle: "Questions & Discussion",
     body: "Navigate back to any section to explore the interactive demos further.",
+  },
+  {
+    id: "quiz-intro",
+    type: "text",
+    title: "Engineering Professional Assessment",
+    subtitle: "27 Questions · 9 Sections · Certificate on Completion",
+    body: "Each question requires applying the mechanisms from this presentation to novel scenarios — not recalling slide text. You will be asked to reason about new examples drawn from clinical AI, legal systems, domain-shifted corpora, and adversarial prompt design.",
+    keyTakeaway: "Pass threshold: 20 / 27 (74%). A personalised certificate is generated on completion regardless of outcome.",
+  },
+  {
+    id: "quiz",
+    type: "component",
+    component: "EngineeringProfQuiz",
+    instructions: "Answer all 27 questions across 9 sections. Select an answer, then click Reveal to see the explanation before advancing.",
   },
 ];
 
@@ -288,6 +319,7 @@ function TextSlide({ slide }) {
 function ComponentSlide({ slide }) {
   const components = {
     AttentionAnimation,
+    WeightOrigins,
     AttentionDilution,
     ContextDensity,
     DissociatingViz,
@@ -295,6 +327,7 @@ function ComponentSlide({ slide }) {
     LandscapeOutput,
     HallucinationMap,
     ConfidenceLandscape3D,
+    EngineeringProfQuiz,
   };
   const Component = components[slide.component];
 

@@ -5,6 +5,7 @@ An interactive, locally-hosted presentation that walks through the core concepts
 ## Topics Covered
 
 - **Self-Attention** - Step through the Query/Key/Value computation that lets transformers understand word relationships
+- **Where Weights Come From** - 3D visualization of how training corpus co-occurrence builds the 3x3 attention weight matrix
 - **Attention Dilution** - See how noise tokens steal probability mass from meaningful words
 - **Context Density** - Compare three versions of the same prompt and learn why token-level information density matters
 - **Feature Activation Landscape** - 3D rotatable grid showing how specific tokens create sharp activation peaks while vague tokens stay flat across layers
@@ -42,6 +43,7 @@ Open http://localhost:5173 in your browser.
 │       ├── App.jsx        # Slide framework and navigation
 │       └── components/
 │           ├── AttentionAnimation.jsx   # Self-attention step-through
+│           ├── WeightOrigins.jsx       # 3D training weight visualization
 │           ├── AttentionDilution.jsx    # Noise vs. signal demo
 │           ├── ContextDensity.jsx       # Prompt comparison tool
 │           ├── FeatureGrid3D.jsx        # 3D feature activation landscape
