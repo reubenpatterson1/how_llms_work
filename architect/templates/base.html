@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Architecture Agent{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B1120;
+      --surface: #131B2E;
+      --surface2: #1A2340;
+      --border: #1E2D4A;
+      --border-light: #2A3F6A;
+      --text: #E8ECF4;
+      --text-dim: #7B8BA8;
+      --text-muted: #4A5A78;
+      --accent: #60A5FA;
+      --accent-dim: #3B82F6;
+      --green: #34D399;
+      --green-dim: #059669;
+      --red: #F87171;
+      --red-dim: #DC2626;
+      --orange: #FBBF24;
+      --orange-dim: #D97706;
+      --purple: #A78BFA;
+      --purple-dim: #7C3AED;
+      --cyan: #22D3EE;
+      --gradient-start: #60A5FA;
+      --gradient-end: #A78BFA;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Navigation ── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(11, 17, 32, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex; align-items: center; gap: 32px;
+    }
+    .nav-brand {
+      font-weight: 700; font-size: 15px; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-link {
+      padding: 8px 16px; border-radius: 8px;
+      font-size: 13px; font-weight: 500;
+      color: var(--text-dim); text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-link:hover { color: var(--text); background: var(--surface); }
+    .nav-link.active { color: var(--accent); background: rgba(96, 165, 250, 0.1); }
+    .nav-status {
+      margin-left: auto; display: flex; align-items: center; gap: 12px;
+      font-size: 12px; color: var(--text-dim);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 4px;
+    }
+    .status-dot.online { background: var(--green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+    .status-dot.offline { background: var(--red); }
+
+    /* ── Layout ── */
+    .main { padding-top: 56px; min-height: 100vh; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--border-light); }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 14px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      border-radius: 10px; font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* ── Channel bars ── */
+    .channel-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid rgba(30, 45, 74, 0.5);
+    }
+    .channel-bar:last-child { border-bottom: none; }
+    .channel-name {
+      width: 130px; font-size: 13px; font-weight: 500;
+      color: var(--text-dim); flex-shrink: 0;
+    }
+    .channel-track {
+      flex: 1; height: 8px; background: var(--surface2);
+      border-radius: 4px; overflow: hidden; position: relative;
+    }
+    .channel-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                  background 0.3s;
+      position: relative;
+    }
+    .channel-fill::after {
+      content: ''; position: absolute; top: 0; right: 0;
+      width: 20px; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15));
+      border-radius: 0 4px 4px 0;
+    }
+    .channel-pct {
+      width: 48px; text-align: right;
+      font-size: 13px; font-weight: 600;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      font-family: 'IBM Plex Sans', sans-serif;
+      border: 1px solid transparent; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent); color: #000;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: #93C5FD; }
+    .btn-ghost {
+      background: transparent; color: var(--text-dim);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border-light); }
+    .btn-danger {
+      background: rgba(248, 113, 113, 0.1); color: var(--red);
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+    .btn-danger:hover { background: rgba(248, 113, 113, 0.2); }
+
+    /* ── Utilities ── */
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .text-dim { color: var(--text-dim); }
+    .text-accent { color: var(--accent); }
+    .text-green { color: var(--green); }
+    .text-red { color: var(--red); }
+    .text-orange { color: var(--orange); }
+
+    .density-ring {
+      width: 120px; height: 120px; position: relative;
+    }
+    .density-ring svg { transform: rotate(-90deg); }
+    .density-ring .value {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px; font-weight: 700;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .density-ring .label {
+      position: absolute; bottom: -4px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px; color: var(--text-dim); white-space: nowrap;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-in { animation: fadeIn 0.3s ease-out; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-brand">Architecture Agent</div>
+    <div class="nav-links">
+      <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="/intake" class="nav-link {% if active_page == 'intake' %}active{% endif %}">Intake</a>
+      <a href="/spec" class="nav-link {% if active_page == 'spec' %}active{% endif %}">Specification</a>
+      <a href="/comparison" class="nav-link {% if active_page == 'comparison' %}active{% endif %}">Comparison</a>
+    </div>
+    <div class="nav-status">
+      <span>
+        <span class="status-dot" id="llm-status-dot"></span>
+        <span id="llm-status-text">Checking LLM...</span>
+      </span>
+      <span class="mono" style="color: var(--accent)" id="density-badge">0.0%</span>
+    </div>
+  </nav>
+
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    const SID = sessionStorage.getItem('arch_sid') || 'sid_' + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem('arch_sid', SID);
+
+    async function fetchStatus() {
+      try {
+        const r = await fetch('/api/status?sid=' + SID);
+        const data = await r.json();
+        document.getElementById('density-badge').textContent = (data.density_score * 100).toFixed(1) + '%';
+        const dot = document.getElementById('llm-status-dot');
+        const txt = document.getElementById('llm-status-text');
+        if (data.ollama_available) {
+          dot.className = 'status-dot online';
+          txt.textContent = 'llama3.2';
+        } else {
+          dot.className = 'status-dot offline';
+          txt.textContent = 'Regex mode';
+        }
+        return data;
+      } catch (e) {
+        console.error('Status fetch failed:', e);
+      }
+    }
+
+    function channelColor(res) {
+      if (res >= 0.8) return 'var(--green)';
+      if (res >= 0.5) return 'var(--orange)';
+      if (res > 0) return 'var(--red)';
+      return 'var(--text-muted)';
+    }
+
+    function renderDensityRing(containerId, score) {
+      const pct = Math.round(score * 100);
+      const circumference = 2 * Math.PI * 50;
+      const offset = circumference - (score * circumference);
+      const color = score >= 0.8 ? 'var(--green)' : score >= 0.5 ? 'var(--orange)' : 'var(--red)';
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = `
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface2)" stroke-width="8"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="${color}" stroke-width="8"
+            stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
+            stroke-linecap="round" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1);"/>
+        </svg>
+        <div class="value" style="color:${color}">${pct}</div>
+        <div class="label">Density Score</div>`;
+    }
+
+    function renderChannelBars(containerId, channels) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = Object.entries(channels).map(([id, ch]) => {
+        const pct = Math.round(ch.resolution * 100);
+        const color = channelColor(ch.resolution);
+        return `<div class="channel-bar">
+          <div class="channel-name">${ch.name}</div>
+          <div class="channel-track">
+            <div class="channel-fill" style="width:${pct}%;background:${color};"></div>
+          </div>
+          <div class="channel-pct" style="color:${color}">${pct}%</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Initial status check
+    fetchStatus();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

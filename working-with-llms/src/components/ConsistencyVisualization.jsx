@@ -170,20 +170,55 @@ export default function ConsistencyVisualization() {
         </table>
       </div>
 
+      {/* Jaccard Similarity Explainer */}
+      <div style={{ background: C.surface, border: `1px solid ${C.accent}33`, borderRadius: 8,
+        padding: "16px 20px", marginTop: 24 }}>
+        <h4 style={{ color: C.accent, margin: "0 0 8px", fontSize: 14 }}>
+          How Jaccard Similarity Measures Confabulation
+        </h4>
+        <p style={{ color: C.textDim, fontSize: 13, lineHeight: 1.6, margin: "0 0 12px" }}>
+          For each pair of runs, Jaccard similarity = (shared decisions) / (all unique decisions).
+          If Run 1 chose <span style={{ color: C.accent }}>{"{Express, MongoDB, JWT}"}</span> and
+          Run 2 chose <span style={{ color: C.accent }}>{"{Express, PostgreSQL, no auth}"}</span>,
+          their intersection is <span style={{ color: C.green }}>{"{Express}"}</span> (1 item)
+          and their union is {"{Express, MongoDB, PostgreSQL, JWT, no auth}"} (5 items),
+          giving J = 1/5 = <strong>20%</strong>.
+        </p>
+        <p style={{ color: C.textDim, fontSize: 13, lineHeight: 1.6, margin: "0 0 12px" }}>
+          We average J across all 10 pairs (5 runs = 10 unique pairs). <strong>Every dimension where
+          runs disagree is an unresolved dimension the model filled stochastically from training
+          defaults</strong> — that is confabulation. Low Jaccard = high confabulation surface.
+        </p>
+        <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+          <span style={{ color: C.textDim }}>Dense spec resolves all dimensions →</span>
+          <span style={{ color: C.green, fontWeight: 600 }}>identical decisions → J = 100%</span>
+        </div>
+        <div style={{ display: "flex", gap: 12, fontSize: 12, marginTop: 4 }}>
+          <span style={{ color: C.textDim }}>Vague prompt leaves dimensions open →</span>
+          <span style={{ color: C.red, fontWeight: 600 }}>varying decisions → J drops</span>
+        </div>
+      </div>
+
       {/* Consistency scores */}
-      <div style={{ display: "flex", gap: 24, marginTop: 24 }}>
+      <div style={{ display: "flex", gap: 24, marginTop: 16 }}>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
           padding: "12px 16px", flex: 1 }}>
-          <div style={{ color: C.red, fontSize: 13, marginBottom: 4 }}>Vague Consistency</div>
+          <div style={{ color: C.red, fontSize: 13, marginBottom: 4 }}>Vague Jaccard Consistency</div>
           <div style={{ color: C.text, fontSize: 24, fontWeight: 700 }}>
             {((testResults.vague?.metrics?.consistency || 0) * 100).toFixed(1)}%
+          </div>
+          <div style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>
+            Unresolved dimensions → different choices each run
           </div>
         </div>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
           padding: "12px 16px", flex: 1 }}>
-          <div style={{ color: C.green, fontSize: 13, marginBottom: 4 }}>Dense Consistency</div>
+          <div style={{ color: C.green, fontSize: 13, marginBottom: 4 }}>Dense Jaccard Consistency</div>
           <div style={{ color: C.text, fontSize: 24, fontWeight: 700 }}>
             {((testResults.dense?.metrics?.consistency || 0) * 100).toFixed(1)}%
+          </div>
+          <div style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>
+            All dimensions resolved → identical output every run
           </div>
         </div>
       </div>

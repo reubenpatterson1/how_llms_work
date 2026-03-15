@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+{% block title %}Dashboard — Architecture Agent{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 1400px; margin: 0 auto;">
+  <!-- Header -->
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px;">
+    <div>
+      <h1 style="font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px;">
+        Architecture Intake Dashboard
+      </h1>
+      <p style="color: var(--text-dim); font-size: 14px; max-width: 560px;">
+        Fill architectural channels through structured Q&A. Each response is analyzed by
+        <span id="method-tag" class="mono" style="color: var(--accent);">...</span>
+        to extract constraints and resolve dimensions.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <a href="/intake" class="btn btn-primary">Start Intake</a>
+      <button class="btn btn-danger" onclick="resetSession()">Reset</button>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;">
+    <div class="card" style="text-align: center; padding: 20px;">
+      <div class="density-ring" id="main-density-ring" style="margin: 0 auto 12px;"></div>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 8px;">Channels Resolved</div>
+      <div id="stat-resolved" class="mono" style="font-size: 32px; font-weight: 700; color: var(--green);">0 / 10</div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Target: ≥ 80% each</div>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 8px;">Exchanges</div>
+      <div id="stat-exchanges" class="mono" style="font-size: 32px; font-weight: 700; color: var(--accent);">0</div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Q&A rounds completed</div>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 8px;">Analysis Engine</div>
+      <div id="stat-engine" style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">...</div>
+      <div id="stat-engine-detail" style="font-size: 12px; color: var(--text-muted);">Checking availability</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <!-- Channel Resolution -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span style="font-size: 16px;">◈</span> Channel Resolution
+        </div>
+        <span class="card-badge" style="background: rgba(96,165,250,0.1); color: var(--accent);">LIVE</span>
+      </div>
+      <div id="dashboard-channels"></div>
+    </div>
+
+    <!-- Constraints Collected -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span style="font-size: 16px;">⊞</span> Constraints Collected
+        </div>
+        <span id="constraint-count" class="card-badge mono" style="background: rgba(52,211,153,0.1); color: var(--green);">0</span>
+      </div>
+      <div id="constraints-list" style="max-height: 400px; overflow-y: auto;"></div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-header">
+        <div class="card-title">
+          <span style="font-size: 16px;">◉</span> Recent Activity
+        </div>
+      </div>
+      <div id="activity-feed" style="max-height: 300px; overflow-y: auto;">
+        <div style="color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center;">
+          No activity yet. <a href="/intake" style="color: var(--accent); text-decoration: none;">Start an intake session</a> to begin.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function refreshDashboard() {
+  const data = await fetchStatus();
+  if (!data) return;
+
+  // Density ring
+  renderDensityRing('main-density-ring', data.density_score);
+
+  // Channel bars
+  renderChannelBars('dashboard-channels', data.channels);
+
+  // Stats
+  const resolved = Object.values(data.channels).filter(c => c.resolution >= 0.8).length;
+  document.getElementById('stat-resolved').textContent = `${resolved} / 10`;
+  document.getElementById('stat-resolved').style.color = resolved >= 10 ? 'var(--green)' : resolved >= 5 ? 'var(--orange)' : 'var(--text-dim)';
+  document.getElementById('stat-exchanges').textContent = data.history_length;
+  document.getElementById('method-tag').textContent = data.analysis_method;
+
+  const eng = document.getElementById('stat-engine');
+  const engD = document.getElementById('stat-engine-detail');
+  if (data.ollama_available) {
+    eng.innerHTML = '<span style="color:var(--green)">llama3.2</span>';
+    engD.textContent = 'Local LLM active via Ollama';
+  } else {
+    eng.innerHTML = '<span style="color:var(--orange)">Regex</span>';
+    engD.textContent = 'Pattern matching fallback';
+  }
+
+  // Constraints
+  let allConstraints = [];
+  Object.entries(data.channels).forEach(([id, ch]) => {
+    (ch.constraints || []).forEach(c => {
+      allConstraints.push({ channel: ch.name, constraint: c });
+    });
+  });
+  document.getElementById('constraint-count').textContent = allConstraints.length;
+  const cl = document.getElementById('constraints-list');
+  if (allConstraints.length) {
+    cl.innerHTML = allConstraints.map(c => `
+      <div style="padding: 6px 0; border-bottom: 1px solid rgba(30,45,74,0.4); font-size: 13px;">
+        <span class="mono" style="color: var(--accent); font-size: 11px;">${c.channel}</span>
+        <div style="color: var(--text-dim); margin-top: 2px;">${c.constraint}</div>
+      </div>`).join('');
+  } else {
+    cl.innerHTML = '<div style="color: var(--text-muted); font-size: 13px; padding: 16px; text-align: center;">No constraints yet</div>';
+  }
+
+  // Activity
+  try {
+    const hr = await fetch('/api/history?sid=' + SID);
+    const hdata = await hr.json();
+    const feed = document.getElementById('activity-feed');
+    if (hdata.history.length) {
+      feed.innerHTML = hdata.history.slice(-20).reverse().map(h => {
+        const isAgent = h.role === 'agent';
+        const icon = isAgent ? '🤖' : '👤';
+        const method = h.method ? `<span class="mono" style="font-size:10px;color:var(--purple);margin-left:8px;">${h.method}</span>` : '';
+        const updates = (h.updates || []).length;
+        const badge = updates ? `<span class="mono" style="font-size:10px;color:var(--green);margin-left:8px;">+${updates} dims</span>` : '';
+        return `<div class="animate-in" style="padding:10px 0;border-bottom:1px solid rgba(30,45,74,0.4);font-size:13px;">
+          <span>${icon}</span>${method}${badge}
+          <div style="color:${isAgent ? 'var(--accent)' : 'var(--text)'};margin-top:4px;">${h.message.slice(0,200)}${h.message.length > 200 ? '...' : ''}</div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e) {}
+}
+
+async function resetSession() {
+  if (!confirm('Reset all intake data?')) return;
+  await fetch('/api/reset', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sid: SID}),
+  });
+  refreshDashboard();
+}
+
+refreshDashboard();
+setInterval(refreshDashboard, 3000);
+</script>
+{% endblock %}

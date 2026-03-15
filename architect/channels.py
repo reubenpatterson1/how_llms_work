@@ -16,7 +16,8 @@ class SubDimension:
     constraints: list[str] = field(default_factory=list)
 
     def update(self, resolution: float, constraint: Optional[str] = None):
-        self.resolution = min(1.0, max(0.0, resolution))
+        # Never downgrade resolution — take the max of existing and new
+        self.resolution = min(1.0, max(self.resolution, resolution))
         if constraint and constraint not in self.constraints:
             self.constraints.append(constraint)
 

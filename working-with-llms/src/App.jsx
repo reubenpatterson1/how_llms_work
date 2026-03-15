@@ -92,8 +92,8 @@ const SLIDES = [
     type: "text",
     title: "Run-to-Run Consistency",
     subtitle: "The same prompt, 5 times — how stable are the outputs?",
-    body: "Vague prompts produce different architectures every run: Express then FastAPI then Hono, MongoDB then PostgreSQL then SQLite, JWT then no auth. Dense specs produce identical output every run because there are no dimensions left for the model to fill stochastically. This is the difference between a slot machine and an engineering tool.",
-    keyTakeaway: "Predictability is the foundation of engineering. If you can't predict what the model will produce, you can't build systems on top of it.",
+    body: "Vague prompts produce different architectures every run: Express then FastAPI then Hono, MongoDB then PostgreSQL then SQLite, JWT then no auth. Dense specs produce identical output every run because there are no dimensions left for the model to fill stochastically. We measure this with Jaccard similarity — for each pair of runs, we compute (shared decisions) / (total unique decisions). A pair that both chose Express+PostgreSQL+JWT scores 1.0; a pair where one chose Express and the other FastAPI scores near 0. The average across all pairs gives the consistency score. Low Jaccard means unresolved dimensions are being filled differently each run — each varying decision is a confabulation vector the model resolves stochastically from training defaults rather than deterministically from your spec.",
+    keyTakeaway: "Jaccard similarity directly measures confabulation surface: every dimension where runs disagree is a dimension the model is inventing rather than executing. Low consistency = high confabulation.",
   },
   {
     id: "consistency-demo",

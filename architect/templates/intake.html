@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% set active_page = "intake" %}
+{% block title %}Intake — Architecture Agent{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 380px; height: calc(100vh - 56px);">
+  <!-- Chat panel -->
+  <div style="display: flex; flex-direction: column; border-right: 1px solid var(--border);">
+    <!-- Chat messages -->
+    <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 24px;">
+      <div style="text-align: center; padding: 48px 0 24px;">
+        <div style="font-size: 40px; margin-bottom: 12px;">◈</div>
+        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px;">Architecture Intake</h2>
+        <p style="color: var(--text-dim); font-size: 13px; max-width: 400px; margin: 0 auto;">
+          Describe your application architecture. Each response is analyzed to fill constraint channels.
+          The agent will ask targeted follow-up questions until all channels reach 80% resolution.
+        </p>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div style="padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface);">
+      <div style="display: flex; gap: 12px; align-items: flex-end;">
+        <textarea id="user-input" rows="3" placeholder="Describe your architecture decisions..."
+          style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px 16px; color: var(--text); font-size: 14px; font-family: 'IBM Plex Sans', sans-serif;
+            resize: none; outline: none; transition: border-color 0.2s; line-height: 1.5;"
+          onfocus="this.style.borderColor='var(--accent)'"
+          onblur="this.style.borderColor='var(--border)'"
+        ></textarea>
+        <button id="send-btn" class="btn btn-primary" onclick="sendMessage()" style="height: 48px; padding: 0 24px;">
+          Send
+        </button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        <span style="font-size: 11px; color: var(--text-muted);">
+          Press <kbd style="background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-size: 10px; border: 1px solid var(--border);">Shift+Enter</kbd> for newline,
+          <kbd style="background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-size: 10px; border: 1px solid var(--border);">Enter</kbd> to send
+        </span>
+        <span id="analysis-indicator" style="font-size: 11px; color: var(--text-muted); display: none;">
+          <span class="animate-pulse">Analyzing...</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side panel: channels + updates -->
+  <div style="display: flex; flex-direction: column; overflow-y: auto; background: var(--surface);">
+    <!-- Density header -->
+    <div style="padding: 20px; border-bottom: 1px solid var(--border); text-align: center;">
+      <div class="density-ring" id="intake-density-ring" style="margin: 0 auto 8px;"></div>
+      <div id="intake-complete-badge" style="display: none; font-size: 13px; color: var(--green); font-weight: 600; margin-top: 8px;">
+        ✓ All channels resolved
+      </div>
+    </div>
+
+    <!-- Channel resolution -->
+    <div style="padding: 16px 20px;">
+      <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 12px;">
+        Channel Resolution
+      </div>
+      <div id="intake-channels"></div>
+    </div>
+
+    <!-- Latest updates -->
+    <div style="padding: 16px 20px; border-top: 1px solid var(--border); flex: 1;">
+      <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 12px;">
+        Latest Updates
+      </div>
+      <div id="latest-updates" style="font-size: 12px; color: var(--text-muted);">
+        Send a message to begin
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="padding: 16px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+      <a href="/spec" class="btn btn-ghost" style="text-decoration: none; text-align: center; width: 100%;">
+        View Specification
+      </a>
+      <button class="btn btn-danger" onclick="resetAndRestart()" style="width: 100%;">
+        Reset Intake
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let isProcessing = false;
+
+// Key handler
+document.getElementById('user-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function appendMessage(role, text, meta = {}) {
+  const chat = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'animate-in';
+  const isAgent = role === 'agent';
+  const align = isAgent ? 'flex-start' : 'flex-end';
+  const bg = isAgent ? 'var(--surface2)' : 'rgba(96,165,250,0.12)';
+  const border = isAgent ? 'var(--border)' : 'rgba(96,165,250,0.25)';
+  const maxW = '85%';
+
+  let metaHtml = '';
+  if (meta.updates && meta.updates.length) {
+    metaHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${border};font-size:11px;">`;
+    meta.updates.forEach(u => {
+      const color = u.resolution >= 0.8 ? 'var(--green)' : u.resolution >= 0.5 ? 'var(--orange)' : 'var(--red)';
+      metaHtml += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+        <span style="color:${color};font-weight:600;" class="mono">${u.channel}.${u.sub}</span>
+        <span style="color:var(--text-muted);">→</span>
+        <span style="color:${color};" class="mono">${Math.round(u.resolution*100)}%</span>
+        <span style="color:var(--text-dim);">${u.constraint}</span>
+      </div>`;
+    });
+    metaHtml += '</div>';
+  }
+  if (meta.ambiguities && meta.ambiguities.length) {
+    metaHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(251,191,36,0.2);font-size:11px;">`;
+    meta.ambiguities.forEach(a => {
+      metaHtml += `<div style="color:var(--orange);margin-bottom:3px;">⚠ "${a.text}" — ${a.reason}</div>`;
+    });
+    metaHtml += '</div>';
+  }
+  if (meta.method) {
+    metaHtml += `<div style="margin-top:6px;font-size:10px;color:var(--text-muted);">
+      Analyzed by <span class="mono" style="color:var(--purple);">${meta.method}</span>
+      ${meta.density_score !== undefined ? `· Density: <span class="mono" style="color:var(--accent);">${Math.round(meta.density_score*100)}%</span>` : ''}
+    </div>`;
+  }
+
+  div.innerHTML = `
+    <div style="display:flex;justify-content:${align};margin-bottom:16px;">
+      <div style="max-width:${maxW};background:${bg};border:1px solid ${border};border-radius:12px;padding:14px 18px;">
+        <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">
+          ${isAgent ? '🤖 Agent' : '👤 You'}
+        </div>
+        <div style="font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;">${escapeHtml(text)}</div>
+        ${metaHtml}
+      </div>
+    </div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function sendMessage() {
+  if (isProcessing) return;
+  const input = document.getElementById('user-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  isProcessing = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('analysis-indicator').style.display = 'inline';
+
+  appendMessage('user', msg);
+
+  try {
+    const r = await fetch('/api/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, sid: SID}),
+    });
+    const data = await r.json();
+
+    // Update side panel
+    updateSidePanel(data);
+
+    // Show agent response
+    if (data.next_question) {
+      appendMessage('agent', data.next_question);
+    }
+    if (data.is_complete) {
+      appendMessage('agent', '✓ All channels resolved to ≥80%. Your Dense Architecture Specification is ready.', {});
+      document.getElementById('intake-complete-badge').style.display = 'block';
+    }
+
+    // Show updates inline on the user message
+    const lastUserMsg = document.querySelectorAll('#chat-messages > div');
+    // Re-render with meta
+    const lastDiv = lastUserMsg[lastUserMsg.length - (data.next_question ? 2 : 1)];
+    if (lastDiv && data.updates.length) {
+      // Already sent — append via new message
+    }
+
+    // Update nav density
+    document.getElementById('density-badge').textContent = (data.density_score * 100).toFixed(1) + '%';
+
+    // Render latest updates
+    renderLatestUpdates(data.updates, data.ambiguities, data.method, data.density_score);
+
+  } catch (e) {
+    appendMessage('agent', 'Error processing response. Please try again.');
+    console.error(e);
+  } finally {
+    isProcessing = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('analysis-indicator').style.display = 'none';
+    input.focus();
+  }
+}
+
+function updateSidePanel(data) {
+  // Density ring
+  renderDensityRing('intake-density-ring', data.density_score);
+
+  // Channels
+  renderChannelBars('intake-channels', data.channels);
+}
+
+function renderLatestUpdates(updates, ambiguities, method, density) {
+  const el = document.getElementById('latest-updates');
+  if (!updates.length && !ambiguities.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);">No dimensions updated from this response</div>';
+    return;
+  }
+  let html = '';
+  updates.forEach(u => {
+    const color = u.resolution >= 0.8 ? 'var(--green)' : 'var(--orange)';
+    html += `<div style="padding:4px 0;display:flex;gap:8px;align-items:baseline;">
+      <span class="mono" style="color:${color};font-weight:600;font-size:11px;">${Math.round(u.resolution*100)}%</span>
+      <span style="color:var(--text-dim);">${u.channel}.${u.sub}</span>
+    </div>
+    <div style="color:var(--text-muted);font-size:11px;margin-bottom:6px;padding-left:40px;">${u.constraint}</div>`;
+  });
+  ambiguities.forEach(a => {
+    html += `<div style="color:var(--orange);padding:4px 0;font-size:11px;">⚠ ${a.reason}</div>`;
+  });
+  html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--text-muted);font-size:10px;">
+    via <span class="mono" style="color:var(--purple);">${method}</span>
+  </div>`;
+  el.innerHTML = html;
+}
+
+async function resetAndRestart() {
+  if (!confirm('Reset all intake data?')) return;
+  await fetch('/api/reset', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sid: SID}),
+  });
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('latest-updates').innerHTML = '<div style="color:var(--text-muted);">Send a message to begin</div>';
+  document.getElementById('intake-complete-badge').style.display = 'none';
+  initIntake();
+}
+
+async function initIntake() {
+  try {
+    const r = await fetch('/api/first-question?sid=' + SID);
+    const data = await r.json();
+    appendMessage('agent', data.question);
+    // Load initial channels
+    const status = await fetchStatus();
+    if (status) {
+      renderDensityRing('intake-density-ring', status.density_score);
+      renderChannelBars('intake-channels', status.channels);
+    }
+  } catch(e) { console.error(e); }
+}
+
+// Load history or start fresh
+(async () => {
+  try {
+    const r = await fetch('/api/history?sid=' + SID);
+    const data = await r.json();
+    if (data.history.length > 0) {
+      data.history.forEach(h => {
+        appendMessage(h.role, h.message, {
+          updates: h.updates,
+          ambiguities: h.ambiguities,
+          method: h.method,
+          density_score: h.density_after,
+        });
+      });
+      const status = await fetchStatus();
+      if (status) {
+        renderDensityRing('intake-density-ring', status.density_score);
+        renderChannelBars('intake-channels', status.channels);
+      }
+    } else {
+      initIntake();
+    }
+  } catch(e) { initIntake(); }
+})();
+</script>
+{% endblock %}
