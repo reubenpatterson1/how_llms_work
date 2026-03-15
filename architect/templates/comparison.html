@@ -21,8 +21,8 @@
         <div style="font-size: 36px; margin-bottom: 16px;">⊗</div>
         <h3 style="margin-bottom: 8px;">Run Comparative Analysis</h3>
         <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 24px;">
-          This will generate 5 outputs from a vague prompt and 5 from your dense specification,
-          then compare hallucination, consistency, and quality metrics.
+          Sends the same prompt to your configured LLM with and without the dense spec,
+          then compares hallucination, consistency, and quality metrics across runs.
         </p>
         <div style="margin-bottom: 16px;">
           <label style="font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 6px; text-align: left;">Vague Prompt</label>
@@ -31,20 +31,42 @@
               padding: 10px 14px; color: var(--text); font-size: 13px; font-family: 'IBM Plex Sans', sans-serif;
               outline: none;" />
         </div>
+        <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: center; justify-content: center;">
+          <label style="font-size: 12px; color: var(--text-dim);">Iterations:</label>
+          <select id="iterations" style="background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 12px; color: var(--text); font-size: 13px;">
+            <option value="1">1 (quick)</option>
+            <option value="2">2</option>
+            <option value="3" selected>3 (default)</option>
+            <option value="5">5 (thorough)</option>
+          </select>
+          <div id="provider-label" style="font-size: 11px; color: var(--text-muted);">
+            Loading provider...
+          </div>
+        </div>
         <button id="run-btn" class="btn btn-primary" onclick="runComparison()" style="padding: 10px 32px;">
-          Run Comparison (5 iterations)
+          Run Comparison
         </button>
       </div>
     </div>
     <div id="comparison-loading" style="display: none;">
-      <div class="animate-pulse" style="font-size: 16px; color: var(--accent); padding: 48px;">
-        Running 10 iterations (5 vague + 5 dense)...
+      <div style="padding: 48px; text-align: center;">
+        <div class="animate-pulse" style="font-size: 16px; color: var(--accent); margin-bottom: 12px;">
+          <span id="loading-message">Running comparison...</span>
+        </div>
+        <div id="loading-timer" class="mono" style="font-size: 13px; color: var(--text-muted);">0.0s</div>
+        <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+          Each iteration sends a full prompt to the LLM — this may take a minute.
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Results -->
   <div id="comparison-results" style="display: none;">
+    <!-- Run info -->
+    <div id="run-info" style="text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 16px;"></div>
+
     <!-- Delta cards -->
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;">
       <div class="card" style="text-align: center;">
@@ -119,22 +141,53 @@
 </div>
 
 <script>
+let loadingTimer = null;
+let loadingStart = 0;
+
+// Load provider info on page load
+(async () => {
+  try {
+    const r = await fetch('/api/status?sid=' + SID);
+    const data = await r.json();
+    const label = document.getElementById('provider-label');
+    if (data.provider === 'regex') {
+      label.innerHTML = '<span style="color:var(--orange);">Using mock data (regex provider)</span>';
+    } else if (data.provider_available) {
+      label.innerHTML = `<span style="color:var(--green);">Using ${data.model || data.provider}</span>`;
+    } else {
+      label.innerHTML = `<span style="color:var(--red);">${data.provider} offline — will use mock data</span>`;
+    }
+  } catch(e) {}
+})();
+
 async function runComparison() {
   document.getElementById('comparison-placeholder').style.display = 'none';
   document.getElementById('comparison-loading').style.display = 'block';
   document.getElementById('comparison-results').style.display = 'none';
 
   const vaguePrompt = document.getElementById('vague-prompt').value;
+  const iterations = parseInt(document.getElementById('iterations').value);
+  const msg = document.getElementById('loading-message');
+  msg.textContent = `Running ${iterations * 2} LLM calls (${iterations} vague + ${iterations} dense)...`;
+
+  // Start timer
+  loadingStart = performance.now();
+  loadingTimer = setInterval(() => {
+    const el = document.getElementById('loading-timer');
+    if (el) el.textContent = ((performance.now() - loadingStart) / 1000).toFixed(1) + 's';
+  }, 100);
 
   try {
     const r = await fetch('/api/compare', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({vague_prompt: vaguePrompt, sid: SID}),
+      body: JSON.stringify({vague_prompt: vaguePrompt, iterations: iterations, sid: SID}),
     });
     const data = await r.json();
+    clearInterval(loadingTimer);
     renderResults(data);
   } catch(e) {
+    clearInterval(loadingTimer);
     console.error(e);
     document.getElementById('comparison-loading').style.display = 'none';
     document.getElementById('comparison-placeholder').style.display = 'block';
@@ -145,6 +198,18 @@ async function runComparison() {
 function renderResults(data) {
   document.getElementById('comparison-loading').style.display = 'none';
   document.getElementById('comparison-results').style.display = 'block';
+
+  const elapsed = ((performance.now() - loadingStart) / 1000).toFixed(1);
+
+  // Update header with run info
+  const infoEl = document.getElementById('run-info');
+  if (infoEl) {
+    const usingReal = data.using_real_llm;
+    const provider = data.model || data.provider || 'mock';
+    infoEl.innerHTML = `<span class="mono" style="color:${usingReal ? 'var(--green)' : 'var(--orange)'};">
+      ${usingReal ? '🔴 Live' : '🟡 Mock'}</span>
+      ${provider} · ${data.iterations} iterations · ${elapsed}s`;
+  }
 
   // Deltas
   const d = data.deltas;
@@ -157,9 +222,14 @@ function renderResults(data) {
   renderMetrics('vague-metrics', data.vague.metrics, 'var(--red)');
   renderMetrics('dense-metrics', data.dense.metrics, 'var(--green)');
 
-  // Grounding
-  renderGrounding('vague-grounding', data.vague.outputs);
-  renderGrounding('dense-grounding', data.dense.outputs);
+  // Grounding / output preview
+  if (data.using_real_llm) {
+    renderOutputPreviews('vague-grounding', data.vague.outputs, 'vague');
+    renderOutputPreviews('dense-grounding', data.dense.outputs, 'dense');
+  } else {
+    renderGrounding('vague-grounding', data.vague.outputs);
+    renderGrounding('dense-grounding', data.dense.outputs);
+  }
 }
 
 function setDelta(id, value, invert) {
@@ -222,6 +292,33 @@ function renderGrounding(containerId, outputs) {
       <span class="mono" style="width: 50px; text-align: right; font-size: 12px; color: ${colors[key]};">${pct.toFixed(1)}%</span>
     </div>`;
   }).join('');
+}
+
+function renderOutputPreviews(containerId, outputs, label) {
+  const el = document.getElementById(containerId);
+  if (!outputs || !outputs.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);">No outputs generated</div>';
+    return;
+  }
+  el.innerHTML = outputs.map((o, i) => {
+    const text = o.raw_text || '';
+    const preview = text.length > 600 ? text.substring(0, 600) + '...' : text;
+    const decisions = Object.keys(o.grounding_breakdown || {}).length;
+    return `<details style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim);padding:4px 0;">
+        Run ${i+1} · ${text.length} chars
+      </summary>
+      <pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;
+        font-size:11px;line-height:1.5;overflow-x:auto;max-height:300px;overflow-y:auto;
+        color:var(--text);margin-top:4px;">${escapeHtml(preview)}</pre>
+    </details>`;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 </script>
 {% endblock %}

@@ -6,6 +6,7 @@ questions when available, falling back to generic templates.
 """
 
 import json
+import re
 import sys
 import requests
 from dataclasses import dataclass, field
@@ -114,10 +115,17 @@ class IntakeEngine:
         self._snapshots: list[dict] = []
         self._app_description: str = ""  # Accumulated context about the app
         self._llm_config = None  # Set externally by webapp
+        self._critical_channels: set[str] = set()  # Phase-aware: only these must hit threshold
+        self._asked_questions: list[str] = []  # Track questions to avoid repeats
 
     def set_llm_config(self, config):
         """Set the LLM config for contextual question generation."""
         self._llm_config = config
+
+    def set_critical_channels(self, channels: set[str]):
+        """Set which channels are critical for the current phase.
+        When set, is_complete() only checks these channels."""
+        self._critical_channels = channels
 
     def process_response(self, response: str) -> IntakeResult:
         updates = self.analyzer.analyze(response)
@@ -156,13 +164,28 @@ class IntakeEngine:
 
     def is_complete(self, threshold: float | None = None) -> bool:
         t = threshold if threshold is not None else self.threshold
+        if self._critical_channels:
+            # Phase-aware: only critical channels must hit threshold
+            return all(
+                ch.resolution >= t
+                for ch_id, ch in self.registry.channels.items()
+                if ch_id in self._critical_channels
+            )
         return all(ch.resolution >= t for ch in self.registry.channels.values())
 
     def get_snapshots(self) -> list[dict]:
         return list(self._snapshots)
 
     def _next_question(self) -> str:
-        unresolved = self.registry.get_unresolved(self.threshold)
+        # Only target critical channels if phase-aware
+        if self._critical_channels:
+            unresolved = [
+                ch for ch_id, ch in self.registry.channels.items()
+                if ch_id in self._critical_channels and ch.resolution < self.threshold
+            ]
+        else:
+            unresolved = self.registry.get_unresolved(self.threshold)
+
         if not unresolved:
             return "All channels resolved. Ready to generate specification."
 
@@ -173,11 +196,45 @@ class IntakeEngine:
         # Try LLM-generated contextual question first
         if self._app_description.strip() and self._llm_config:
             llm_question = self._generate_contextual_question(target)
-            if llm_question:
+            if llm_question and not self._is_repeat_question(llm_question):
+                self._asked_questions.append(llm_question)
                 return llm_question
 
         # Fall back to generic templates
-        return self._generic_question(target)
+        question = self._generic_question(target)
+        self._asked_questions.append(question)
+        return question
+
+    def _is_repeat_question(self, question: str) -> bool:
+        """Check if a question is too similar to one already asked."""
+        q_lower = question.lower().strip()
+        # Remove punctuation for comparison
+        q_clean = re.sub(r'[^\w\s]', '', q_lower)
+        q_words = set(q_clean.split())
+
+        for prev in self._asked_questions:
+            prev_lower = prev.lower().strip()
+            prev_clean = re.sub(r'[^\w\s]', '', prev_lower)
+            p_words = set(prev_clean.split())
+
+            # Exact or near-exact match
+            if q_clean == prev_clean:
+                return True
+
+            # Word overlap check (Jaccard > 0.6 = too similar)
+            if q_words and p_words:
+                overlap = len(q_words & p_words) / len(q_words | p_words)
+                if overlap > 0.6:
+                    return True
+
+                # Also check: do 80%+ of the shorter question's words appear in the longer?
+                shorter, longer = (q_words, p_words) if len(q_words) < len(p_words) else (p_words, q_words)
+                if shorter:
+                    containment = len(shorter & longer) / len(shorter)
+                    if containment > 0.8:
+                        return True
+
+        return False
 
     def _generate_contextual_question(self, target) -> str | None:
         """Use the LLM to generate a context-aware follow-up question."""

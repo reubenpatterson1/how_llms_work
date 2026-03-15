@@ -86,6 +86,9 @@ def _get_state(sid: str) -> dict:
         engine.set_llm_config(_global_config)
         phase = ProjectPhase.MVP  # Default phase
         judge = LLMJudge(registry, config=_global_config, phase=phase)
+        # Set phase-aware completion on engine
+        engine.threshold = judge.completion_threshold
+        engine.set_critical_channels(judge.critical_channels)
         _sessions[sid] = {
             "registry": registry,
             "engine": engine,
@@ -329,8 +332,9 @@ def api_set_phase():
     state["phase"] = phase
     state["judge"].phase = phase
 
-    # Update the engine's completion threshold to match phase
+    # Update the engine's completion threshold and critical channels to match phase
     state["engine"].threshold = state["judge"].completion_threshold
+    state["engine"].set_critical_channels(state["judge"].critical_channels)
 
     phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
 
@@ -399,17 +403,31 @@ def api_spec_download():
 
 @app.route("/api/compare", methods=["POST"])
 def api_compare():
-    """Run vague vs dense comparison."""
+    """Run vague vs dense comparison using the configured LLM provider."""
+    global _global_config
     data = request.get_json() or {}
     vague_prompt = data.get("vague_prompt", "Build me a task management API with real-time updates")
+    iterations = min(int(data.get("iterations", 3)), 5)  # Cap at 5
     sid = data.get("sid", session.get("sid", "default"))
     state = _get_state(sid)
 
     gen = SpecGenerator(state["registry"])
     dense_spec = gen.generate()
 
-    comp = Comparator(MockLLM(), iterations=5)
+    # Use real LLM if provider is available and not regex
+    from .comparator import Comparator, RealLLM
+    judge = state["judge"]
+    if _global_config.type != ProviderType.REGEX and judge.provider_available:
+        comp = Comparator(config=_global_config, iterations=iterations)
+    else:
+        # Fall back to mock for demo purposes
+        from .mock_llm import MockLLM
+        comp = Comparator(MockLLM(), iterations=min(iterations, 5))
+
     results = comp.run(vague_prompt, dense_spec)
+    results["spec_used"] = dense_spec[:500] + "..." if len(dense_spec) > 500 else dense_spec
+    results["provider"] = _global_config.type.value
+    results["model"] = _global_config.model
 
     return jsonify(results)
 
