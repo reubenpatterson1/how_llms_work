@@ -104,12 +104,18 @@ async function refreshDashboard() {
 
   const eng = document.getElementById('stat-engine');
   const engD = document.getElementById('stat-engine-detail');
-  if (data.ollama_available) {
-    eng.innerHTML = '<span style="color:var(--green)">llama3.2</span>';
-    engD.textContent = 'Local LLM active via Ollama';
-  } else {
+  if (data.provider === 'regex') {
     eng.innerHTML = '<span style="color:var(--orange)">Regex</span>';
     engD.textContent = 'Pattern matching fallback';
+  } else if (data.provider_available) {
+    eng.innerHTML = `<span style="color:var(--green)">${data.model || data.provider}</span>`;
+    engD.textContent = data.provider === 'ollama' ? 'Local LLM active via Ollama'
+      : data.provider === 'openai' ? 'OpenAI API connected'
+      : data.provider === 'anthropic' ? 'Anthropic API connected'
+      : `${data.provider} connected`;
+  } else {
+    eng.innerHTML = `<span style="color:var(--red)">${data.provider} (offline)</span>`;
+    engD.textContent = 'Provider unavailable — falling back to regex';
   }
 
   // Constraints

@@ -2,6 +2,15 @@
 {% set active_page = "intake" %}
 {% block title %}Intake — Architecture Agent{% endblock %}
 
+{% block extra_head %}
+<style>
+  @keyframes thinkPulse {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1.2); }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div style="display: grid; grid-template-columns: 1fr 380px; height: calc(100vh - 56px);">
   <!-- Chat panel -->
@@ -38,7 +47,7 @@
           <kbd style="background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-size: 10px; border: 1px solid var(--border);">Enter</kbd> to send
         </span>
         <span id="analysis-indicator" style="font-size: 11px; color: var(--text-muted); display: none;">
-          <span class="animate-pulse">Analyzing...</span>
+          <span class="animate-pulse">⏳ Analyzing via <span id="analysis-method-label" class="mono" style="color:var(--purple);">LLM</span>...</span>
         </span>
       </div>
     </div>
@@ -153,6 +162,81 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function showThinkingBubble() {
+  const chat = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.id = 'thinking-bubble';
+  div.className = 'animate-in';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:flex-start;margin-bottom:16px;">
+      <div style="max-width:85%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+        <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">
+          🤖 Agent
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="display:flex;gap:4px;align-items:center;">
+            <span class="thinking-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:thinkPulse 1.4s ease-in-out infinite;"></span>
+            <span class="thinking-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:thinkPulse 1.4s ease-in-out 0.2s infinite;"></span>
+            <span class="thinking-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:thinkPulse 1.4s ease-in-out 0.4s infinite;"></span>
+          </div>
+          <span id="thinking-label" style="font-size:13px;color:var(--text-dim);">
+            Analyzing with <span id="thinking-model" class="mono" style="color:var(--purple);">LLM</span>...
+          </span>
+        </div>
+        <div id="thinking-timer" style="font-size:11px;color:var(--text-muted);margin-top:8px;font-family:'IBM Plex Mono',monospace;">
+          0.0s
+        </div>
+      </div>
+    </div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function removeThinkingBubble() {
+  const bubble = document.getElementById('thinking-bubble');
+  if (bubble) bubble.remove();
+}
+
+let thinkingTimer = null;
+let thinkingStart = 0;
+
+function startThinkingTimer() {
+  thinkingStart = performance.now();
+  thinkingTimer = setInterval(() => {
+    const el = document.getElementById('thinking-timer');
+    if (el) {
+      const elapsed = ((performance.now() - thinkingStart) / 1000).toFixed(1);
+      el.textContent = elapsed + 's';
+    }
+  }, 100);
+}
+
+function stopThinkingTimer() {
+  if (thinkingTimer) {
+    clearInterval(thinkingTimer);
+    thinkingTimer = null;
+  }
+}
+
+function setProcessingState(active) {
+  const dot = document.getElementById('llm-status-dot');
+  const txt = document.getElementById('llm-status-text');
+  const sendBtn = document.getElementById('send-btn');
+  if (active) {
+    dot.className = 'status-dot online';
+    dot.style.animation = 'pulse 1s ease-in-out infinite';
+    txt.textContent = 'Processing...';
+    txt.style.color = 'var(--accent)';
+    sendBtn.disabled = true;
+    sendBtn.textContent = '...';
+  } else {
+    dot.style.animation = '';
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send';
+    fetchStatus(); // restore normal status
+  }
+}
+
 async function sendMessage() {
   if (isProcessing) return;
   const input = document.getElementById('user-input');
@@ -161,10 +245,25 @@ async function sendMessage() {
 
   input.value = '';
   isProcessing = true;
-  document.getElementById('send-btn').disabled = true;
   document.getElementById('analysis-indicator').style.display = 'inline';
+  setProcessingState(true);
 
   appendMessage('user', msg);
+
+  // Show thinking bubble and start timer
+  // First check what method will be used
+  const methodLabel = document.getElementById('analysis-method-label');
+  const thinkingModel = document.getElementById('thinking-model');
+  try {
+    const statusR = await fetch('/api/ollama/status?sid=' + SID);
+    const statusData = await statusR.json();
+    const methodName = statusData.available ? statusData.model : 'regex';
+    if (methodLabel) methodLabel.textContent = methodName;
+    if (thinkingModel) thinkingModel.textContent = methodName;
+  } catch(e) {}
+
+  showThinkingBubble();
+  startThinkingTimer();
 
   try {
     const r = await fetch('/api/send', {
@@ -174,24 +273,26 @@ async function sendMessage() {
     });
     const data = await r.json();
 
+    // Remove thinking bubble
+    stopThinkingTimer();
+    removeThinkingBubble();
+
     // Update side panel
     updateSidePanel(data);
 
-    // Show agent response
+    // Show agent response with analysis meta
+    if (data.updates.length) {
+      appendMessage('agent',
+        `Extracted ${data.updates.length} constraint${data.updates.length > 1 ? 's' : ''} via ${data.method}. Density: ${Math.round(data.density_score * 100)}%`,
+        { updates: data.updates, ambiguities: data.ambiguities, method: data.method, density_score: data.density_score }
+      );
+    }
     if (data.next_question) {
       appendMessage('agent', data.next_question);
     }
     if (data.is_complete) {
       appendMessage('agent', '✓ All channels resolved to ≥80%. Your Dense Architecture Specification is ready.', {});
       document.getElementById('intake-complete-badge').style.display = 'block';
-    }
-
-    // Show updates inline on the user message
-    const lastUserMsg = document.querySelectorAll('#chat-messages > div');
-    // Re-render with meta
-    const lastDiv = lastUserMsg[lastUserMsg.length - (data.next_question ? 2 : 1)];
-    if (lastDiv && data.updates.length) {
-      // Already sent — append via new message
     }
 
     // Update nav density
@@ -201,22 +302,37 @@ async function sendMessage() {
     renderLatestUpdates(data.updates, data.ambiguities, data.method, data.density_score);
 
   } catch (e) {
+    stopThinkingTimer();
+    removeThinkingBubble();
     appendMessage('agent', 'Error processing response. Please try again.');
     console.error(e);
   } finally {
     isProcessing = false;
-    document.getElementById('send-btn').disabled = false;
+    setProcessingState(false);
     document.getElementById('analysis-indicator').style.display = 'none';
     input.focus();
   }
 }
 
-function updateSidePanel(data) {
-  // Density ring
+async function updateSidePanel(data) {
+  // Immediately render from send response
+  console.log('[Side Panel] Updating with density:', data.density_score, 'channels:', JSON.stringify(data.channels));
   renderDensityRing('intake-density-ring', data.density_score);
+  if (data.channels) {
+    renderChannelBars('intake-channels', data.channels);
+  }
 
-  // Channels
-  renderChannelBars('intake-channels', data.channels);
+  // Then fetch authoritative full status from server to catch any discrepancies
+  try {
+    const r = await fetch('/api/status?sid=' + SID);
+    const full = await r.json();
+    console.log('[Side Panel] Full status density:', full.density_score);
+    renderDensityRing('intake-density-ring', full.density_score);
+    renderChannelBars('intake-channels', full.channels);
+    document.getElementById('density-badge').textContent = (full.density_score * 100).toFixed(1) + '%';
+  } catch(e) {
+    console.warn('[Side Panel] Full status fetch failed, using send data', e);
+  }
 }
 
 function renderLatestUpdates(updates, ambiguities, method, density) {

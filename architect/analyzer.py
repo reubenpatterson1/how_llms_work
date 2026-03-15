@@ -247,11 +247,20 @@ PATTERN_REGISTRY: list[tuple[str, str, str, float, str]] = [
     (r"\bon\s+(?:PR|merge\s+to\s+main)\b", "testing", "ci_integration", 0.8, "CI: trigger conditions specified"),
 
     # ── Purpose ──
+    # Objective: match "building/creating/developing a <type> for <users>"
+    (r"\b(?:build(?:ing)?|creat(?:e|ing)|develop(?:ing)?)\s+(?:a\s+)?(\w+[\w\s]*?)(?:\s+(?:for|to|that))\b", "purpose", "objective", 0.6, "Objective: application described"),
     (r"\btask\s+manag", "purpose", "objective", 0.6, "Objective: task management"),
     (r"\b(?:e[- ]?commerce|shop|store|marketplace)\b", "purpose", "objective", 0.6, "Objective: e-commerce"),
     (r"\b(?:chat|messaging|communication)\s+(?:app|platform|system)\b", "purpose", "objective", 0.6, "Objective: messaging"),
     (r"\b(?:CRM|customer\s+relationship)\b", "purpose", "objective", 0.6, "Objective: CRM"),
     (r"\b(?:analytics|dashboard|reporting)\s+(?:platform|tool|system)\b", "purpose", "objective", 0.6, "Objective: analytics"),
+    (r"\b(?:portal|platform|application|app|system|tool|service)\b", "purpose", "objective", 0.5, "Objective: application type identified"),
+    (r"\b(?:document|file|upload|review|summary|summariz)\w*\s+(?:portal|platform|system|app|tool)\b", "purpose", "objective", 0.6, "Objective: document processing"),
+    (r"\b(?:RAG|retrieval[- ]?augmented|vector\s+(?:db|database|store))\b", "tech_stack", "database", 0.7, "Database: vector store / RAG"),
+    (r"\b(?:pinecone|Pinecone|weaviate|Weaviate|chromadb|Chroma|qdrant|Qdrant|pgvector|Milvus)\b", "tech_stack", "database", 0.9, "Database: vector database specified"),
+    (r"\b(?:embed(?:ding)?s?|vectoriz)\b", "data_model", "entities", 0.6, "Entity: vector embeddings"),
+    # User/domain identification
+    (r"\bfor\s+(?:lawyers?|developers?|doctors?|nurses?|teachers?|students?|engineers?|managers?|users?|customers?|clients?|admins?)\b", "purpose", "users", 0.6, "Users: target audience identified"),
     (r"\breal[- ]?time\b", "purpose", "scope", 0.5, "Scope: real-time features"),
     (r"\bcollabora", "purpose", "scope", 0.5, "Scope: collaboration features"),
     (r"\b(?:initial|v1|MVP|first)\s+release\b", "purpose", "scope", 0.7, "Scope: initial release boundary"),
@@ -264,25 +273,26 @@ PATTERN_REGISTRY: list[tuple[str, str, str, float, str]] = [
     (r"\bsub[- ]?\d+\s*ms\b", "purpose", "success_criteria", 0.7, "Success: latency criteria specified"),
     (r"\bsuccess\s+(?:means|criteria|metric)\b", "purpose", "success_criteria", 0.7, "Success criteria defined"),
     (r"\b(?:solve|problem|pain\s+point)\b.*\b(?:for|with)\b", "purpose", "objective", 0.6, "Objective: problem statement"),
+    # Scope: feature lists (e.g., "upload documents", "provide summaries")
+    (r"\b(?:upload|download|import|export|generate|provide|create|manage|review|analyze)\s+\w+", "purpose", "scope", 0.5, "Scope: feature identified"),
+    # Domain-specific entity patterns
+    (r"\b(?:document|file|attachment|pdf|upload)s?\b", "data_model", "entities", 0.5, "Entity: documents/files"),
+    (r"\b(?:source|reference|citation|archive)s?\b", "data_model", "entities", 0.5, "Entity: sources/references"),
+    (r"\b(?:user|account|profile|member)s?\b", "data_model", "entities", 0.5, "Entity: users/accounts"),
 ]
 
 # Ambiguity patterns: (regex, channel_id, reason)
+# Only flag genuinely problematic vagueness, not natural language patterns.
 AMBIGUITY_PATTERNS: list[tuple[str, str, str]] = [
-    (r"\bsome\s+(?:kind|sort|type)\s+of\b", "", "Vague qualifier: 'some kind of' — specify exactly"),
-    (r"\bmaybe\b", "", "Uncertain: 'maybe' — commit to a decision"),
-    (r"\bsimple\b", "", "Ambiguous: 'simple' is subjective — specify constraints"),
-    (r"\bbasic\b", "", "Ambiguous: 'basic' is subjective — specify what's included/excluded"),
-    (r"\bprobably\b", "", "Uncertain: 'probably' — confirm the requirement"),
-    (r"\bstandard\b", "", "Ambiguous: 'standard' — specify which standard"),
-    (r"\bnormal\b", "", "Ambiguous: 'normal' — define the expected behavior"),
-    (r"\betc\.?\b", "", "Incomplete: 'etc.' — enumerate all items explicitly"),
-    (r"\band\s+(?:so\s+on|stuff|things)\b", "", "Incomplete: vague list terminator — enumerate explicitly"),
-    (r"\bwhatever\b", "", "Dismissive: 'whatever' — this dimension needs a decision"),
-    (r"\bdefault\b", "", "Unspecified: 'default' — state the explicit value"),
-    (r"\bI\s+(?:guess|think|suppose)\b", "", "Uncertain: hedging — commit to a requirement"),
-    (r"\bsomething\s+like\b", "", "Vague: 'something like' — specify exactly"),
-    (r"\bfigure\s+(?:it\s+)?out\s+later\b", "", "Deferred: deferring decisions creates hallucination surface"),
-    (r"\bdon'?t\s+(?:care|matter|mind)\b", "", "Unspecified: every unresolved dimension is a hallucination vector"),
+    (r"\bsome\s+(?:kind|sort|type)\s+of\b", "", "Vague qualifier — specify the exact technology or approach"),
+    (r"\bmaybe\b", "", "Uncertain — commit to a decision to reduce hallucination surface"),
+    (r"\bprobably\b", "", "Uncertain — confirm the requirement"),
+    (r"\bwhatever\b", "", "Dismissive — this dimension needs a decision"),
+    (r"\bI\s+(?:guess|think|suppose)\b", "", "Uncertain — commit to a specific requirement"),
+    (r"\bsomething\s+like\b", "", "Vague — specify exactly what you need"),
+    (r"\bfigure\s+(?:it\s+)?out\s+later\b", "", "Deferred — deferring decisions creates hallucination surface"),
+    (r"\bdon'?t\s+(?:care|matter|mind)\b", "", "Unspecified — every unresolved dimension is a hallucination vector"),
+    (r"\band\s+(?:so\s+on|stuff|things)\b", "", "Vague list terminator — enumerate the remaining items"),
 ]
 
 
