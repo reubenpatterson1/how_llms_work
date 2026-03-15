@@ -23,9 +23,45 @@ from .analyzer import ResponseAnalyzer, DimensionUpdate, Ambiguity
 from .channels import ChannelRegistry
 
 
-# ── System prompt shared across all LLM providers ──
+# ── Project phases ──
 
-SYSTEM_PROMPT = """You are an architecture intake analyst. Extract ONLY what the user EXPLICITLY stated. NEVER infer, assume, or fill in technologies, patterns, or decisions the user did not mention.
+class ProjectPhase(str, Enum):
+    POC = "poc"
+    MVP = "mvp"
+    PREPROD = "preprod"
+
+PROJECT_PHASE_LABELS = {
+    ProjectPhase.POC: "Proof of Concept",
+    ProjectPhase.MVP: "Minimum Viable Product",
+    ProjectPhase.PREPROD: "Pre-Production",
+}
+
+# Channels that are critical vs optional per phase
+# Critical channels MUST reach threshold; optional channels get a scoring boost
+PHASE_CHANNEL_WEIGHTS = {
+    ProjectPhase.POC: {
+        "critical": {"purpose", "tech_stack", "data_model"},
+        "optional": {"auth", "deployment", "error_handling", "performance", "security", "testing"},
+        # PoC: focus on proving concept works; skip ops concerns
+    },
+    ProjectPhase.MVP: {
+        "critical": {"purpose", "data_model", "api", "tech_stack", "auth"},
+        "optional": {"error_handling", "performance", "security", "testing"},
+        # MVP: need working product with auth, but ops can be basic
+    },
+    ProjectPhase.PREPROD: {
+        "critical": {"purpose", "data_model", "api", "tech_stack", "auth",
+                     "deployment", "error_handling", "performance", "security", "testing"},
+        "optional": set(),
+        # Pre-prod: everything matters
+    },
+}
+
+
+# ── System prompt shared across all LLM providers ──
+# Built dynamically per phase via build_system_prompt()
+
+_SYSTEM_PROMPT_BASE = """You are an architecture intake analyst. Extract ONLY what the user EXPLICITLY stated. NEVER infer, assume, or fill in technologies, patterns, or decisions the user did not mention.
 
 CRITICAL RULES:
 - ONLY extract information the user EXPLICITLY stated or clearly implied
@@ -35,7 +71,6 @@ CRITICAL RULES:
 - If the user says "RAG vector DB" but no specific product → extract at 0.5 (mentioned, not specified)
 - NEVER output technologies the user didn't name (no inventing Express.js, Redis, JWT, Sentry, etc.)
 - NEVER assume an architecture pattern the user didn't describe
-- A resolution of 0.8+ requires the user to have given SPECIFIC, CONCRETE details
 - DO extract every distinct piece of information the user provided — enumerate entities, features, sources separately
 - If the user lists examples like "discovery, appeal, arraignment" → extract those as scope details at 0.6
 
@@ -53,44 +88,132 @@ The 10 channels and their sub-dimensions are:
 
 Output format — a JSON array of updates for things ACTUALLY stated:
 [
-  {
+  {{
     "channel": "<channel_id lowercase>",
     "sub": "<sub_dimension>",
     "resolution": <float 0.0-1.0>,
     "constraint": "<quote or close paraphrase of what the user said>"
-  }
+  }}
 ]
 
-Resolution scoring — be STRICT:
-- 0.3-0.4: Topic area touched but nothing specific ("I need a portal")
-- 0.5: Mentioned with some context ("document summary portal for lawyers")
-- 0.6: Partially described ("upload documents for discovery, appeal, arraignment hearings")
-- 0.7: Well described with multiple specifics ("RAG vector DB with Google Scholar, FindLaw, CourtListener sources")
-- 0.8: Precisely specified with exact values, versions, or configurations
-- 0.9: Fully specified with implementation details
-- 1.0: Exhaustively specified with edge cases
+{phase_scoring}
 
 Also identify things the user mentioned vaguely that need follow-up:
 [
-  {"text": "<the vague phrase>", "channel": "<channel_id>", "reason": "<what specifically needs clarification>"}
+  {{"text": "<the vague phrase>", "channel": "<channel_id>", "reason": "<what specifically needs clarification>"}}
 ]
 
-Return ONLY valid JSON: {"updates": [...], "ambiguities": [...]}
+Return ONLY valid JSON: {{"updates": [...], "ambiguities": [...]}}
 
 EXAMPLE — User says: "I'm building a recipe sharing app for home cooks to upload photos and rate dishes, using Supabase"
 Correct output:
-{"updates": [
-  {"channel": "purpose", "sub": "objective", "resolution": 0.5, "constraint": "recipe sharing app"},
-  {"channel": "purpose", "sub": "users", "resolution": 0.6, "constraint": "home cooks"},
-  {"channel": "purpose", "sub": "scope", "resolution": 0.5, "constraint": "upload photos, rate dishes"},
-  {"channel": "data_model", "sub": "entities", "resolution": 0.5, "constraint": "recipes, photos, ratings, users"},
-  {"channel": "tech_stack", "sub": "database", "resolution": 0.7, "constraint": "Supabase"}
+{{"updates": [
+  {{"channel": "purpose", "sub": "objective", "resolution": 0.5, "constraint": "recipe sharing app"}},
+  {{"channel": "purpose", "sub": "users", "resolution": 0.6, "constraint": "home cooks"}},
+  {{"channel": "purpose", "sub": "scope", "resolution": 0.5, "constraint": "upload photos, rate dishes"}},
+  {{"channel": "data_model", "sub": "entities", "resolution": 0.5, "constraint": "recipes, photos, ratings, users"}},
+  {{"channel": "tech_stack", "sub": "database", "resolution": 0.7, "constraint": "Supabase"}}
 ], "ambiguities": [
-  {"text": "rate dishes", "channel": "data_model", "reason": "rating scale not specified (1-5 stars? thumbs up/down?)"}
-]}
+  {{"text": "rate dishes", "channel": "data_model", "reason": "rating scale not specified (1-5 stars? thumbs up/down?)"}}
+]}}
 WRONG: Do NOT add auth, deployment, testing, etc. updates — the user didn't mention those topics.
 
+{phase_example}
+
 Remember: extract ONLY what was said. Omit channels the user didn't address at all."""
+
+
+# ── Phase-specific scoring instructions ──
+
+PHASE_SCORING = {
+    ProjectPhase.POC: """Resolution scoring — PoC / Proof of Concept calibration:
+This is a PROOF OF CONCEPT. The goal is to validate feasibility, NOT production readiness.
+Score decisions generously — a PoC doesn't need exhaustive detail.
+
+- 0.3-0.4: Topic area barely touched ("I need something")
+- 0.5: Mentioned with basic context ("a portal for lawyers")
+- 0.6-0.7: Described with enough detail to prototype ("upload docs, RAG with vector DB")
+- 0.8: A CLEAR decision, even if simple ("No auth for PoC", "SQLite for now", "No versioning")
+- 0.9: Specific enough to implement immediately ("ChromaDB local, cosine similarity")
+- 1.0: Fully nailed down
+
+IMPORTANT for PoC:
+- "Not needed for PoC" or "Skip for now" = 0.9 (deliberate exclusion IS a decision)
+- "No auth" for a PoC = 0.9 (correct PoC scoping, not a gap)
+- Channels like deployment, security, testing can be resolved with minimal detail
+- Focus scoring weight on purpose, tech_stack, and data_model""",
+
+    ProjectPhase.MVP: """Resolution scoring — MVP calibration:
+This is a MINIMUM VIABLE PRODUCT. The goal is a working product for real users, but NOT feature-complete.
+
+- 0.3-0.4: Topic area touched but nothing specific ("I need a portal")
+- 0.5: Mentioned with some context ("document summary portal for lawyers")
+- 0.6: Partially described with a few details ("upload documents for discovery, appeal hearings")
+- 0.7: Well described with multiple specifics ("RAG vector DB with Google Scholar, FindLaw sources")
+- 0.8: A CLEAR, DEFINITIVE decision or precise specification ("No versioning for MVP", "PostgreSQL 16")
+- 0.9: Fully specified with implementation-level details ("JWT with RS256, 15min access tokens")
+- 1.0: Exhaustively specified with edge cases and error handling
+
+IMPORTANT for MVP:
+- A direct, unambiguous answer to a specific question is a CLEAR DECISION → 0.8+
+- "No versioning for MVP" → 0.8 (definitive choice)
+- "Maybe REST" → 0.5 (tentative, needs confirmation)
+- "Defer to post-MVP" for non-critical channels → 0.7 (acknowledged but not resolved)""",
+
+    ProjectPhase.PREPROD: """Resolution scoring — Pre-Production calibration:
+This is PRE-PRODUCTION architecture. Every channel needs rigorous specification.
+Score STRICTLY — production systems need precise, implementable details.
+
+- 0.3-0.4: Topic area touched but nothing actionable ("I need a portal")
+- 0.5: Mentioned with basic context ("document portal for lawyers") — needs much more
+- 0.6: Partially described ("upload documents for various hearing types")
+- 0.7: Well described but missing implementation detail ("RAG with vector DB and multiple sources")
+- 0.8: Precisely specified with exact values ("PostgreSQL 16.2", "REST with /api/v1 prefix")
+- 0.9: Fully specified with implementation details ("JWT RS256, 15min access + 7day refresh, Redis session store")
+- 1.0: Exhaustively specified with edge cases, error handling, and migration strategy
+
+IMPORTANT for Pre-Production:
+- "No versioning" is NOT 0.8 here — it needs justification and migration plan → 0.6
+- "No auth" is a RED FLAG for pre-prod — flag as ambiguity unless explicitly justified
+- Every channel is critical — deployment, security, testing, error handling ALL matter
+- Prefer 0.5-0.7 range unless user gave implementation-ready specifics""",
+}
+
+PHASE_EXAMPLES = {
+    ProjectPhase.POC: """EXAMPLE 2 — PoC phase, agent asked about auth, user answers: "No auth for the PoC"
+Correct output:
+{{"updates": [
+  {{"channel": "auth", "sub": "method", "resolution": 0.9, "constraint": "No auth for PoC — deliberate scoping decision"}}
+], "ambiguities": []}}
+NOTE: Deliberately skipping a concern for PoC IS a valid architectural decision → 0.9.""",
+
+    ProjectPhase.MVP: """EXAMPLE 2 — MVP phase, agent asked about API versioning, user answers: "No versioning for MVP"
+Correct output:
+{{"updates": [
+  {{"channel": "api", "sub": "versioning", "resolution": 0.8, "constraint": "No versioning for MVP"}}
+], "ambiguities": []}}
+NOTE: The user gave a CLEAR, DEFINITIVE answer → 0.8. Do NOT score direct decisions below 0.8.""",
+
+    ProjectPhase.PREPROD: """EXAMPLE 2 — Pre-prod phase, agent asked about API versioning, user answers: "No versioning"
+Correct output:
+{{"updates": [
+  {{"channel": "api", "sub": "versioning", "resolution": 0.6, "constraint": "No API versioning planned"}}
+], "ambiguities": [
+  {{"text": "No versioning", "channel": "api", "reason": "Pre-production API needs versioning strategy — how will breaking changes be communicated to consumers? Consider URL path (/v1/) or header-based versioning."}}
+]}}
+NOTE: For pre-prod, "no versioning" is incomplete — it needs justification and a migration plan.""",
+}
+
+
+def build_system_prompt(phase: ProjectPhase = ProjectPhase.MVP) -> str:
+    """Build the system prompt calibrated for the given project phase."""
+    return _SYSTEM_PROMPT_BASE.format(
+        phase_scoring=PHASE_SCORING[phase],
+        phase_example=PHASE_EXAMPLES[phase],
+    )
+
+# Default for backward compatibility
+SYSTEM_PROMPT = build_system_prompt(ProjectPhase.MVP)
 
 
 # ── Provider definitions ──
@@ -256,7 +379,8 @@ def _parse_llm_response(text: str) -> Optional[dict]:
     return None
 
 
-def query_ollama(config: ProviderConfig, user_response: str, context: str = "") -> Optional[dict]:
+def query_ollama(config: ProviderConfig, user_response: str, context: str = "",
+                 system_prompt: str = "") -> Optional[dict]:
     """Query Ollama local LLM."""
     prompt = _build_prompt(user_response, context)
     try:
@@ -265,7 +389,7 @@ def query_ollama(config: ProviderConfig, user_response: str, context: str = "") 
             json={
                 "model": config.model,
                 "prompt": prompt,
-                "system": SYSTEM_PROMPT,
+                "system": system_prompt or SYSTEM_PROMPT,
                 "stream": False,
                 "options": {
                     "temperature": config.temperature,
@@ -290,7 +414,8 @@ def query_ollama(config: ProviderConfig, user_response: str, context: str = "") 
     return None
 
 
-def query_openai(config: ProviderConfig, user_response: str, context: str = "") -> Optional[dict]:
+def query_openai(config: ProviderConfig, user_response: str, context: str = "",
+                 system_prompt: str = "") -> Optional[dict]:
     """Query OpenAI API."""
     prompt = _build_prompt(user_response, context)
     if not config.api_key:
@@ -306,7 +431,7 @@ def query_openai(config: ProviderConfig, user_response: str, context: str = "") 
             json={
                 "model": config.model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": config.temperature,
@@ -330,7 +455,8 @@ def query_openai(config: ProviderConfig, user_response: str, context: str = "") 
     return None
 
 
-def query_anthropic(config: ProviderConfig, user_response: str, context: str = "") -> Optional[dict]:
+def query_anthropic(config: ProviderConfig, user_response: str, context: str = "",
+                    system_prompt: str = "") -> Optional[dict]:
     """Query Anthropic API."""
     prompt = _build_prompt(user_response, context)
     if not config.api_key:
@@ -347,7 +473,7 @@ def query_anthropic(config: ProviderConfig, user_response: str, context: str = "
             json={
                 "model": config.model,
                 "max_tokens": config.max_tokens,
-                "system": SYSTEM_PROMPT,
+                "system": system_prompt or SYSTEM_PROMPT,
                 "messages": [
                     {"role": "user", "content": prompt},
                 ],
@@ -442,8 +568,13 @@ def check_anthropic(config: ProviderConfig) -> dict:
         elif r.status_code == 401:
             return {"available": False, "error": "Invalid API key", "models": AVAILABLE_MODELS[ProviderType.ANTHROPIC]}
         else:
-            # 400, 429, etc. — key is valid, provider is reachable
-            return {"available": True, "error": None, "models": AVAILABLE_MODELS[ProviderType.ANTHROPIC]}
+            # Parse error message from response
+            try:
+                err_data = r.json()
+                err_msg = err_data.get("error", {}).get("message", f"HTTP {r.status_code}")
+            except (json.JSONDecodeError, AttributeError):
+                err_msg = f"HTTP {r.status_code}"
+            return {"available": False, "error": err_msg, "models": AVAILABLE_MODELS[ProviderType.ANTHROPIC]}
     except (requests.ConnectionError, requests.Timeout) as e:
         return {"available": False, "error": f"Connection failed: {e}", "models": AVAILABLE_MODELS[ProviderType.ANTHROPIC]}
 
@@ -460,10 +591,12 @@ CHECK_FUNCTIONS = {
 class LLMJudge:
     """Multi-provider LLM analyzer with regex fallback."""
 
-    def __init__(self, registry: ChannelRegistry, config: Optional[ProviderConfig] = None):
+    def __init__(self, registry: ChannelRegistry, config: Optional[ProviderConfig] = None,
+                 phase: ProjectPhase = ProjectPhase.MVP):
         self.registry = registry
         self.regex_analyzer = ResponseAnalyzer()
         self._analysis_log: list[dict] = []
+        self._phase = phase
 
         # Default: try Ollama first
         if config:
@@ -479,6 +612,7 @@ class LLMJudge:
             )
 
         self._provider_status: Optional[dict] = None
+        self._last_fallback_reason: str | None = None
 
     @property
     def config(self) -> ProviderConfig:
@@ -488,6 +622,18 @@ class LLMJudge:
         """Update the active provider configuration."""
         self._config = config
         self._provider_status = None  # Reset cached status
+
+    @property
+    def phase(self) -> ProjectPhase:
+        return self._phase
+
+    @phase.setter
+    def phase(self, value: ProjectPhase):
+        self._phase = value
+
+    @property
+    def phase_label(self) -> str:
+        return PROJECT_PHASE_LABELS.get(self._phase, self._phase.value)
 
     @property
     def active_provider(self) -> str:
@@ -527,6 +673,30 @@ class LLMJudge:
             pass
         return []
 
+    @property
+    def completion_threshold(self) -> float:
+        """Phase-aware completion threshold."""
+        return {
+            ProjectPhase.POC: 0.6,
+            ProjectPhase.MVP: 0.8,
+            ProjectPhase.PREPROD: 0.85,
+        }.get(self._phase, 0.8)
+
+    @property
+    def critical_channels(self) -> set[str]:
+        """Channels that are critical for the current phase."""
+        return PHASE_CHANNEL_WEIGHTS.get(self._phase, {}).get("critical", set())
+
+    @property
+    def optional_channels(self) -> set[str]:
+        """Channels that are optional for the current phase."""
+        return PHASE_CHANNEL_WEIGHTS.get(self._phase, {}).get("optional", set())
+
+    @property
+    def last_fallback_reason(self) -> str | None:
+        """Why the last analyze() call fell back to regex, if it did."""
+        return self._last_fallback_reason
+
     def analyze(self, response: str) -> tuple[list[DimensionUpdate], list[Ambiguity], str]:
         """Analyze a response. Returns (updates, ambiguities, method_used).
 
@@ -535,17 +705,21 @@ class LLMJudge:
         method = "regex"
         updates = []
         ambiguities = []
+        self._last_fallback_reason = None
 
         # Try the configured LLM provider
         if self._config.type != ProviderType.REGEX:
             query_fn = QUERY_FUNCTIONS.get(self._config.type)
             if query_fn:
-                print(f"[LLM Judge] Querying {self._config.type.value}:{self._config.model}", file=sys.stderr)
+                print(f"[LLM Judge] Querying {self._config.type.value}:{self._config.model} (phase={self._phase.value})", file=sys.stderr)
                 context = self._build_context()
-                result = query_fn(self._config, response, context)
+                phase_prompt = build_system_prompt(self._phase)
+                result = query_fn(self._config, response, context, system_prompt=phase_prompt)
                 if result is None:
+                    self._last_fallback_reason = f"{self._config.type.value} query failed — check provider status in Settings"
                     print(f"[LLM Judge] Provider returned None — falling back to regex", file=sys.stderr)
                 elif "updates" not in result:
+                    self._last_fallback_reason = f"LLM response missing 'updates' key"
                     print(f"[LLM Judge] Response has no 'updates' key. Keys: {list(result.keys())}", file=sys.stderr)
                 else:
                     method = f"{self._config.type.value}:{self._config.model}"
@@ -553,6 +727,7 @@ class LLMJudge:
                     ambiguities = self._parse_ambiguities(result.get("ambiguities", []))
                     print(f"[LLM Judge] LLM returned {len(updates)} updates, {len(ambiguities)} ambiguities", file=sys.stderr)
             else:
+                self._last_fallback_reason = f"No query function for {self._config.type}"
                 print(f"[LLM Judge] No query function for {self._config.type}", file=sys.stderr)
 
         # Fall back to regex or merge with regex results

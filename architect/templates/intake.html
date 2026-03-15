@@ -55,6 +55,27 @@
 
   <!-- Side panel: channels + updates -->
   <div style="display: flex; flex-direction: column; overflow-y: auto; background: var(--surface);">
+    <!-- Phase selector -->
+    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
+      <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px;">
+        Project Phase
+      </div>
+      <div id="phase-selector" style="display: flex; gap: 4px;">
+        <button class="phase-btn" data-phase="poc"
+          style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-dim);cursor:pointer;transition:all 0.2s;"
+          onclick="setPhase('poc')">PoC</button>
+        <button class="phase-btn active" data-phase="mvp"
+          style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:1px solid var(--accent);border-radius:6px;background:rgba(96,165,250,0.12);color:var(--accent);cursor:pointer;transition:all 0.2s;"
+          onclick="setPhase('mvp')">MVP</button>
+        <button class="phase-btn" data-phase="preprod"
+          style="flex:1;padding:6px 8px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-dim);cursor:pointer;transition:all 0.2s;"
+          onclick="setPhase('preprod')">Pre-Prod</button>
+      </div>
+      <div id="phase-info" style="font-size:10px;color:var(--text-muted);margin-top:6px;">
+        MVP — Target: 80% on critical channels
+      </div>
+    </div>
+
     <!-- Density header -->
     <div style="padding: 20px; border-bottom: 1px solid var(--border); text-align: center;">
       <div class="density-ring" id="intake-density-ring" style="margin: 0 auto 8px;"></div>
@@ -95,6 +116,58 @@
 
 <script>
 let isProcessing = false;
+let currentPhase = 'mvp';
+let phaseInfo = {
+  poc: { label: 'PoC', threshold: 0.6, desc: 'Proof of Concept — Target: 60% on core channels' },
+  mvp: { label: 'MVP', threshold: 0.8, desc: 'MVP — Target: 80% on critical channels' },
+  preprod: { label: 'Pre-Prod', threshold: 0.85, desc: 'Pre-Production — Target: 85% on ALL channels' },
+};
+let criticalChannels = new Set();
+let optionalChannels = new Set();
+
+async function setPhase(phase) {
+  try {
+    const r = await fetch('/api/phase', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phase: phase, sid: SID}),
+    });
+    const data = await r.json();
+    if (data.error) { console.error(data.error); return; }
+
+    currentPhase = phase;
+    criticalChannels = new Set(data.critical_channels || []);
+    optionalChannels = new Set(data.optional_channels || []);
+
+    // Update button styles
+    document.querySelectorAll('.phase-btn').forEach(btn => {
+      if (btn.dataset.phase === phase) {
+        btn.style.border = '1px solid var(--accent)';
+        btn.style.background = 'rgba(96,165,250,0.12)';
+        btn.style.color = 'var(--accent)';
+      } else {
+        btn.style.border = '1px solid var(--border)';
+        btn.style.background = 'var(--bg)';
+        btn.style.color = 'var(--text-dim)';
+      }
+    });
+
+    // Update info text
+    const info = phaseInfo[phase] || phaseInfo.mvp;
+    document.getElementById('phase-info').textContent = info.desc;
+
+    // Refresh channel display with phase awareness
+    const status = await fetchStatus();
+    if (status) {
+      renderDensityRing('intake-density-ring', status.density_score);
+      renderChannelBars('intake-channels', status.channels);
+    }
+
+    // Notify in chat
+    appendMessage('agent', `Phase changed to ${info.label}. Scoring calibrated for ${info.label} — completion threshold is ${Math.round(info.threshold * 100)}%.`);
+
+  } catch(e) { console.error('Phase change failed:', e); }
+}
 
 // Key handler
 document.getElementById('user-input').addEventListener('keydown', (e) => {
@@ -282,9 +355,18 @@ async function sendMessage() {
 
     // Show agent response with analysis meta
     if (data.updates.length) {
+      let methodNote = data.method;
+      if (data.fallback_reason && data.method === 'regex') {
+        methodNote = `regex (${data.fallback_reason})`;
+      }
       appendMessage('agent',
-        `Extracted ${data.updates.length} constraint${data.updates.length > 1 ? 's' : ''} via ${data.method}. Density: ${Math.round(data.density_score * 100)}%`,
-        { updates: data.updates, ambiguities: data.ambiguities, method: data.method, density_score: data.density_score }
+        `Extracted ${data.updates.length} constraint${data.updates.length > 1 ? 's' : ''} via ${methodNote}. Density: ${Math.round(data.density_score * 100)}%`,
+        { updates: data.updates, ambiguities: data.ambiguities, method: data.method, density_score: data.density_score, fallback_reason: data.fallback_reason }
+      );
+    } else if (data.fallback_reason) {
+      appendMessage('agent',
+        `⚠ ${data.fallback_reason}. No constraints extracted.`,
+        { method: data.method }
       );
     }
     if (data.next_question) {
@@ -372,8 +454,37 @@ async function resetAndRestart() {
   initIntake();
 }
 
+async function loadPhaseState() {
+  try {
+    const r = await fetch('/api/phase?sid=' + SID);
+    const data = await r.json();
+    currentPhase = data.current || 'mvp';
+    // Update button states
+    document.querySelectorAll('.phase-btn').forEach(btn => {
+      if (btn.dataset.phase === currentPhase) {
+        btn.style.border = '1px solid var(--accent)';
+        btn.style.background = 'rgba(96,165,250,0.12)';
+        btn.style.color = 'var(--accent)';
+      } else {
+        btn.style.border = '1px solid var(--border)';
+        btn.style.background = 'var(--bg)';
+        btn.style.color = 'var(--text-dim)';
+      }
+    });
+    const info = phaseInfo[currentPhase] || phaseInfo.mvp;
+    document.getElementById('phase-info').textContent = info.desc;
+
+    // Set critical/optional from server
+    const status = await fetch('/api/status?sid=' + SID);
+    const statusData = await status.json();
+    criticalChannels = new Set(statusData.critical_channels || []);
+    optionalChannels = new Set(statusData.optional_channels || []);
+  } catch(e) { console.warn('Phase load failed:', e); }
+}
+
 async function initIntake() {
   try {
+    await loadPhaseState();
     const r = await fetch('/api/first-question?sid=' + SID);
     const data = await r.json();
     appendMessage('agent', data.question);
@@ -389,6 +500,7 @@ async function initIntake() {
 // Load history or start fresh
 (async () => {
   try {
+    await loadPhaseState();
     const r = await fetch('/api/history?sid=' + SID);
     const data = await r.json();
     if (data.history.length > 0) {

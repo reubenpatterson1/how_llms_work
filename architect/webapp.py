@@ -19,8 +19,9 @@ from .channels import ChannelRegistry
 from .intake import IntakeEngine
 from .spec_generator import SpecGenerator
 from .llm_judge import (
-    LLMJudge, ProviderConfig, ProviderType,
-    PROVIDER_DEFAULTS, AVAILABLE_MODELS,
+    LLMJudge, ProviderConfig, ProviderType, ProjectPhase,
+    PROVIDER_DEFAULTS, AVAILABLE_MODELS, PROJECT_PHASE_LABELS,
+    PHASE_CHANNEL_WEIGHTS,
 )
 from .comparator import Comparator
 from .mock_llm import MockLLM
@@ -31,15 +32,47 @@ app = Flask(__name__,
 app.secret_key = os.environ.get("FLASK_SECRET", "arch-agent-dev-key-change-in-prod")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# ── Config persistence ──
+_CONFIG_PATH = os.path.join(os.path.dirname(__file__), ".provider_config.json")
+
+def _load_config() -> ProviderConfig:
+    """Load provider config from disk, falling back to defaults."""
+    if os.path.exists(_CONFIG_PATH):
+        try:
+            with open(_CONFIG_PATH, "r") as f:
+                data = json.load(f)
+            print(f"[Config] Loaded saved config: {data.get('type')}:{data.get('model')}", flush=True)
+            return ProviderConfig.from_dict(data)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            print(f"[Config] Failed to load saved config: {e}", flush=True)
+    return ProviderConfig(
+        type=ProviderType.OLLAMA,
+        model="llama3.2",
+        base_url="http://localhost:11434",
+        temperature=0.1,
+        max_tokens=2048,
+        timeout=120,
+    )
+
+def _save_config(config: ProviderConfig):
+    """Persist provider config to disk."""
+    data = {
+        "type": config.type.value,
+        "model": config.model,
+        "api_key": config.api_key,  # Stored locally only
+        "base_url": config.base_url,
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
+        "timeout": config.timeout,
+    }
+    try:
+        with open(_CONFIG_PATH, "w") as f:
+            json.dump(data, f, indent=2)
+    except OSError as e:
+        print(f"[Config] Failed to save config: {e}", flush=True)
+
 # ── Global provider config (shared across sessions) ──
-_global_config: ProviderConfig = ProviderConfig(
-    type=ProviderType.OLLAMA,
-    model="llama3.2",
-    base_url="http://localhost:11434",
-    temperature=0.1,
-    max_tokens=2048,
-    timeout=120,
-)
+_global_config: ProviderConfig = _load_config()
 
 # ── Session state management ──
 _sessions: dict[str, dict] = {}
@@ -51,11 +84,13 @@ def _get_state(sid: str) -> dict:
         registry = ChannelRegistry()
         engine = IntakeEngine(registry)
         engine.set_llm_config(_global_config)
-        judge = LLMJudge(registry, config=_global_config)
+        phase = ProjectPhase.MVP  # Default phase
+        judge = LLMJudge(registry, config=_global_config, phase=phase)
         _sessions[sid] = {
             "registry": registry,
             "engine": engine,
             "judge": judge,
+            "phase": phase,
             "history": [],
             "created": time.time(),
         }
@@ -132,7 +167,9 @@ def api_status():
 
     provider = judge.active_provider
     model = judge.active_model
-    available = judge.provider_available
+    status = judge.check_provider()
+    available = status.get("available", False)
+    provider_error = status.get("error")
 
     if provider == "regex":
         method_label = "Regex patterns"
@@ -141,6 +178,9 @@ def api_status():
     else:
         method_label = f"{provider} (offline)"
 
+    phase = state.get("phase", ProjectPhase.MVP)
+    phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
+
     return jsonify({
         "density_score": round(registry.overall_density_score(), 3),
         "channels": channels,
@@ -148,8 +188,14 @@ def api_status():
         "provider": provider,
         "model": model,
         "provider_available": available,
+        "provider_error": provider_error,
         "analysis_method": method_label,
         "is_complete": state["engine"].is_complete(),
+        "phase": phase.value,
+        "phase_label": PROJECT_PHASE_LABELS.get(phase, phase.value),
+        "completion_threshold": judge.completion_threshold,
+        "critical_channels": list(phase_weights.get("critical", [])),
+        "optional_channels": list(phase_weights.get("optional", [])),
     })
 
 
@@ -227,10 +273,13 @@ def api_send():
         "updates": update_list,
         "ambiguities": ambiguity_list,
         "method": method,
+        "fallback_reason": judge.last_fallback_reason,
         "next_question": next_q,
         "is_complete": is_complete,
         "density_score": round(registry.overall_density_score(), 3),
         "channels": channels_summary,
+        "phase": state.get("phase", ProjectPhase.MVP).value,
+        "completion_threshold": judge.completion_threshold,
     })
 
 
@@ -262,6 +311,63 @@ def api_reset():
     sid = request.get_json().get("sid", session.get("sid", "default"))
     _reset_state(sid)
     return jsonify({"status": "reset"})
+
+
+@app.route("/api/phase", methods=["POST"])
+def api_set_phase():
+    """Set the project phase for the current session."""
+    data = request.get_json()
+    sid = data.get("sid", session.get("sid", "default"))
+    phase_str = data.get("phase", "mvp")
+
+    try:
+        phase = ProjectPhase(phase_str)
+    except ValueError:
+        return jsonify({"error": f"Unknown phase: {phase_str}"}), 400
+
+    state = _get_state(sid)
+    state["phase"] = phase
+    state["judge"].phase = phase
+
+    # Update the engine's completion threshold to match phase
+    state["engine"].threshold = state["judge"].completion_threshold
+
+    phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
+
+    return jsonify({
+        "phase": phase.value,
+        "phase_label": PROJECT_PHASE_LABELS[phase],
+        "completion_threshold": state["judge"].completion_threshold,
+        "critical_channels": list(phase_weights.get("critical", [])),
+        "optional_channels": list(phase_weights.get("optional", [])),
+    })
+
+
+@app.route("/api/phase")
+def api_get_phase():
+    """Get available phases and current phase."""
+    sid = request.args.get("sid", session.get("sid", "default"))
+    state = _get_state(sid)
+    current = state.get("phase", ProjectPhase.MVP)
+
+    return jsonify({
+        "current": current.value,
+        "current_label": PROJECT_PHASE_LABELS[current],
+        "phases": [
+            {
+                "value": p.value,
+                "label": PROJECT_PHASE_LABELS[p],
+                "threshold": {
+                    ProjectPhase.POC: 0.6,
+                    ProjectPhase.MVP: 0.8,
+                    ProjectPhase.PREPROD: 0.85,
+                }[p],
+                "critical_channels": list(PHASE_CHANNEL_WEIGHTS[p]["critical"]),
+                "optional_channels": list(PHASE_CHANNEL_WEIGHTS[p]["optional"]),
+            }
+            for p in ProjectPhase
+        ],
+    })
 
 
 @app.route("/api/spec")
@@ -411,6 +517,7 @@ def api_settings_update():
     )
 
     _global_config = new_config
+    _save_config(new_config)
     _update_all_judges()
 
     # Check the new provider

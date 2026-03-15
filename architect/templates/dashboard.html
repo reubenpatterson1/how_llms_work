@@ -115,7 +115,7 @@ async function refreshDashboard() {
       : `${data.provider} connected`;
   } else {
     eng.innerHTML = `<span style="color:var(--red)">${data.provider} (offline)</span>`;
-    engD.textContent = 'Provider unavailable — falling back to regex';
+    engD.textContent = data.provider_error || 'Provider unavailable — falling back to regex';
   }
 
   // Constraints

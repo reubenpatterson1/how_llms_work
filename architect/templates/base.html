@@ -296,13 +296,24 @@
 
       const entries = Object.entries(channels);
 
+      // Check if phase awareness is available (intake page sets these globals)
+      const hasCritical = typeof criticalChannels !== 'undefined' && criticalChannels instanceof Set && criticalChannels.size > 0;
+
       // If bars don't exist yet, create them
       if (!el.querySelector('[data-channel]')) {
         el.innerHTML = entries.map(([id, ch]) => {
           const pct = Math.round(ch.resolution * 100);
           const color = channelColor(ch.resolution);
+          let badge = '';
+          if (hasCritical) {
+            if (criticalChannels.has(id)) {
+              badge = '<span style="font-size:8px;color:var(--orange);margin-left:4px;font-weight:700;" title="Critical for this phase">●</span>';
+            } else if (optionalChannels.has(id)) {
+              badge = '<span style="font-size:8px;color:var(--text-muted);margin-left:4px;" title="Optional for this phase">○</span>';
+            }
+          }
           return `<div class="channel-bar" data-channel="${id}">
-            <div class="channel-name">${ch.name}</div>
+            <div class="channel-name">${ch.name}${badge}</div>
             <div class="channel-track">
               <div class="channel-fill" style="width:${pct}%;background:${color};transition:width 0.6s cubic-bezier(0.4,0,0.2,1),background 0.3s;"></div>
             </div>
@@ -320,6 +331,7 @@
         const color = channelColor(ch.resolution);
         const fill = bar.querySelector('.channel-fill');
         const pctEl = bar.querySelector('.channel-pct');
+        const nameEl = bar.querySelector('.channel-name');
         if (fill) {
           fill.style.width = pct + '%';
           fill.style.background = color;
@@ -327,6 +339,16 @@
         if (pctEl) {
           pctEl.style.color = color;
           pctEl.textContent = pct + '%';
+        }
+        // Update badges if phase changed
+        if (hasCritical && nameEl) {
+          const existingBadge = nameEl.querySelector('span');
+          if (existingBadge) existingBadge.remove();
+          if (criticalChannels.has(id)) {
+            nameEl.insertAdjacentHTML('beforeend', '<span style="font-size:8px;color:var(--orange);margin-left:4px;font-weight:700;" title="Critical for this phase">●</span>');
+          } else if (optionalChannels.has(id)) {
+            nameEl.insertAdjacentHTML('beforeend', '<span style="font-size:8px;color:var(--text-muted);margin-left:4px;" title="Optional for this phase">○</span>');
+          }
         }
       });
     }
