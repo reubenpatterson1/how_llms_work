@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% set active_page = "decompose" %}
+{% block title %}Decompose — Architecture Agent{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 1200px; margin: 0 auto;">
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px;">
+    <div>
+      <h1 style="font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px;">
+        Decomposition Agent
+      </h1>
+      <p style="color: var(--text-dim); font-size: 14px;">
+        Splits the dense spec into dependency-ordered waves for parallel LLM build. Interfaces first, then independent components in parallel.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <!-- Phase selector -->
+      <div style="display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px;">
+        <button id="phase-poc" onclick="setPhase('poc')" class="phase-btn" style="padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--text-dim);">PoC</button>
+        <button id="phase-mvp" onclick="setPhase('mvp')" class="phase-btn" style="padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; background: var(--accent); color: #fff;">MVP</button>
+        <button id="phase-preprod" onclick="setPhase('preprod')" class="phase-btn" style="padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--text-dim);">Pre-Prod</button>
+      </div>
+      <button class="btn btn-primary" onclick="runDecompose()" id="run-btn">Run Decompose</button>
+      <button class="btn btn-ghost" onclick="copyMarkdown()" id="copy-btn" style="display:none;">Copy</button>
+    </div>
+  </div>
+
+  <!-- Metrics bar (hidden until results) -->
+  <div id="metrics-bar" style="display:none; display:none; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px;">
+    <div class="card" style="text-align:center; padding: 16px;">
+      <div id="m-components" style="font-size: 28px; font-weight: 700; color: var(--accent); font-family: 'IBM Plex Mono', monospace;">—</div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Components</div>
+    </div>
+    <div class="card" style="text-align:center; padding: 16px;">
+      <div id="m-waves" style="font-size: 28px; font-weight: 700; color: var(--purple); font-family: 'IBM Plex Mono', monospace;">—</div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Waves</div>
+    </div>
+    <div class="card" style="text-align:center; padding: 16px;">
+      <div id="m-parallelism" style="font-size: 28px; font-weight: 700; color: var(--cyan); font-family: 'IBM Plex Mono', monospace;">—</div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Max Parallel</div>
+    </div>
+    <div class="card" style="text-align:center; padding: 16px;">
+      <div id="m-savings" style="font-size: 28px; font-weight: 700; color: var(--green); font-family: 'IBM Plex Mono', monospace;">—</div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Time Saved</div>
+    </div>
+    <div class="card" style="text-align:center; padding: 16px;">
+      <div id="m-time" style="font-size: 28px; font-weight: 700; color: var(--orange); font-family: 'IBM Plex Mono', monospace;">—</div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">Wall-Clock (min)</div>
+    </div>
+  </div>
+
+  <!-- Main content grid -->
+  <div style="display: grid; grid-template-columns: 1fr 320px; gap: 24px;">
+
+    <!-- Wave plan output -->
+    <div>
+      <!-- Empty state -->
+      <div id="empty-state" class="card" style="padding: 60px 32px; text-align: center;">
+        <div style="font-size: 40px; margin-bottom: 16px;">◈</div>
+        <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Ready to Decompose</div>
+        <div style="font-size: 13px; color: var(--text-dim); max-width: 400px; margin: 0 auto; line-height: 1.6;">
+          Complete the intake session first, then click <strong>Run Decompose</strong> to split the spec into parallel build waves.
+        </div>
+        <div style="margin-top: 24px;">
+          <a href="/intake" style="color: var(--accent); font-size: 13px; text-decoration: none;">→ Go to Intake</a>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="loading-state" class="card" style="padding: 60px 32px; text-align: center; display:none;">
+        <div style="font-size: 13px; color: var(--text-dim);">Analyzing dependencies...</div>
+      </div>
+
+      <!-- Wave cards (populated by JS) -->
+      <div id="wave-cards" style="display:none; display:flex; flex-direction:column; gap:16px;"></div>
+    </div>
+
+    <!-- Side panel -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- Principle callouts -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom: 12px;">◈ First Principles</div>
+        <div style="font-size: 12px; color: var(--text-dim); line-height: 1.7; display: flex; flex-direction: column; gap: 10px;">
+          <div><span style="color: var(--green); font-weight: 600;">Decompose First</span><br>Each component is a confabulation firewall. Single-function boundaries.</div>
+          <div><span style="color: var(--cyan); font-weight: 600;">Parallelize Smartly</span><br>Interfaces defined in Wave 0. Independent components built in parallel. 30–40% wall-clock savings.</div>
+          <div><span style="color: var(--purple); font-weight: 600;">Orchestrate for Quality</span><br>Multi-step generation = 80× better results vs single-shot.</div>
+          <div><span style="color: var(--orange); font-weight: 600;">Spec → Decompose → Build</span><br>Dense spec eliminates prompt hallucination. This wave plan eliminates architecture hallucination.</div>
+        </div>
+      </div>
+
+      <!-- Interface contracts -->
+      <div class="card" id="interfaces-card" style="display:none;">
+        <div class="card-title" style="margin-bottom: 12px;">⬡ Interface Contracts</div>
+        <pre id="interfaces-content" style="font-size: 11px; color: var(--cyan); font-family: 'IBM Plex Mono', monospace;
+          white-space: pre-wrap; word-break: break-word; margin: 0; line-height: 1.6; max-height: 300px; overflow-y: auto;"></pre>
+      </div>
+
+      <!-- Dependency graph -->
+      <div class="card" id="deps-card" style="display:none;">
+        <div class="card-title" style="margin-bottom: 12px;">→ Dependency Graph</div>
+        <pre id="deps-content" style="font-size: 11px; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace;
+          white-space: pre-wrap; margin: 0; line-height: 1.6; max-height: 300px; overflow-y: auto;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wave-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .wave-header { padding: 14px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+  .wave-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; font-family: 'IBM Plex Mono', monospace; }
+  .wave-0 { background: rgba(167,139,250,0.15); color: var(--purple); }
+  .wave-1 { background: rgba(96,165,250,0.15); color: var(--accent); }
+  .wave-2 { background: rgba(52,211,153,0.15); color: var(--green); }
+  .wave-n { background: rgba(251,191,36,0.15); color: var(--orange); }
+  .component-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  .component-row:last-child { border-bottom: none; }
+  .comp-type-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+    background: var(--surface2); color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; }
+  .phase-btn.active { background: var(--accent) !important; color: #fff !important; }
+</style>
+
+<script>
+  let currentPhase = 'mvp';
+  let markdownOutput = '';
+
+  function setPhase(phase) {
+    currentPhase = phase;
+    document.querySelectorAll('.phase-btn').forEach(b => {
+      b.style.background = 'transparent';
+      b.style.color = 'var(--text-dim)';
+    });
+    const btn = document.getElementById('phase-' + phase);
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#fff';
+  }
+
+  async function runDecompose() {
+    const runBtn = document.getElementById('run-btn');
+    runBtn.disabled = true;
+    runBtn.textContent = 'Decomposing…';
+
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('loading-state').style.display = 'block';
+    document.getElementById('wave-cards').style.display = 'none';
+
+    try {
+      const res = await fetch('/api/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase: currentPhase }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        alert('Decompose failed: ' + data.error);
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'block';
+        return;
+      }
+
+      markdownOutput = data.markdown;
+      renderResults(data);
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'block';
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run Decompose';
+    }
+  }
+
+  const WAVE_COLORS = ['wave-0', 'wave-1', 'wave-2', 'wave-n'];
+  const WAVE_LABELS = ['Wave 0: Interface Definitions', 'Wave 1: Foundation', 'Wave 2: Services', 'Wave 3+: Final'];
+
+  const TYPE_COLORS = {
+    model: 'color: var(--green)',
+    config: 'color: var(--text-dim)',
+    service: 'color: var(--cyan)',
+    handler: 'color: var(--accent)',
+    middleware: 'color: var(--orange)',
+    test: 'color: var(--purple)',
+    data_model: 'color: var(--green)',
+    tech_stack: 'color: var(--text-dim)',
+  };
+
+  function renderResults(data) {
+    const { metrics, wave_plan } = data;
+
+    // Metrics bar
+    const mb = document.getElementById('metrics-bar');
+    mb.style.display = 'grid';
+    document.getElementById('m-components').textContent = metrics.total_components;
+    document.getElementById('m-waves').textContent = metrics.total_waves;
+    document.getElementById('m-parallelism').textContent = metrics.max_parallelism + '×';
+    document.getElementById('m-savings').textContent = metrics.time_savings_percent + '%';
+    document.getElementById('m-time').textContent = metrics.estimated_parallel_minutes + ' min';
+
+    // Wave cards
+    const container = document.getElementById('wave-cards');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+
+    (wave_plan.waves || []).forEach((wave, wi) => {
+      const colorClass = WAVE_COLORS[Math.min(wi, 3)];
+      const card = document.createElement('div');
+      card.className = 'wave-card';
+
+      const deps = wave.number > 0 ? ` &nbsp;·&nbsp; Dependencies: Wave ${wave.number - 1}` : '';
+      card.innerHTML = `
+        <div class="wave-header">
+          <span class="wave-badge ${colorClass}">Wave ${wave.number}</span>
+          <span style="font-size: 13px; font-weight: 600; flex: 1;">${wave.label}</span>
+          <span style="font-size: 12px; color: var(--text-dim);">${wave.components.length} components · ${wave.components.length}× parallel${deps}</span>
+        </div>
+        <div>
+          ${wave.components.map(c => `
+            <div class="component-row">
+              <div style="flex: 1;">
+                <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${c.name}</div>
+                <div style="font-size: 12px; color: var(--text-dim);">${c.description}</div>
+              </div>
+              <span class="comp-type-badge" style="${TYPE_COLORS[c.component_type] || ''}">${c.component_type}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    // Interface contracts
+    const ifaces = (wave_plan.interfaces || []);
+    if (ifaces.length > 0) {
+      document.getElementById('interfaces-card').style.display = 'block';
+      document.getElementById('interfaces-content').textContent = ifaces
+        .map(i => `${i.name}:\n  ${i.methods.join('\n  ')}`)
+        .join('\n\n');
+    }
+
+    // Dependency graph
+    const edges = (wave_plan.dependency_graph || []);
+    if (edges.length > 0) {
+      document.getElementById('deps-card').style.display = 'block';
+      document.getElementById('deps-content').textContent = edges
+        .map(e => `${e.from_component} → ${e.to_component}\n  ${e.reason}`)
+        .join('\n');
+    }
+
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('copy-btn').style.display = 'inline-flex';
+  }
+
+  function copyMarkdown() {
+    navigator.clipboard.writeText(markdownOutput).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+  }
+</script>
+{% endblock %}

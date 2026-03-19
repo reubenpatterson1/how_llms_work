@@ -118,9 +118,19 @@ def main():
     parser = argparse.ArgumentParser(description="Architecture Agent — structured intake for dense specs")
     parser.add_argument("--output", "-o", help="Output file path for specification")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed updates")
+    parser.add_argument("--decompose", "-d", help="Path to spec file to decompose into wave plan")
+    parser.add_argument("--phase", choices=["poc", "mvp", "preprod"], default="mvp",
+                        help="Project phase for decomposition (default: mvp)")
+    parser.add_argument("--wave-output", help="Output file path for wave plan")
     args = parser.parse_args()
 
-    run_interactive(output_path=args.output, verbose=args.verbose)
+    if args.decompose:
+        from .decomposer import run_decompose_interactive
+        with open(args.decompose) as f:
+            spec = f.read()
+        run_decompose_interactive(spec, phase=args.phase, output_path=args.wave_output)
+    else:
+        run_interactive(output_path=args.output, verbose=args.verbose)
 
 
 if __name__ == "__main__":

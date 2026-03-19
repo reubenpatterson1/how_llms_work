@@ -25,6 +25,7 @@ from .llm_judge import (
 )
 from .comparator import Comparator
 from .mock_llm import MockLLM
+from .decomposer import run_decompose_programmatic
 
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(__file__), "templates"),
@@ -133,6 +134,11 @@ def comparison_page():
 @app.route("/spec")
 def spec_page():
     return render_template("spec.html")
+
+
+@app.route("/decompose")
+def decompose_page():
+    return render_template("decompose.html")
 
 
 @app.route("/settings")
@@ -399,6 +405,35 @@ def api_spec_download():
         mimetype="text/plain",
         headers={"Content-Disposition": "attachment; filename=architecture-spec.md"},
     )
+
+
+@app.route("/api/decompose", methods=["POST"])
+def api_decompose():
+    """Run decomposition agent on current session spec."""
+    sid = request.args.get("sid", session.get("sid", "default"))
+    state = _get_state(sid)
+    registry = state["registry"]
+    gen = SpecGenerator(registry)
+    spec_text = gen.generate()
+    phase = request.json.get("phase", "mvp") if request.is_json else "mvp"
+    try:
+        plan = run_decompose_programmatic(spec_text, registry, phase=phase)
+        return jsonify({
+            "ok": True,
+            "wave_plan": plan.to_dict(),
+            "markdown": plan.to_markdown(),
+            "metrics": {
+                "total_components": plan.metrics.total_components,
+                "total_waves": plan.metrics.total_waves,
+                "max_parallelism": plan.metrics.max_parallelism,
+                "time_savings_percent": round(plan.metrics.time_savings_percent),
+                "estimated_sequential_minutes": round(plan.metrics.estimated_sequential_minutes),
+                "estimated_parallel_minutes": round(plan.metrics.estimated_parallel_minutes),
+                "dependency_depth": plan.metrics.dependency_depth,
+            },
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/compare", methods=["POST"])
