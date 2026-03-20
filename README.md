@@ -132,6 +132,48 @@ print(plan.to_markdown())
 # Wave Plan: 7 components · 3 waves · 50% time savings
 ```
 
+### Pipeline Efficacy: Hello World Weather App (PoC)
+
+End-to-end validation of the full Spec → Decompose → Build pipeline against a real application.
+
+**Pipeline Performance**
+
+| Stage | Metric | Result |
+|-------|--------|--------|
+| Intake | Exchanges to complete | 1 |
+| Intake | Density score (phase-aware) | 74% |
+| Decompose | Components extracted | 3 |
+| Decompose | Waves | 1 |
+| Decompose | Max parallelism | 3× |
+| Decompose | Time savings | 67% |
+| Decompose | Estimated wall-clock | 20 min (vs 60 min sequential) |
+
+**Test Results**
+
+| Metric | Result |
+|--------|--------|
+| Tests passing | 21 / 21 |
+| Code coverage | 92% (target: 70%) |
+| Fixture cities | London, Tokyo, New York |
+
+**Constraint Audit — Generated Code vs Dense Spec**
+
+| Category | Grounded | Total | Rate |
+|----------|----------|-------|------|
+| Auth (API key, rate limit, decorator) | 4 | 4 | 100% |
+| Data Model (entities, indexes, NOT NULL) | 5 | 5 | 100% |
+| API (endpoints, params, JSON responses) | 6 | 6 | 100% |
+| Error Handling (400/401/404/502) | 4 | 4 | 100% |
+| Caching (in-memory, 5min TTL) | 3 | 3 | 100% |
+| CORS (allow-all, headers) | 2 | 2 | 100% |
+| Input Validation (max 100 chars, sanitization) | 3 | 3 | 100% |
+| Tech Stack (Python 3.12, Flask 3.0, SQLite) | 3 | 5 | 60% |
+| **Total** | **30** | **32** | **94%** |
+
+2 ungrounded constraints (Dockerfile, GitHub Actions CI) are intentionally out of PoC scope. **0 confabulated** — no hallucinated features or invented behavior in the generated code.
+
+**Key Insight:** A single dense spec + wave plan produced a working application with **94% constraint grounding and 0% confabulation**, compared to the vague-prompt baseline of **37.5% hallucination** measured in Part 2.
+
 ---
 
 ## Project Structure
