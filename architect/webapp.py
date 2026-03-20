@@ -439,6 +439,7 @@ def api_decompose():
             "ok": True,
             "wave_plan": plan.to_dict(),
             "markdown": plan.to_markdown(),
+            "build_package": plan.to_build_package(spec_text),
             "metrics": {
                 "total_components": plan.metrics.total_components,
                 "total_waves": plan.metrics.total_waves,

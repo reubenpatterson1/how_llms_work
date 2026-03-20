@@ -22,6 +22,7 @@
       </div>
       <button class="btn btn-primary" onclick="runDecompose()" id="run-btn">Run Decompose</button>
       <button class="btn btn-ghost" onclick="copyMarkdown()" id="copy-btn" style="display:none;">Copy</button>
+      <button class="btn btn-ghost" onclick="downloadBuildPackage()" id="download-btn" style="display:none;">⬇ Download Build Package</button>
     </div>
   </div>
 
@@ -124,6 +125,7 @@
 <script>
   let currentPhase = 'mvp';
   let markdownOutput = '';
+  let buildPackage = '';
 
   function setPhase(phase) {
     currentPhase = phase;
@@ -161,6 +163,7 @@
       }
 
       markdownOutput = data.markdown;
+      buildPackage = data.build_package || data.markdown;
       renderResults(data);
     } catch (e) {
       alert('Request failed: ' + e.message);
@@ -250,14 +253,31 @@
 
     document.getElementById('loading-state').style.display = 'none';
     document.getElementById('copy-btn').style.display = 'inline-flex';
+    document.getElementById('download-btn').style.display = 'inline-flex';
   }
 
   function copyMarkdown() {
-    navigator.clipboard.writeText(markdownOutput).then(() => {
+    navigator.clipboard.writeText(buildPackage).then(() => {
       const btn = document.getElementById('copy-btn');
       btn.textContent = 'Copied!';
       setTimeout(() => btn.textContent = 'Copy', 2000);
     });
+  }
+
+  function downloadBuildPackage() {
+    const blob = new Blob([buildPackage], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `build-package-${currentPhase}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const btn = document.getElementById('download-btn');
+    btn.textContent = 'Downloaded!';
+    setTimeout(() => btn.textContent = '\u2B07 Download Build Package', 2000);
   }
 </script>
 {% endblock %}
