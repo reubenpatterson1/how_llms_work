@@ -359,8 +359,11 @@ async function sendMessage() {
       if (data.fallback_reason && data.method === 'regex') {
         methodNote = `regex (${data.fallback_reason})`;
       }
+      const qualityNote = data.constraint_quality !== undefined
+        ? ` · Quality: ${Math.round(data.constraint_quality * 100)}%`
+        : '';
       appendMessage('agent',
-        `Extracted ${data.updates.length} constraint${data.updates.length > 1 ? 's' : ''} via ${methodNote}. Density: ${Math.round(data.density_score * 100)}%`,
+        `Extracted ${data.updates.length} constraint${data.updates.length > 1 ? 's' : ''} via ${methodNote}. Density: ${Math.round(data.density_score * 100)}%${qualityNote}`,
         { updates: data.updates, ambiguities: data.ambiguities, method: data.method, density_score: data.density_score, fallback_reason: data.fallback_reason }
       );
     } else if (data.fallback_reason) {

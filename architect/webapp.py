@@ -27,6 +27,16 @@ from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
 
+# Quality weight per phase: higher = more forgiving of unfilled sub-dimensions
+# PoC: mostly quality-based (don't penalize missing subs)
+# MVP: blended (some completeness expected)
+# Pre-Prod: completeness-based (everything matters)
+PHASE_QUALITY_WEIGHT = {
+    ProjectPhase.POC: 0.7,
+    ProjectPhase.MVP: 0.3,
+    ProjectPhase.PREPROD: 0.0,
+}
+
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(__file__), "templates"),
             static_folder=os.path.join(os.path.dirname(__file__), "static"))
@@ -90,6 +100,7 @@ def _get_state(sid: str) -> dict:
         # Set phase-aware completion on engine
         engine.threshold = judge.completion_threshold
         engine.set_critical_channels(judge.critical_channels)
+        engine.set_quality_weight(PHASE_QUALITY_WEIGHT.get(phase, 0.0))
         _sessions[sid] = {
             "registry": registry,
             "engine": engine,
@@ -189,9 +200,11 @@ def api_status():
 
     phase = state.get("phase", ProjectPhase.MVP)
     phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
+    critical = phase_weights.get("critical", None)
 
     return jsonify({
-        "density_score": round(registry.overall_density_score(), 3),
+        "density_score": round(registry.overall_density_score(critical, PHASE_QUALITY_WEIGHT.get(phase, 0.0)), 3),
+        "constraint_quality": round(registry.constraint_quality_score(), 3),
         "channels": channels,
         "history_length": len(state["history"]),
         "provider": provider,
@@ -222,6 +235,8 @@ def api_send():
     registry = state["registry"]
     engine = state["engine"]
     judge = state["judge"]
+    phase = state.get("phase", ProjectPhase.MVP)
+    critical = PHASE_CHANNEL_WEIGHTS.get(phase, {}).get("critical", None)
 
     # Analyze with LLM judge (falls back to regex)
     updates, ambiguities, method = judge.analyze(user_response)
@@ -258,7 +273,7 @@ def api_send():
         "updates": update_list,
         "ambiguities": ambiguity_list,
         "method": method,
-        "density_after": round(registry.overall_density_score(), 3),
+        "density_after": round(registry.overall_density_score(critical, PHASE_QUALITY_WEIGHT.get(phase, 0.0)), 3),
         "timestamp": time.time(),
     }
     state["history"].append(entry)
@@ -285,9 +300,10 @@ def api_send():
         "fallback_reason": judge.last_fallback_reason,
         "next_question": next_q,
         "is_complete": is_complete,
-        "density_score": round(registry.overall_density_score(), 3),
+        "density_score": round(registry.overall_density_score(critical, PHASE_QUALITY_WEIGHT.get(phase, 0.0)), 3),
+        "constraint_quality": round(registry.constraint_quality_score(), 3),
         "channels": channels_summary,
-        "phase": state.get("phase", ProjectPhase.MVP).value,
+        "phase": phase.value,
         "completion_threshold": judge.completion_threshold,
     })
 
@@ -341,6 +357,7 @@ def api_set_phase():
     # Update the engine's completion threshold and critical channels to match phase
     state["engine"].threshold = state["judge"].completion_threshold
     state["engine"].set_critical_channels(state["judge"].critical_channels)
+    state["engine"].set_quality_weight(PHASE_QUALITY_WEIGHT.get(phase, 0.0))
 
     phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
 
@@ -653,6 +670,8 @@ def ws_send_message(data):
     registry = state["registry"]
     engine = state["engine"]
     judge = state["judge"]
+    phase = state.get("phase", ProjectPhase.MVP)
+    critical = PHASE_CHANNEL_WEIGHTS.get(phase, {}).get("critical", None)
 
     updates, ambiguities, method = judge.analyze(user_msg)
 
@@ -682,7 +701,8 @@ def ws_send_message(data):
         "method": method,
         "next_question": next_q,
         "is_complete": is_complete,
-        "density_score": round(registry.overall_density_score(), 3),
+        "density_score": round(registry.overall_density_score(critical, PHASE_QUALITY_WEIGHT.get(phase, 0.0)), 3),
+        "constraint_quality": round(registry.constraint_quality_score(), 3),
         "channels": channels_data,
     })
 

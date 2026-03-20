@@ -39,9 +39,20 @@ class Channel:
 
     @property
     def resolution(self) -> float:
+        """Channel resolution: average across ALL sub-dimensions (completeness)."""
         if not self.sub_dimensions:
             return 0.0
         return sum(sd.resolution for sd in self.sub_dimensions.values()) / len(self.sub_dimensions)
+
+    @property
+    def quality(self) -> float:
+        """Average resolution of only FILLED sub-dimensions (quality of what's provided)."""
+        filled = [sd.resolution for sd in self.sub_dimensions.values() if sd.resolution > 0]
+        return sum(filled) / len(filled) if filled else 0.0
+
+    @property
+    def filled_count(self) -> int:
+        return sum(1 for sd in self.sub_dimensions.values() if sd.resolution > 0)
 
     @property
     def constraints(self) -> list[str]:
@@ -158,14 +169,61 @@ class ChannelRegistry:
         if ch and sub_id in ch.sub_dimensions:
             ch.sub_dimensions[sub_id].update(resolution, constraint)
 
-    def overall_density_score(self) -> float:
+    def overall_density_score(self, critical_channels: set[str] | None = None,
+                              quality_weight: float = 0.0) -> float:
+        """Overall density score, optionally phase-weighted.
+
+        Args:
+            critical_channels: If set, only these channels contribute.
+            quality_weight: 0.0 = pure completeness (avg all subs),
+                           1.0 = pure quality (avg only filled subs).
+                           Use ~0.7 for PoC, ~0.3 for MVP, 0.0 for Pre-Prod.
+        """
         if not self.channels:
             return 0.0
-        return sum(ch.resolution for ch in self.channels.values()) / len(self.channels)
+        if critical_channels:
+            relevant = [(cid, ch) for cid, ch in self.channels.items() if cid in critical_channels]
+        else:
+            relevant = list(self.channels.items())
+        if not relevant:
+            return 0.0
+        total = 0.0
+        for _, ch in relevant:
+            completeness = ch.resolution
+            quality = ch.quality
+            blended = quality * quality_weight + completeness * (1 - quality_weight)
+            total += blended
+        return total / len(relevant)
+
+    def constraint_quality_score(self) -> float:
+        """Average resolution of only the sub-dimensions that have been filled.
+
+        This reflects the quality of provided constraints (how specific they
+        are) without penalizing for missing dimensions.
+        """
+        filled = []
+        for ch in self.channels.values():
+            for sd in ch.sub_dimensions.values():
+                if sd.resolution > 0:
+                    filled.append(sd.resolution)
+        return sum(filled) / len(filled) if filled else 0.0
+
+    def coverage_ratio(self) -> tuple[int, int]:
+        """(filled, total) sub-dimensions across all channels."""
+        filled = total = 0
+        for ch in self.channels.values():
+            for sd in ch.sub_dimensions.values():
+                total += 1
+                if sd.resolution > 0:
+                    filled += 1
+        return filled, total
 
     def snapshot(self) -> dict:
+        filled, total = self.coverage_ratio()
         return {
             "density_score": round(self.overall_density_score(), 3),
+            "constraint_quality": round(self.constraint_quality_score(), 3),
+            "coverage": f"{filled}/{total}",
             "channels": {k: v.to_dict() for k, v in self.channels.items()},
         }
 

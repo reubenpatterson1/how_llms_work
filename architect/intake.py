@@ -117,6 +117,7 @@ class IntakeEngine:
         self._llm_config = None  # Set externally by webapp
         self._critical_channels: set[str] = set()  # Phase-aware: only these must hit threshold
         self._asked_questions: list[str] = []  # Track questions to avoid repeats
+        self._quality_weight: float = 0.0  # 0=completeness, 1=quality-only
 
     def set_llm_config(self, config):
         """Set the LLM config for contextual question generation."""
@@ -126,6 +127,13 @@ class IntakeEngine:
         """Set which channels are critical for the current phase.
         When set, is_complete() only checks these channels."""
         self._critical_channels = channels
+
+    def set_quality_weight(self, weight: float):
+        """Set quality vs completeness weight for is_complete() checks.
+        0.0 = pure completeness (all subs must be filled).
+        1.0 = pure quality (only filled subs count).
+        PoC ≈ 0.7, MVP ≈ 0.3, Pre-Prod = 0.0."""
+        self._quality_weight = max(0.0, min(1.0, weight))
 
     def process_response(self, response: str) -> IntakeResult:
         updates = self.analyzer.analyze(response)
@@ -162,16 +170,21 @@ class IntakeEngine:
             is_complete=complete,
         )
 
+    def _channel_score(self, ch) -> float:
+        """Blend channel resolution and quality based on phase weight."""
+        qw = self._quality_weight
+        return ch.quality * qw + ch.resolution * (1 - qw)
+
     def is_complete(self, threshold: float | None = None) -> bool:
         t = threshold if threshold is not None else self.threshold
         if self._critical_channels:
             # Phase-aware: only critical channels must hit threshold
             return all(
-                ch.resolution >= t
+                self._channel_score(ch) >= t
                 for ch_id, ch in self.registry.channels.items()
                 if ch_id in self._critical_channels
             )
-        return all(ch.resolution >= t for ch in self.registry.channels.values())
+        return all(self._channel_score(ch) >= t for ch in self.registry.channels.values())
 
     def get_snapshots(self) -> list[dict]:
         return list(self._snapshots)
