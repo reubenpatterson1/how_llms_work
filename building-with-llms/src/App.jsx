@@ -90,13 +90,15 @@ const SLIDES = [
     type: "text",
     title: "Dependency DAG (Directed Acyclic Graph) Principles",
     subtitle: "A DAG maps which components must finish before others can start — 'directed' means dependencies flow one way, 'acyclic' means no circular dependencies",
-    body: "The recommended output format for your dependency document is YAML. Feed this block directly into every subsequent LLM prompt as a constraint — the model will honour the wave assignments and dependency contracts without further instruction.",
-    codeLabel: "hello-world-dag.yaml",
-    code: `dag:
+    body: "The recommended output format for your dependency document is YAML. Feed this block directly into every subsequent LLM prompt as a constraint — the model will honour the wave assignments and dependency contracts without further instruction. The second example adds a prompt: field to each component — the exact dense prompt the orchestrator passes to the LLM for that wave.",
+    codeBlocks: [
+      {
+        label: "hello-world-dag.yaml — structure only",
+        code: `dag:
   shared_interfaces:
     - IAnimationEngine   # start(), reset(), onComplete(cb)
-    - IWeatherService    # fetchForecast(cityId): Promise<Forecast>
-    - ICitySelector      # value: string, onChange(city)
+    - IWeatherService    # fetchForecast(lat, lon): Promise<Forecast>
+    - ICitySelector      # value: string, onChange({name, lat, lon})
 
   components:
     AnimationEngine:
@@ -126,6 +128,67 @@ const SLIDES = [
       depends_on: [AnimationEngine, WeatherService, CitySelector, ResetController]
       wave: 3
       purpose: Composes all components, owns top-level state`,
+      },
+      {
+        label: "hello-world-dag.yaml — with orchestrator prompts",
+        code: `dag:
+  shared_interfaces:
+    IAnimationEngine: "start(), reset(), onComplete(cb)"
+    IWeatherService:  "fetchForecast(lat, lon): Promise<{temp, description, icon}>"
+    ICitySelector:    "value: string, onChange({name, lat, lon})"
+
+  components:
+    AnimationEngine:
+      depends_on: []
+      wave: 1
+      implements: IAnimationEngine
+      purpose: Manages typewriter animation lifecycle and state
+      prompt: >
+        Create a React component that renders text with a CSS keyframe typewriter
+        animation. Props: text (string), speed (number, ms per char). Use @keyframes,
+        inject via <style> tag. Export as default.
+
+    WeatherService:
+      depends_on: []
+      wave: 1
+      implements: IWeatherService
+      purpose: Two-step api.weather.gov fetch (points → forecast)
+      prompt: >
+        Create an async function fetchWeather(lat, lon). Call
+        https://api.weather.gov/points/{lat},{lon}, extract properties.forecast URL,
+        fetch it. Set User-Agent: 'HowLLMsWork/1.0'. Return {temp, description, icon}.
+
+    CitySelector:
+      depends_on: []
+      wave: 1
+      implements: ICitySelector
+      purpose: Dropdown of 15 US cities, controlled component
+      prompt: >
+        Create a React <select> with 15 US cities (NYC, LA, Chicago, Houston, Phoenix,
+        Philadelphia, San Antonio, San Diego, Dallas, Denver, Seattle, Miami, Atlanta,
+        Boston, Nashville) each with lat/lon. onChange returns {name, lat, lon}.
+        Style: background #131B2E, color #E2E8F0, border 1px solid #1E293B.
+
+    ResetController:
+      depends_on: [AnimationEngine]
+      wave: 2
+      purpose: Button that calls AnimationEngine.reset() on click
+      prompt: >
+        Create a React button component. Props: onReset (callback). Increments a key
+        state variable to force AnimationEngine re-mount on click. Style: border 1px
+        solid #3B82F6, background transparent, color #3B82F6, border-radius 6px,
+        padding 8px 20px.
+
+    LayoutShell:
+      depends_on: [AnimationEngine, WeatherService, CitySelector, ResetController]
+      wave: 3
+      purpose: Composes all components, owns top-level state
+      prompt: >
+        Create a React component composing AnimationEngine, ResetController,
+        CitySelector, and WeatherService into a centered card. Max-width 600px,
+        background #131B2E, border 1px solid #1E293B, border-radius 12px, padding 32px.`,
+      },
+    ],
     bullets: [
       { label: "LLM-Native Format", desc: "LLMs are trained on massive corpora of YAML — GitHub Actions, Kubernetes manifests, Docker Compose, Helm charts. They parse and generate it reliably without special prompting. Feed a YAML DAG into a prompt and the model treats it as a first-class constraint, not free text." },
       { label: "Structure > Prose", desc: "Prose like 'ResetController depends on AnimationEngine' is ambiguous to a model (how? which method?). YAML makes the relationship machine-verifiable: depends_on: [AnimationEngine] plus implements: IAnimationEngine is unambiguous. The format eliminates the interpretation gap." },
@@ -270,20 +333,28 @@ function TextSlide({ slide }) {
             {slide.body}
           </p>
         )}
-        {slide.code && (
-          <div style={{ margin: "0 0 24px 0", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
-            {slide.codeLabel && (
-              <div style={{ background: C.border, padding: "6px 14px", fontSize: 11, fontWeight: 600,
-                color: C.textDim, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.04em" }}>
-                {slide.codeLabel}
-              </div>
-            )}
-            <pre style={{ margin: 0, padding: "16px 20px", background: "#0D1117", overflowX: "auto",
-              fontSize: 13, lineHeight: 1.65, color: "#E2E8F0", fontFamily: "'IBM Plex Mono', monospace" }}>
-              {slide.code}
-            </pre>
-          </div>
-        )}
+        {(slide.codeBlocks || (slide.code ? [{ label: slide.codeLabel, code: slide.code }] : null)) && (() => {
+          const blocks = slide.codeBlocks || [{ label: slide.codeLabel, code: slide.code }];
+          return (
+            <div style={{ margin: "0 0 24px 0", display: "grid", gridTemplateColumns: blocks.length > 1 ? "1fr 1fr" : "1fr", gap: 12 }}>
+              {blocks.map((b, i) => (
+                <div key={i} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                  {b.label && (
+                    <div style={{ background: C.border, padding: "6px 14px", fontSize: 11, fontWeight: 600,
+                      color: C.textDim, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.04em" }}>
+                      {b.label}
+                    </div>
+                  )}
+                  <pre style={{ margin: 0, padding: "16px 20px", background: "#0D1117", overflowX: "auto",
+                    overflowY: "auto", maxHeight: 340, fontSize: 12, lineHeight: 1.6,
+                    color: "#E2E8F0", fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {b.code}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {slide.bullets && (
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px 0" }}>
             {slide.bullets.map((b, i) => (
