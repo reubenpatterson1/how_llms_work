@@ -26,7 +26,7 @@ from .llm_judge import (
 from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
-from .analytics import record_event, get_dashboard_data
+from .analytics import record_event, get_dashboard_data, get_module_locks, set_module_lock
 
 # Quality weight per phase: higher = more forgiving of unfilled sub-dimensions
 # PoC: mostly quality-based (don't penalize missing subs)
@@ -760,6 +760,25 @@ def analytics_dashboard():
     if not session.get("settings_auth"):
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify(get_dashboard_data())
+
+
+@app.route("/api/analytics/locks")
+def analytics_locks():
+    """Public endpoint — flow-through script checks this to gate access."""
+    return jsonify(get_module_locks())
+
+
+@app.route("/api/analytics/locks", methods=["POST"])
+def analytics_set_lock():
+    if not session.get("settings_auth"):
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    module = data.get("module", "")
+    locked = data.get("locked", False)
+    if module not in [f"part{i}" for i in range(1, 7)]:
+        return jsonify({"error": "Invalid module"}), 400
+    set_module_lock(module, locked)
+    return jsonify({"ok": True, "module": module, "locked": locked})
 
 
 def run(host="0.0.0.0", port=5001, debug=True):

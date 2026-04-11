@@ -48,7 +48,20 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id);
             CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
             CREATE INDEX IF NOT EXISTS idx_events_module ON events(module);
+
+            CREATE TABLE IF NOT EXISTS module_locks (
+                module TEXT PRIMARY KEY,
+                locked INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
         """)
+        # Seed lock rows if missing
+        for i in range(1, 7):
+            mod = f"part{i}"
+            db.execute(
+                "INSERT OR IGNORE INTO module_locks (module, locked, updated_at) VALUES (?, 0, ?)",
+                (mod, datetime.now(timezone.utc).isoformat()),
+            )
 
 
 def record_event(user_id, event_type, module=None, data=None, user_agent=None):
@@ -160,6 +173,11 @@ def get_dashboard_data():
                 "quizzes_taken": r["quizzes_taken"],
             })
 
+        # Module locks
+        locks = {}
+        for row in db.execute("SELECT module, locked FROM module_locks").fetchall():
+            locks[row["module"]] = bool(row["locked"])
+
         return {
             "total_users": total_users,
             "active_today": active_today,
@@ -168,7 +186,25 @@ def get_dashboard_data():
             "quiz_results": quiz_results,
             "recent_activity": recent,
             "user_progress": user_progress,
+            "module_locks": locks,
         }
+
+
+def get_module_locks():
+    with get_db() as db:
+        locks = {}
+        for row in db.execute("SELECT module, locked FROM module_locks").fetchall():
+            locks[row["module"]] = bool(row["locked"])
+        return locks
+
+
+def set_module_lock(module, locked):
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db() as db:
+        db.execute(
+            "UPDATE module_locks SET locked=?, updated_at=? WHERE module=?",
+            (1 if locked else 0, now, module),
+        )
 
 
 # Initialize on import

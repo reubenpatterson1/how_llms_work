@@ -239,7 +239,7 @@
     const PFX = '{{ pfx }}';
     const _origFetch = window.fetch;
     window.fetch = function(url, opts) {
-      if (typeof url === 'string' && url.startsWith('/api/') && PFX) {
+      if (typeof url === 'string' && url.startsWith('/api/') && PFX && !url.startsWith(PFX)) {
         url = PFX + url;
       }
       return _origFetch.call(this, url, opts);

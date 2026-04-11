@@ -80,6 +80,8 @@ function getProgress(){
   try{return JSON.parse(localStorage.getItem('llm_course_progress'))||{}}catch(e){return{}}
 }
 
+var serverLocks={};
+
 function render(){
   const progress=getProgress();
   const completed=MODULES.filter(m=>progress[m.id]).length;
@@ -91,17 +93,19 @@ function render(){
   MODULES.forEach((m,i)=>{
     const done=!!progress[m.id];
     const prevDone=i===0||!!progress[MODULES[i-1].id];
-    const unlocked=done||prevDone;
-    const state=done?'completed':unlocked?'unlocked':'locked';
+    const adminLocked=!!serverLocks[m.id];
+    const unlocked=!adminLocked&&(done||prevDone);
+    const state=adminLocked?'locked':done?'completed':unlocked?'unlocked':'locked';
 
     const card=document.createElement(unlocked?'a':'div');
     card.className='module-card '+state;
     if(unlocked)card.href=m.path;
 
+    var badgeText=adminLocked?'Admin Locked':done?'Completed':unlocked?'Start':'Locked';
     var recLink=m.recording?'<span class="rec-link" data-url="'+m.recording+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:12px;color:#a78bfa;cursor:pointer;"><span style="font-size:14px">&#9654;</span> Watch Recording</span>':'';
-    card.innerHTML='<div class="module-num">'+(done?'&#10003;':m.num)+'</div>'
+    card.innerHTML='<div class="module-num">'+(done&&!adminLocked?'&#10003;':m.num)+'</div>'
       +'<div class="module-info"><h3>Part '+m.num+': '+m.title+'</h3><p>'+m.desc+'</p>'+recLink+'</div>'
-      +'<span class="module-badge">'+(done?'Completed':unlocked?'Start':'Locked')+'</span>'
+      +'<span class="module-badge">'+badgeText+'</span>'
       +(!unlocked?'<span class="lock-icon">&#128274;</span>':'');
     var rec=card.querySelector('.rec-link');
     if(rec)rec.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();window.open(this.dataset.url,'_blank');});
@@ -122,6 +126,7 @@ function render(){
   }
 }
 render();
+fetch('/api/analytics/locks').then(function(r){return r.json()}).then(function(locks){serverLocks=locks;render();}).catch(function(){});
 </script>
 </body>
 </html>

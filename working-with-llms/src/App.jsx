@@ -331,13 +331,15 @@ export default function App() {
       flexDirection: "column", fontFamily: "'IBM Plex Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-      <div style={{ flex: 1, overflow: "auto" }}>
+      <div style={{ flex: 1, overflow: "auto", paddingBottom: 56 }}>
         {slide.type === "text" ? <TextSlide slide={slide} /> : <ComponentSlide slide={slide} />}
       </div>
 
-      <div style={{
+      <nav style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 1000,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
-        padding: "12px 20px", borderTop: `1px solid ${C.border}`, background: C.surface,
+        padding: "12px 20px", borderTop: `1px solid ${C.border}`,
+        background: "rgba(19,27,46,0.95)", backdropFilter: "blur(12px)",
       }}>
         <button onClick={() => go(-1)} disabled={idx === 0}
           style={{
@@ -371,7 +373,7 @@ export default function App() {
         <span style={{ fontSize: 12, color: C.textDim, marginLeft: 8 }}>
           {idx + 1} / {SLIDES.length}
         </span>
-      </div>
+      </nav>
     </div>
   );
 }

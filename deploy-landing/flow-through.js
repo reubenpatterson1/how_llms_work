@@ -17,6 +17,11 @@
       body:JSON.stringify({user_id:userId,event_type:eventType,module:module,data:data})});}catch(e){}
   }
 
+  // Check server-side module locks
+  fetch('/api/analytics/locks').then(function(r){return r.json()}).then(function(locks){
+    if(locks[current]){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#94a3b8;font-family:sans-serif;flex-direction:column;gap:12px"><div style="font-size:48px">&#128274;</div><div style="font-size:18px;font-weight:600;color:#e2e8f0">Module Locked</div><div>This module is not yet available. Please return to the course home.</div><a href="/" style="margin-top:12px;padding:8px 20px;border-radius:6px;background:#3b82f6;color:#fff;text-decoration:none;font-weight:600">Course Home</a></div>';return;}
+  }).catch(function(){});
+
   // Track module start
   trackEvent('module_start',current);
 
