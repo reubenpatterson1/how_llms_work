@@ -216,12 +216,13 @@
   <nav class="nav">
     <div class="nav-brand">Architecture Agent</div>
     <div class="nav-links">
-      <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-      <a href="/intake" class="nav-link {% if active_page == 'intake' %}active{% endif %}">Intake</a>
-      <a href="/spec" class="nav-link {% if active_page == 'spec' %}active{% endif %}">Specification</a>
-      <a href="/decompose" class="nav-link {% if active_page == 'decompose' %}active{% endif %}">Decompose</a>
-      <a href="/comparison" class="nav-link {% if active_page == 'comparison' %}active{% endif %}">Comparison</a>
-      <a href="/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">Settings</a>
+      <a href="{{ pfx }}/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{{ pfx }}/intake" class="nav-link {% if active_page == 'intake' %}active{% endif %}">Intake</a>
+      <a href="{{ pfx }}/spec" class="nav-link {% if active_page == 'spec' %}active{% endif %}">Specification</a>
+      <a href="{{ pfx }}/decompose" class="nav-link {% if active_page == 'decompose' %}active{% endif %}">Decompose</a>
+      <a href="{{ pfx }}/comparison" class="nav-link {% if active_page == 'comparison' %}active{% endif %}">Comparison</a>
+      <a href="{{ pfx }}/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">Settings</a>
+      <a href="{{ pfx }}/admin" class="nav-link {% if active_page == 'admin' %}active{% endif %}">Admin</a>
     </div>
     <div class="nav-status">
       <span>
@@ -235,6 +236,14 @@
   <script>
     const SID = sessionStorage.getItem('arch_sid') || 'sid_' + Math.random().toString(36).slice(2, 10);
     sessionStorage.setItem('arch_sid', SID);
+    const PFX = '{{ pfx }}';
+    const _origFetch = window.fetch;
+    window.fetch = function(url, opts) {
+      if (typeof url === 'string' && url.startsWith('/api/') && PFX) {
+        url = PFX + url;
+      }
+      return _origFetch.call(this, url, opts);
+    };
   </script>
 
   <main class="main">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 const C = {
   bg: '#0B1120', surface: '#111827', border: '#1E293B',
@@ -177,18 +177,46 @@ function hashCode(str) {
   return Math.abs(hash).toString(36).toUpperCase().slice(0, 5)
 }
 
+async function downloadCertPDF({ title, subtitle, name, body, fields, watermark = "LLM ENGINEERING COURSE" }) {
+  if (!window.jspdf) { await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); }); }
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" }); const W = 297, H = 210;
+  doc.setFillColor(15,23,42); doc.rect(0,0,W,H,"F");
+  doc.setTextColor(30,41,59); doc.setFontSize(28); doc.setFont("helvetica","bold");
+  for (let y = -50; y < H+50; y += 40) for (let x = -100; x < W+100; x += 160) doc.text(watermark, x, y, { angle: 30 });
+  doc.setDrawColor(232,168,56); doc.setLineWidth(0.5); doc.rect(12,12,W-24,H-24); doc.rect(15,15,W-30,H-30);
+  [[18,18,1,1],[W-18,18,-1,1],[18,H-18,1,-1],[W-18,H-18,-1,-1]].forEach(([x,y,dx,dy])=>{doc.line(x,y,x+8*dx,y);doc.line(x,y,x,y+8*dy);});
+  doc.setTextColor(232,168,56); doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.text(title.toUpperCase(), W/2, 38, { align: "center" });
+  doc.setTextColor(138,150,167); doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.text(subtitle.toUpperCase(), W/2, 45, { align: "center" });
+  doc.setTextColor(138,150,167); doc.setFontSize(10); doc.text("This certifies that", W/2, 60, { align: "center" });
+  doc.setTextColor(226,232,240); doc.setFontSize(28); doc.setFont("helvetica","bold"); doc.text(name, W/2, 75, { align: "center" });
+  doc.setDrawColor(232,168,56); doc.setLineWidth(0.3); doc.line(W/2-20,82,W/2+20,82);
+  doc.setTextColor(138,150,167); doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(body,180), W/2, 92, { align: "center", lineHeightFactor: 1.6 });
+  const fY=135, fS=W/(fields.length+1); fields.forEach((f,i)=>{const x=fS*(i+1); doc.setTextColor(74,85,104); doc.setFontSize(7); doc.setFont("helvetica","bold"); doc.text(f.label.toUpperCase(),x,fY,{align:"center"}); doc.setTextColor(226,232,240); doc.setFontSize(11); doc.text(f.value,x,fY+7,{align:"center"});});
+  doc.setTextColor(50,60,80); doc.setFontSize(7); doc.setFont("helvetica","normal"); doc.text("This certificate was generated as part of the LLM Engineering Course", W/2, H-20, { align: "center" });
+  doc.save(`${name.replace(/\s+/g,"_")}_Certificate.pdf`);
+}
+
 export default function CICDQuiz() {
   const [phase, setPhase] = useState('quiz') // 'quiz' | 'results' | 'certificate'
   const [answers, setAnswers] = useState({})
   const [currentQ, setCurrentQ] = useState(0)
   const [showExplanation, setShowExplanation] = useState(false)
 
-  const q = QUESTIONS[currentQ]
+  const shuffledQuestions = useMemo(() => QUESTIONS.map(q => {
+    const indices = q.options.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    return { ...q, options: indices.map(i => q.options[i]), correct: indices.indexOf(q.correct) };
+  }), []);
+
+  const q = shuffledQuestions[currentQ]
   const selectedAnswer = answers[q.id]
   const isAnswered = selectedAnswer !== undefined
   const isCorrect = selectedAnswer === q.correct
 
-  const score = QUESTIONS.filter(q => answers[q.id] === q.correct).length
+  const score = shuffledQuestions.filter(q => answers[q.id] === q.correct).length
   const passed = score >= 9
   const tier = score >= 11 ? 'Distinction' : score >= 9 ? 'Pass' : 'Below Threshold'
 
@@ -218,7 +246,7 @@ export default function CICDQuiz() {
   }
 
   const sectionProgress = SECTIONS.map((name, si) => {
-    const sectionQs = QUESTIONS.filter(q => q.section === si)
+    const sectionQs = shuffledQuestions.filter(q => q.section === si)
     const answered = sectionQs.filter(q => answers[q.id] !== undefined).length
     const correct = sectionQs.filter(q => answers[q.id] === q.correct).length
     return { name, total: sectionQs.length, answered, correct }
@@ -278,6 +306,20 @@ export default function CICDQuiz() {
           </div>
 
           <div style={{ color: C.muted, fontSize: 12, marginBottom: 24 }}>Issued: {today}</div>
+
+          <button
+            onClick={() => {
+              const n = prompt("Enter your name for the certificate:");
+              if (n) downloadCertPDF({ title: "Certificate of Completion", subtitle: "CI/CD with LLMs \u2014 Module 6 (Series Complete)", name: n, body: "has completed all 6 modules of the LLM Engineering Course, demonstrating practitioner-level comprehension from model internals through production CI/CD pipelines for LLM-generated systems.", fields: [{ label: "Score", value: `${score}/12` }, { label: "Result", value: tier }, { label: "Date", value: today }, { label: "Certificate ID", value: certId }] });
+            }}
+            style={{
+              background: C.accent, color: '#fff', border: 'none',
+              borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+              width: '100%', marginBottom: 10
+            }}
+          >
+            Download PDF Certificate
+          </button>
 
           <button
             onClick={restart}
@@ -343,7 +385,7 @@ export default function CICDQuiz() {
           <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Question Review
           </div>
-          {QUESTIONS.map(q => {
+          {shuffledQuestions.map(q => {
             const userAnswer = answers[q.id]
             const correct = userAnswer === q.correct
             return (
@@ -517,12 +559,12 @@ export default function CICDQuiz() {
       {/* Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 4 }}>
-          {QUESTIONS.map((_, i) => (
+          {shuffledQuestions.map((sq, i) => (
             <div key={i} style={{
               width: 6, height: 6, borderRadius: '50%',
               background: i === currentQ ? C.accent
-                : answers[QUESTIONS[i].id] === QUESTIONS[i].correct ? C.green
-                : answers[QUESTIONS[i].id] !== undefined ? C.red
+                : answers[sq.id] === sq.correct ? C.green
+                : answers[sq.id] !== undefined ? C.red
                 : C.border
             }} />
           ))}

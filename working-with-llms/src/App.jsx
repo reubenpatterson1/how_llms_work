@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import NoisePollutionBridge from "./components/NoisePollutionBridge";
+import ChannelGroundingViz from "./components/ChannelGroundingViz";
+import CostComparison from "./components/CostComparison";
 import DensityMethodology from "./components/DensityMethodology";
 import AgentWalkthrough from "./components/AgentWalkthrough";
 import ComparativeResults from "./components/ComparativeResults";
@@ -17,7 +20,7 @@ const SLIDES = [
   {
     id: "title",
     type: "text",
-    title: "How to Actually Work WITH LLMs",
+    title: <>How to WORK <em style={{fontStyle: "italic", fontWeight: 400}}>With</em> LLMs</>,
     subtitle: "From Theory to Systematic Engineering",
     body: "Part 1 showed how attention, density, and activation landscapes determine output quality. This presentation turns that theory into a repeatable engineering methodology — with real comparative data proving it works.",
   },
@@ -30,12 +33,24 @@ const SLIDES = [
     keyTakeaway: "Every unresolved architectural dimension is a hallucination vector. The model WILL fill it — the question is whether it fills it from your spec or from its training data.",
   },
   {
+    id: "bridge-demo",
+    type: "component",
+    component: "NoisePollutionBridge",
+    instructions: "Toggle between Vague and Dense prompts to see the causal chain: how prompt tokens flow through attention layers and ultimately determine which architectural channels are resolved vs confabulated.",
+  },
+  {
     id: "core-insight",
     type: "text",
     title: "The Density Principle",
     subtitle: "Constraint-oriented tokens maximize execution, minimize invention",
     body: "Context density isn't just about writing shorter prompts. It's about resolving every dimension the model needs to make decisions. When a prompt specifies 'PostgreSQL 15 with compound index on (team_id, status)', the model executes. When it says 'some kind of database', the model invents. The Architecture Agent systematizes this principle into 10 channels with 45+ sub-dimensions.",
     keyTakeaway: "Density = resolved dimensions / total dimensions. Maximize this ratio and the model shifts from generating to executing.",
+  },
+  {
+    id: "core-insight-demo",
+    type: "component",
+    component: "ChannelGroundingViz",
+    instructions: "Toggle between Vague and Dense to see how each channel's sub-dimensions fill with grounded vs confabulated tokens — then observe how this directly determines whether 5 independent runs produce consistent or varying output.",
   },
   {
     id: "methodology-intro",
@@ -128,6 +143,20 @@ const SLIDES = [
     type: "component",
     component: "AgenticSystems",
     instructions: "Explore the three pillars of stable agentic systems. Each pillar includes principles, anti-patterns, and real examples.",
+  },
+  {
+    id: "cost-intro",
+    type: "text",
+    title: "The True Cost of Vagueness",
+    subtitle: "API tokens are the tip of the iceberg",
+    body: "A vague prompt costs less in input tokens — but triggers 10 iterations of debugging, refactoring, and security patching. A dense spec costs more upfront in input tokens but generates production-ready code in a single pass. Factor in developer time and the soft costs of security vulnerabilities, missing logging, inconsistent code patterns, and technical debt — and vague prompts are 3-4x more expensive than dense specs.",
+    keyTakeaway: "Claude Opus 4: $15/M input, $75/M output. The API cost difference between vague and dense adds up fast — but developer time dwarfs token costs every time.",
+  },
+  {
+    id: "cost-demo",
+    type: "component",
+    component: "CostComparison",
+    instructions: "Three tabs: Cost Overview shows token and time metrics side-by-side. Iteration Breakdown shows each prompt-response cycle. Hidden Costs reveals security, logging, stability, homogeneity, testing, and technical debt issues — click each to expand.",
   },
   {
     id: "synthesis",
@@ -246,6 +275,9 @@ function TextSlide({ slide }) {
 }
 
 const COMPONENT_MAP = {
+  NoisePollutionBridge,
+  ChannelGroundingViz,
+  CostComparison,
   DensityMethodology,
   AgentWalkthrough,
   ComparativeResults,

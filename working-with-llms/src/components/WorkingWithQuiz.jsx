@@ -107,15 +107,15 @@ const QUESTIONS = [
   },
   {
     section: 2,
-    q: `In our test data, the vague prompt produced 37.5% confabulated tokens and the dense spec produced 0%. A skeptic argues this is because the mock LLM is too simple. Is the metric still meaningful?`,
+    q: `In our test data using Claude Sonnet via the Architecture Agent, the vague prompt produced 37.5% confabulated tokens and the dense spec produced 0%. A skeptic argues this only works with one model. Is the metric still meaningful?`,
     options: [
-      `No — mock LLM data can't predict real model behavior`,
+      `No — results from Claude Sonnet can't predict behavior on other models`,
       `Yes — the metric measures the STRUCTURAL property that unresolved dimensions force confabulation, which holds regardless of model complexity`,
       `Partially — the 37.5% number is unreliable but the 0% is meaningful`,
-      `No — real models would produce lower hallucination rates due to RLHF alignment`,
+      `No — other models would produce lower hallucination rates due to RLHF alignment`,
     ],
     answer: 1,
-    explanation: `The confabulation rate is a structural property of the prompt's density, not of the model's capability. A real model might confabulate different values (maybe FastAPI instead of Express), but it still must fill unresolved dimensions. The mock LLM demonstrates the principle: vague prompts have N unresolved dimensions that produce N confabulated decisions. Dense specs have 0 unresolved dimensions that produce 0 confabulated decisions. RLHF doesn't help here — alignment makes the model more helpful, not more constrained. A helpful model fills gaps enthusiastically.`,
+    explanation: `The confabulation rate is a structural property of the prompt's density, not of the model's capability. A different model might confabulate different values (maybe FastAPI instead of Express), but it still must fill unresolved dimensions. The Claude Sonnet results demonstrate the principle: vague prompts have N unresolved dimensions that produce N confabulated decisions. Dense specs have 0 unresolved dimensions that produce 0 confabulated decisions. RLHF doesn't help here — alignment makes the model more helpful, not more constrained. A helpful model fills gaps enthusiastically.`,
   },
   {
     section: 2,
@@ -359,6 +359,44 @@ function QuestionScreen({ q, qNum, total, selected, setSelected, revealed, onRev
   );
 }
 
+async function downloadCertPDF({ title, subtitle, name, body, fields, watermark = "LLM ENGINEERING COURSE" }) {
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const W = 297, H = 210;
+  doc.setFillColor(15, 23, 42); doc.rect(0, 0, W, H, "F");
+  doc.setTextColor(30, 41, 59); doc.setFontSize(28); doc.setFont("helvetica", "bold");
+  for (let y = -50; y < H + 50; y += 40) for (let x = -100; x < W + 100; x += 160) doc.text(watermark, x, y, { angle: 30 });
+  doc.setDrawColor(232, 168, 56); doc.setLineWidth(0.5); doc.rect(12, 12, W - 24, H - 24); doc.rect(15, 15, W - 30, H - 30);
+  const cLen = 8;
+  [[18,18,1,1],[W-18,18,-1,1],[18,H-18,1,-1],[W-18,H-18,-1,-1]].forEach(([x,y,dx,dy]) => { doc.line(x,y,x+cLen*dx,y); doc.line(x,y,x,y+cLen*dy); });
+  doc.setTextColor(232, 168, 56); doc.setFontSize(10); doc.setFont("helvetica", "bold");
+  doc.text(title.toUpperCase(), W/2, 38, { align: "center" });
+  doc.setTextColor(138, 150, 167); doc.setFontSize(8); doc.setFont("helvetica", "normal");
+  doc.text(subtitle.toUpperCase(), W/2, 45, { align: "center" });
+  doc.setTextColor(138, 150, 167); doc.setFontSize(10); doc.text("This certifies that", W/2, 60, { align: "center" });
+  doc.setTextColor(226, 232, 240); doc.setFontSize(28); doc.setFont("helvetica", "bold");
+  doc.text(name, W/2, 75, { align: "center" });
+  doc.setDrawColor(232, 168, 56); doc.setLineWidth(0.3); doc.line(W/2-20, 82, W/2+20, 82);
+  doc.setTextColor(138, 150, 167); doc.setFontSize(9); doc.setFont("helvetica", "normal");
+  doc.text(doc.splitTextToSize(body, 180), W/2, 92, { align: "center", lineHeightFactor: 1.6 });
+  const fieldY = 135, fieldSpacing = W / (fields.length + 1);
+  fields.forEach((f, i) => { const x = fieldSpacing*(i+1);
+    doc.setTextColor(74,85,104); doc.setFontSize(7); doc.setFont("helvetica","bold"); doc.text(f.label.toUpperCase(), x, fieldY, { align: "center" });
+    doc.setTextColor(226,232,240); doc.setFontSize(11); doc.text(f.value, x, fieldY+7, { align: "center" });
+  });
+  doc.setTextColor(50,60,80); doc.setFontSize(7); doc.setFont("helvetica","normal");
+  doc.text("This certificate was generated as part of the LLM Engineering Course", W/2, H-20, { align: "center" });
+  doc.save(`${name.replace(/\s+/g, "_")}_Certificate.pdf`);
+}
+
 function Certificate({ name, score, total, sectionScores }) {
   const pct = Math.round((score / total) * 100);
   const passed = score >= 13;
@@ -417,10 +455,22 @@ function Certificate({ name, score, total, sectionScores }) {
       </div>
 
       <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button onClick={() => window.print()}
+        <button onClick={() => downloadCertPDF({
+            title: "Certificate of Comprehension",
+            subtitle: "Applied LLM Architecture",
+            name,
+            body: "has demonstrated engineering-level comprehension of constraint-oriented prompt architecture, 10-channel density methodology, comparative analysis, run-to-run consistency, and agentic system design for large language models.",
+            fields: [
+              { label: "Score", value: `${score} / ${total}` },
+              { label: "Percentage", value: `${pct}%` },
+              { label: "Result", value: tier },
+              { label: "Date", value: new Date().toLocaleDateString() },
+              { label: "Certificate ID", value: id },
+            ],
+          })}
           style={{ background: "none", color: C.textDim, border: `1px solid ${C.border}`,
             padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-          Print Certificate
+          Download PDF
         </button>
       </div>
     </div>
@@ -439,8 +489,17 @@ export default function WorkingWithQuiz() {
     const seq = [];
     for (let s = 0; s < SECTIONS.length; s++) {
       seq.push({ type: "section", section: s });
-      QUESTIONS.filter(q => q.section === s).forEach((q, qi) => {
-        seq.push({ type: "question", question: q, globalIdx: QUESTIONS.indexOf(q) });
+      QUESTIONS.filter(q => q.section === s).forEach((q) => {
+        const indices = q.options.map((_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        seq.push({
+          type: "question",
+          question: { ...q, options: indices.map(i => q.options[i]), answer: indices.indexOf(q.answer) },
+          globalIdx: QUESTIONS.indexOf(q),
+        });
       });
     }
     return seq;
@@ -466,10 +525,11 @@ export default function WorkingWithQuiz() {
   }
 
   if (phase === "done") {
-    const score = QUESTIONS.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
+    const questionSteps = sequence.filter(s => s.type === "question");
+    const score = questionSteps.reduce((s, step) => s + (answers[step.globalIdx] === step.question.answer ? 1 : 0), 0);
     const sectionScores = SECTIONS.map((_, si) =>
-      QUESTIONS.filter(q => q.section === si)
-        .reduce((s, q) => s + (answers[QUESTIONS.indexOf(q)] === q.answer ? 1 : 0), 0)
+      questionSteps.filter(step => step.question.section === si)
+        .reduce((s, step) => s + (answers[step.globalIdx] === step.question.answer ? 1 : 0), 0)
     );
     return <Certificate name={name} score={score} total={QUESTIONS.length} sectionScores={sectionScores} />;
   }

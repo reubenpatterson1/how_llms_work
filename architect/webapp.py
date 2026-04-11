@@ -12,7 +12,7 @@ Production-level dashboard with:
 import json
 import os
 import time
-from flask import Flask, render_template, request, jsonify, session, Response
+from flask import Flask, render_template, request, jsonify, session, Response, redirect
 from flask_socketio import SocketIO, emit
 
 from .channels import ChannelRegistry
@@ -26,6 +26,7 @@ from .llm_judge import (
 from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
+from .analytics import record_event, get_dashboard_data
 
 # Quality weight per phase: higher = more forgiving of unfilled sub-dimensions
 # PoC: mostly quality-based (don't penalize missing subs)
@@ -40,6 +41,13 @@ PHASE_QUALITY_WEIGHT = {
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(__file__), "templates"),
             static_folder=os.path.join(os.path.dirname(__file__), "static"))
+
+# URL prefix for reverse-proxy deployments (e.g. /architect behind nginx)
+URL_PREFIX = os.environ.get("URL_PREFIX", "")
+
+@app.context_processor
+def inject_url_prefix():
+    return {"pfx": URL_PREFIX}
 app.secret_key = os.environ.get("FLASK_SECRET", "arch-agent-dev-key-change-in-prod")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -154,7 +162,18 @@ def decompose_page():
 
 @app.route("/settings")
 def settings_page():
+    if not session.get("settings_auth"):
+        return render_template("settings_login.html")
     return render_template("settings.html")
+
+
+@app.route("/settings/login", methods=["POST"])
+def settings_login():
+    password = request.form.get("password", "")
+    if password == os.environ.get("SETTINGS_PASSWORD", "D0ntChangeMe"):
+        session["settings_auth"] = True
+        return redirect(URL_PREFIX + "/settings")
+    return render_template("settings_login.html", error="Incorrect password")
 
 
 # ── API endpoints ──
@@ -545,6 +564,8 @@ def api_settings():
 @app.route("/api/settings", methods=["POST"])
 def api_settings_update():
     """Update provider configuration."""
+    if not session.get("settings_auth"):
+        return jsonify({"error": "Unauthorized"}), 401
     global _global_config  # noqa: PLW0603
     data = request.get_json()
 
@@ -706,6 +727,39 @@ def ws_send_message(data):
         "constraint_quality": round(registry.constraint_quality_score(), 3),
         "channels": channels_data,
     })
+
+
+# ── Analytics Routes ──
+
+@app.route("/admin")
+def admin_page():
+    if not session.get("settings_auth"):
+        return render_template("settings_login.html")
+    return render_template("admin.html")
+
+
+@app.route("/api/analytics/event", methods=["POST"])
+def analytics_event():
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id", "")
+    event_type = data.get("event_type", "")
+    if not user_id or not event_type:
+        return jsonify({"error": "user_id and event_type required"}), 400
+    record_event(
+        user_id=user_id,
+        event_type=event_type,
+        module=data.get("module"),
+        data=data.get("data"),
+        user_agent=request.headers.get("User-Agent"),
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/analytics/dashboard")
+def analytics_dashboard():
+    if not session.get("settings_auth"):
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify(get_dashboard_data())
 
 
 def run(host="0.0.0.0", port=5001, debug=True):

@@ -805,6 +805,107 @@ function QuestionScreen({ question, questionNumber, totalQuestions, sectionIndex
   );
 }
 
+async function downloadCertPDF({ title, subtitle, name, body, fields, watermark = "LLM ENGINEERING COURSE" }) {
+  // Load jsPDF from CDN
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js";
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const W = 297, H = 210;
+
+  // Background
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, W, H, "F");
+
+  // Watermark (diagonal, repeated)
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(28);
+  doc.setFont("helvetica", "bold");
+  for (let y = -50; y < H + 50; y += 40) {
+    for (let x = -100; x < W + 100; x += 160) {
+      doc.text(watermark, x, y, { angle: 30 });
+    }
+  }
+
+  // Border
+  doc.setDrawColor(232, 168, 56);
+  doc.setLineWidth(0.5);
+  doc.rect(12, 12, W - 24, H - 24);
+  doc.rect(15, 15, W - 30, H - 30);
+
+  // Corner ornaments
+  const cLen = 8;
+  [[18, 18, 1, 1], [W - 18, 18, -1, 1], [18, H - 18, 1, -1], [W - 18, H - 18, -1, -1]].forEach(([x, y, dx, dy]) => {
+    doc.line(x, y, x + cLen * dx, y);
+    doc.line(x, y, x, y + cLen * dy);
+  });
+
+  // Title
+  doc.setTextColor(232, 168, 56);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(title.toUpperCase(), W / 2, 38, { align: "center" });
+
+  // Subtitle
+  doc.setTextColor(138, 150, 167);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text(subtitle.toUpperCase(), W / 2, 45, { align: "center" });
+
+  // "This certifies that"
+  doc.setTextColor(138, 150, 167);
+  doc.setFontSize(10);
+  doc.text("This certifies that", W / 2, 60, { align: "center" });
+
+  // Name
+  doc.setTextColor(226, 232, 240);
+  doc.setFontSize(28);
+  doc.setFont("helvetica", "bold");
+  doc.text(name, W / 2, 75, { align: "center" });
+
+  // Divider
+  doc.setDrawColor(232, 168, 56);
+  doc.setLineWidth(0.3);
+  doc.line(W / 2 - 20, 82, W / 2 + 20, 82);
+
+  // Body text
+  doc.setTextColor(138, 150, 167);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  const bodyLines = doc.splitTextToSize(body, 180);
+  doc.text(bodyLines, W / 2, 92, { align: "center", lineHeightFactor: 1.6 });
+
+  // Fields row
+  const fieldY = 135;
+  const fieldSpacing = W / (fields.length + 1);
+  fields.forEach((f, i) => {
+    const x = fieldSpacing * (i + 1);
+    doc.setTextColor(74, 85, 104);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(f.label.toUpperCase(), x, fieldY, { align: "center" });
+    doc.setTextColor(226, 232, 240);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(f.value, x, fieldY + 7, { align: "center" });
+  });
+
+  // Footer
+  doc.setTextColor(50, 60, 80);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text("This certificate was generated as part of the LLM Engineering Course", W / 2, H - 20, { align: "center" });
+
+  doc.save(`${name.replace(/\s+/g, "_")}_Certificate.pdf`);
+}
+
 function Certificate({ name, score, total, sectionScores, onRetry }) {
   const pct = Math.round((score / total) * 100);
   const { label, color } = scoreLabel(pct);
@@ -932,7 +1033,19 @@ function Certificate({ name, score, total, sectionScores, onRetry }) {
         {/* Actions */}
         <div style={{ display: "flex", gap: 12 }}>
           <button
-            onClick={() => window.print()}
+            onClick={() => downloadCertPDF({
+              title: "Certificate of Comprehension",
+              subtitle: "Engineering Professional Level",
+              name,
+              body: "has demonstrated engineering-level comprehension of transformer self-attention mechanisms, weight formation dynamics, feature activation landscapes, hallucination topology, and the formal\u2013functional competence distinction in large language models.",
+              fields: [
+                { label: "Score", value: `${score} / ${total}` },
+                { label: "Percentage", value: `${pct}%` },
+                { label: "Result", value: label },
+                { label: "Date", value: date },
+                { label: "Certificate ID", value: certId },
+              ],
+            })}
             style={{
               flex: 1,
               padding: "12px",
@@ -945,7 +1058,7 @@ function Certificate({ name, score, total, sectionScores, onRetry }) {
               cursor: "pointer",
             }}
           >
-            Print / Save
+            Download PDF
           </button>
           <button
             onClick={onRetry}
@@ -983,13 +1096,27 @@ export default function EngineeringProfQuiz() {
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState([]); // [true/false, …]
 
-  // Build the flat sequence once
+  // Build the flat sequence once, shuffling option order per question
   const sequence = useMemo(() => {
     const seq = [];
     for (let s = 0; s < SECTIONS.length; s++) {
       seq.push({ type: "section-header", sectionIndex: s });
       const qs = QUESTIONS.filter(q => q.section === s);
-      qs.forEach(q => seq.push({ type: "question", question: q, sectionIndex: s }));
+      qs.forEach(q => {
+        // Shuffle options while tracking the correct answer
+        const indices = q.options.map((_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        const shuffledOptions = indices.map(i => q.options[i]);
+        const shuffledAnswer = indices.indexOf(q.answer);
+        seq.push({
+          type: "question",
+          question: { ...q, options: shuffledOptions, answer: shuffledAnswer },
+          sectionIndex: s,
+        });
+      });
     }
     return seq;
   }, []);
@@ -1072,6 +1199,7 @@ export default function EngineeringProfQuiz() {
 
   return (
     <QuestionScreen
+      key={stepIndex}
       question={currentStep.question}
       questionNumber={questionNumber}
       totalQuestions={QUESTIONS.length}

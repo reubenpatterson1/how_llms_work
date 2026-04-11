@@ -186,7 +186,7 @@ const SLIDES = [
     title: "Continue to Part 2",
     subtitle: "How to Actually Work WITH LLMs",
     body: "Part 1 covered the theory: attention, weights, dilution, density, hallucination, and confidence. Part 2 turns that theory into a systematic engineering methodology — with an Architecture Agent, real comparative data, and a complete assessment.",
-    keyTakeaway: "Part 2 runs on port 5174. Start it with: cd working-with-llms && npm run dev",
+    keyTakeaway: "",
   },
   {
     id: "quiz-intro",

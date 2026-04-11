@@ -57,15 +57,15 @@ const FUNCTIONAL_DOMAINS = [
     color: "#E07A5F",
     brainRegion: "Multiple Demand Network",
     example: {
-      prompt: "What is 47 × 83?",
-      llmAnswer: "3,811",
-      correctAnswer: "3,901",
+      prompt: "A bat and ball cost $1.10 total. The bat costs $1.00 more than the ball. How much does the ball cost? Now: if the bat costs $1.37 more than the ball, and they total $2.19, how much is the ball?",
+      llmAnswer: "Often $0.10 (echoes part 1), then $0.41 (correct is $0.41)",
+      correctAnswer: "$0.05, then $0.41",
       llmCorrect: false,
     },
-    description: "Logic, math, and multi-step problem solving. LLMs handle simple arithmetic but fail on complex operations. Humans use a separate brain network (the Multiple Demand Network) for these tasks.",
-    llmScore: 0.45,
+    description: "Logic, math, and multi-step reasoning. Frontier models now solve basic arithmetic via tool use and chain-of-thought, but multi-step constraint problems and anchoring traps still expose gaps.",
+    llmScore: 0.78,
     humanScore: 0.92,
-    challenge: "LLMs are trained to predict plausible next tokens, not to compute. Each digit in a multiplication requires carry operations that don't map to pattern matching.",
+    challenge: "Extended thinking and tool use have closed the gap on rote computation. But problems requiring resistance to cognitive anchoring or multi-constraint reasoning still trip models up when they pattern-match from familiar setups.",
   },
   {
     id: "knowledge",
@@ -74,15 +74,15 @@ const FUNCTIONAL_DOMAINS = [
     color: "#81B29A",
     brainRegion: "Distributed cortical regions",
     example: {
-      prompt: "Is a penguin a bird that can fly?",
-      llmAnswer: "Varies—sometimes says yes",
-      correctAnswer: "No, penguins cannot fly",
+      prompt: "You push a heavy box across a carpet, then across a polished marble floor. Where is it harder to stop the box once it's moving?",
+      llmAnswer: "Often says carpet (confuses starting vs stopping friction)",
+      correctAnswer: "Marble\u2014less friction means less stopping force",
       llmCorrect: false,
     },
-    description: "Factual and commonsense knowledge. LLMs absorb vast knowledge from text but hallucinate, give inconsistent answers, and miss 'obvious' facts that humans never write down.",
-    llmScore: 0.60,
+    description: "Factual and commonsense knowledge. Frontier models handle direct fact recall well, but still struggle with physical intuition and commonsense reasoning about scenarios rarely described explicitly in text.",
+    llmScore: 0.82,
     humanScore: 0.95,
-    challenge: "Commonsense facts (\"fire is hot\") are rarely stated in text. LLMs optimize for plausibility, not truth, leading to confident-sounding hallucinations.",
+    challenge: "Explicit facts are well-covered by training data. But embodied intuition\u2014how objects feel, how forces interact\u2014is rarely stated in text and must be inferred from sparse, indirect evidence.",
   },
   {
     id: "situation",
@@ -91,15 +91,15 @@ const FUNCTIONAL_DOMAINS = [
     color: "#3D85C6",
     brainRegion: "Default Network",
     example: {
-      prompt: "Arthur doesn't own a dog. What color is Arthur's dog?",
-      llmAnswer: "\"Arthur's dog is brown.\"",
-      correctAnswer: "Arthur doesn't have a dog.",
+      prompt: "Alice puts milk in her coffee at 8am. At noon she microwaves the same mug. What temperature is the milk now?",
+      llmAnswer: "Often says \"warm\" without noting the milk is mixed into coffee",
+      correctAnswer: "Hot\u2014the milk is part of the coffee and was reheated together",
       llmCorrect: false,
     },
-    description: "Tracking entities and their states over time. Humans build rich mental models of narratives. LLMs can refer to non-existent entities and lose track of who knows what.",
-    llmScore: 0.50,
+    description: "Tracking entities and their states over time. Frontier models handle basic entity tracking, but implicit state changes\u2014where an object's properties change without being explicitly stated\u2014still cause errors.",
+    llmScore: 0.72,
     humanScore: 0.94,
-    challenge: "LLMs process text left-to-right in a context window. They lack a persistent \"world state\" that gets updated—every inference must be reconstructed from raw text each time.",
+    challenge: "Humans maintain a running mental model that updates automatically (milk + coffee = mixture). LLMs must infer state changes from text and often track entities independently rather than modeling their interactions.",
   },
   {
     id: "social",
@@ -108,15 +108,15 @@ const FUNCTIONAL_DOMAINS = [
     color: "#B07AA1",
     brainRegion: "Theory of Mind Network",
     example: {
-      prompt: "Sally puts a ball in a basket, then leaves. Anne moves the ball to a box. Where will Sally look for the ball?",
-      llmAnswer: "Varies—often says \"the box\"",
-      correctAnswer: "The basket (Sally doesn't know it was moved)",
+      prompt: "Emma tells Jake she loves his new haircut. Jake got the haircut because Emma previously said she liked short hair\u2014but she was being polite to someone else at the time. Does Jake know Emma's compliment is genuine?",
+      llmAnswer: "Often misses that Jake's belief is based on a misunderstood context",
+      correctAnswer: "Jake thinks it's genuine\u2014he doesn't know Emma's original comment was politeness, not preference",
       llmCorrect: false,
     },
-    description: "Understanding intentions, beliefs, sarcasm, and social context. Requires reasoning about what others know and don't know—a separate brain network handles this in humans.",
-    llmScore: 0.40,
+    description: "Understanding intentions, beliefs, sarcasm, and nested social context. Frontier models pass basic false-belief tests (Sally-Anne) but struggle with layered social inference\u2014beliefs about beliefs about intentions.",
+    llmScore: 0.68,
     humanScore: 0.96,
-    challenge: "Theory of mind requires modeling another agent's beliefs separately from reality. LLMs tend to leak true-state information into their predictions about what characters believe.",
+    challenge: "Simple theory of mind is now handled, but real social reasoning involves recursive belief modeling: what does A believe that B believes about C's intention? Each layer compounds errors in models that lack persistent agent state.",
   },
 ];
 
@@ -126,6 +126,8 @@ const MODEL_EVOLUTION = [
   { name: "GPT-2", year: "2019", formal: 0.80, functional: 0.30, text: "The meaning of life is something simple that has nothing to do with who we are." },
   { name: "GPT-3", year: "2020", formal: 0.90, functional: 0.50, text: "The meaning of life is a mystery to us all, and a question that will never be answered." },
   { name: "GPT-4", year: "2023", formal: 0.95, functional: 0.65, text: "The meaning of life is subjective and varies greatly depending on personal beliefs, values, and experiences." },
+  { name: "Claude 3.5 / GPT-4o", year: "2024", formal: 0.97, functional: 0.75, text: "The meaning of life is not a single answer but a framework\u2014shaped by relationships, purpose, and the stories we tell ourselves about both." },
+  { name: "Claude 4.6 / o3 / Gemini 2.5", year: "2025\u201326", formal: 0.98, functional: 0.83, text: "The meaning of life resists reduction to a proposition. It emerges from the interplay of biological drives, cultural inheritance, and the capacity for self-reflection that lets us ask the question at all." },
 ];
 
 // ─── Components ─────────────────────────────────────────────────────────────
@@ -544,11 +546,11 @@ export default function DissociatingViz() {
                 <span style={{ fontSize: 11, color: "#E07A5F" }}>● Functional Competence</span>
               </div>
 
-              <svg viewBox="0 0 400 160" style={{ width: "100%", height: 160 }}>
+              <svg viewBox="0 0 520 160" style={{ width: "100%", height: 160 }}>
                 {/* Grid lines */}
                 {[0, 25, 50, 75, 100].map(v => (
                   <g key={v}>
-                    <line x1="50" y1={140 - v * 1.3} x2="390" y2={140 - v * 1.3}
+                    <line x1="50" y1={140 - v * 1.3} x2="500" y2={140 - v * 1.3}
                       stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
                     <text x="46" y={144 - v * 1.3} textAnchor="end" fontSize="8" fill="#3A4A5C">{v}%</text>
                   </g>
@@ -556,20 +558,20 @@ export default function DissociatingViz() {
 
                 {/* Formal line */}
                 <polyline
-                  points={MODEL_EVOLUTION.map((m, i) => `${70 + i * 78},${140 - m.formal * 130}`).join(" ")}
+                  points={MODEL_EVOLUTION.map((m, i) => `${70 + i * 68},${140 - m.formal * 130}`).join(" ")}
                   fill="none" stroke="#4ECDC4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {/* Functional line */}
                 <polyline
-                  points={MODEL_EVOLUTION.map((m, i) => `${70 + i * 78},${140 - m.functional * 130}`).join(" ")}
+                  points={MODEL_EVOLUTION.map((m, i) => `${70 + i * 68},${140 - m.functional * 130}`).join(" ")}
                   fill="none" stroke="#E07A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 />
 
                 {/* Gap fill */}
                 <polygon
                   points={[
-                    ...MODEL_EVOLUTION.map((m, i) => `${70 + i * 78},${140 - m.formal * 130}`),
-                    ...MODEL_EVOLUTION.slice().reverse().map((m, i) => `${70 + (MODEL_EVOLUTION.length - 1 - i) * 78},${140 - m.functional * 130}`),
+                    ...MODEL_EVOLUTION.map((m, i) => `${70 + i * 68},${140 - m.formal * 130}`),
+                    ...MODEL_EVOLUTION.slice().reverse().map((m, i) => `${70 + (MODEL_EVOLUTION.length - 1 - i) * 68},${140 - m.functional * 130}`),
                   ].join(" ")}
                   fill="rgba(255,255,255,0.03)"
                 />
@@ -580,25 +582,27 @@ export default function DissociatingViz() {
                     onMouseEnter={() => setHoveredModel(i)}
                     onMouseLeave={() => setHoveredModel(null)}
                     style={{ cursor: "pointer" }}>
-                    <circle cx={70 + i * 78} cy={140 - m.formal * 130} r={hoveredModel === i ? 5 : 3.5}
+                    <circle cx={70 + i * 68} cy={140 - m.formal * 130} r={hoveredModel === i ? 5 : 3.5}
                       fill="#4ECDC4" style={{ transition: "r 0.2s ease" }} />
-                    <circle cx={70 + i * 78} cy={140 - m.functional * 130} r={hoveredModel === i ? 5 : 3.5}
+                    <circle cx={70 + i * 68} cy={140 - m.functional * 130} r={hoveredModel === i ? 5 : 3.5}
                       fill="#E07A5F" style={{ transition: "r 0.2s ease" }} />
                     {/* Invisible hover target */}
-                    <rect x={70 + i * 78 - 20} y="5" width="40" height="145" fill="transparent" />
-                    <text x={70 + i * 78} y="155" textAnchor="middle" fontSize="7.5"
+                    <rect x={70 + i * 68 - 20} y="5" width="40" height="145" fill="transparent" />
+                    <text x={70 + i * 68} y="155" textAnchor="middle" fontSize="7"
                       fill={hoveredModel === i ? "#E2E8F0" : "#5A6B7E"} fontWeight={hoveredModel === i ? 600 : 400}>
                       {m.name}
                     </text>
-                    <text x={70 + i * 78} y="10" textAnchor="middle" fontSize="6" fill="#3A4A5C">{m.year}</text>
+                    <text x={70 + i * 68} y="10" textAnchor="middle" fontSize="6" fill="#3A4A5C">{m.year}</text>
                   </g>
                 ))}
 
-                {/* Gap label */}
-                <text x="310" y={140 - MODEL_EVOLUTION[4].formal * 130 + (MODEL_EVOLUTION[4].formal - MODEL_EVOLUTION[4].functional) * 65}
-                  fontSize="7" fill="#5A6B7E" textAnchor="middle" fontStyle="italic">
-                  the gap
-                </text>
+                {/* Gap label — positioned at the last model */}
+                {(() => { const last = MODEL_EVOLUTION[MODEL_EVOLUTION.length - 1]; const lastX = 70 + (MODEL_EVOLUTION.length - 1) * 68; return (
+                  <text x={lastX} y={140 - last.formal * 130 + (last.formal - last.functional) * 65}
+                    fontSize="7" fill="#5A6B7E" textAnchor="middle" fontStyle="italic">
+                    the gap
+                  </text>
+                ); })()}
               </svg>
             </div>
 

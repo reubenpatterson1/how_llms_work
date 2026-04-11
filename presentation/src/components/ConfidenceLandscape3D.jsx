@@ -458,7 +458,7 @@ export default function ConfidenceLandscape3D() {
                 color: st.color, fontFamily: FM, fontSize: 11, fontWeight: isSelected ? 700 : 500,
               }}>
                 {tok.word}
-                <div style={{ fontSize: 8, color: "#556677", marginTop: 1 }}>{(tok.confidence * 100).toFixed(0)}%</div>
+                <div style={{ fontSize: 8, color: "#556677", marginTop: 1 }}>{sortMode === "entropy" ? "H=" + tokenEntropy(tok.topK).toFixed(1) : (tok.confidence * 100).toFixed(0) + "%"}</div>
               </button>
             );
           })}

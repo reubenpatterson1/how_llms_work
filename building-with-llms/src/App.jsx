@@ -289,7 +289,7 @@ const SLIDES = [
     title: "Continue to Part 4",
     subtitle: "How to Test with LLMs",
     body: "Part 3 covered building: decomposing the Hello World Weather App into atomic components, building them in parallel, orchestrating multi-step generation for quality, and monitoring costs. Part 4 takes the same app and tests it at every level — functional, unit, E2E, edge cases, and load. Because code that works in a demo isn't code that works in production.",
-    keyTakeaway: "Part 4 runs on port 5176. Start it with: cd testing-with-llms && npm run dev",
+    keyTakeaway: "",
     nextModuleUrl: "http://localhost:5176",
   },
 ];

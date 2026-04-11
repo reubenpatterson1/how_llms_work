@@ -281,6 +281,25 @@ function QuestionScreen({ q, qNum, total, selected, setSelected, revealed, onRev
   );
 }
 
+async function downloadCertPDF({ title, subtitle, name, body, fields, watermark = "LLM ENGINEERING COURSE" }) {
+  if (!window.jspdf) { await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); }); }
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" }); const W = 297, H = 210;
+  doc.setFillColor(15,23,42); doc.rect(0,0,W,H,"F");
+  doc.setTextColor(30,41,59); doc.setFontSize(28); doc.setFont("helvetica","bold");
+  for (let y = -50; y < H+50; y += 40) for (let x = -100; x < W+100; x += 160) doc.text(watermark, x, y, { angle: 30 });
+  doc.setDrawColor(232,168,56); doc.setLineWidth(0.5); doc.rect(12,12,W-24,H-24); doc.rect(15,15,W-30,H-30);
+  [[18,18,1,1],[W-18,18,-1,1],[18,H-18,1,-1],[W-18,H-18,-1,-1]].forEach(([x,y,dx,dy])=>{doc.line(x,y,x+8*dx,y);doc.line(x,y,x,y+8*dy);});
+  doc.setTextColor(232,168,56); doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.text(title.toUpperCase(), W/2, 38, { align: "center" });
+  doc.setTextColor(138,150,167); doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.text(subtitle.toUpperCase(), W/2, 45, { align: "center" });
+  doc.setTextColor(138,150,167); doc.setFontSize(10); doc.text("This certifies that", W/2, 60, { align: "center" });
+  doc.setTextColor(226,232,240); doc.setFontSize(28); doc.setFont("helvetica","bold"); doc.text(name, W/2, 75, { align: "center" });
+  doc.setDrawColor(232,168,56); doc.setLineWidth(0.3); doc.line(W/2-20,82,W/2+20,82);
+  doc.setTextColor(138,150,167); doc.setFontSize(9); doc.setFont("helvetica","normal"); doc.text(doc.splitTextToSize(body,180), W/2, 92, { align: "center", lineHeightFactor: 1.6 });
+  const fY=135, fS=W/(fields.length+1); fields.forEach((f,i)=>{const x=fS*(i+1); doc.setTextColor(74,85,104); doc.setFontSize(7); doc.setFont("helvetica","bold"); doc.text(f.label.toUpperCase(),x,fY,{align:"center"}); doc.setTextColor(226,232,240); doc.setFontSize(11); doc.text(f.value,x,fY+7,{align:"center"});});
+  doc.setTextColor(50,60,80); doc.setFontSize(7); doc.setFont("helvetica","normal"); doc.text("This certificate was generated as part of the LLM Engineering Course", W/2, H-20, { align: "center" });
+  doc.save(`${name.replace(/\s+/g,"_")}_Certificate.pdf`);
+}
+
 function Certificate({ name, score, total, sectionScores }) {
   const pct = Math.round((score / total) * 100);
   const passed = score >= 9;
@@ -339,10 +358,10 @@ function Certificate({ name, score, total, sectionScores }) {
       </div>
 
       <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button onClick={() => window.print()}
+        <button onClick={() => downloadCertPDF({ title: "Certificate of Comprehension", subtitle: "Building with LLMs", name, body: "has demonstrated comprehension of LLM-driven decomposition, orchestration patterns, parallelism strategies, and costing analysis for building software with large language models.", fields: [{ label: "Score", value: `${score} / ${total}` }, { label: "Percentage", value: `${pct}%` }, { label: "Result", value: tier }, { label: "Date", value: new Date().toLocaleDateString() }, { label: "Certificate ID", value: id }] })}
           style={{ background: "none", color: C.textDim, border: `1px solid ${C.border}`,
             padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
-          Print Certificate
+          Download PDF
         </button>
       </div>
     </div>
@@ -361,8 +380,17 @@ export default function BuildingQuiz() {
     const seq = [];
     for (let s = 0; s < SECTIONS.length; s++) {
       seq.push({ type: "section", section: s });
-      QUESTIONS.filter(q => q.section === s).forEach((q, qi) => {
-        seq.push({ type: "question", question: q, globalIdx: QUESTIONS.indexOf(q) });
+      QUESTIONS.filter(q => q.section === s).forEach((q) => {
+        const indices = q.options.map((_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        seq.push({
+          type: "question",
+          question: { ...q, options: indices.map(i => q.options[i]), answer: indices.indexOf(q.answer) },
+          globalIdx: QUESTIONS.indexOf(q),
+        });
       });
     }
     return seq;
@@ -388,10 +416,11 @@ export default function BuildingQuiz() {
   }
 
   if (phase === "done") {
-    const score = QUESTIONS.reduce((s, q, i) => s + (answers[i] === q.answer ? 1 : 0), 0);
+    const questionSteps = sequence.filter(s => s.type === "question");
+    const score = questionSteps.reduce((s, step) => s + (answers[step.globalIdx] === step.question.answer ? 1 : 0), 0);
     const sectionScores = SECTIONS.map((_, si) =>
-      QUESTIONS.filter(q => q.section === si)
-        .reduce((s, q) => s + (answers[QUESTIONS.indexOf(q)] === q.answer ? 1 : 0), 0)
+      questionSteps.filter(step => step.question.section === si)
+        .reduce((s, step) => s + (answers[step.globalIdx] === step.question.answer ? 1 : 0), 0)
     );
     return <Certificate name={name} score={score} total={QUESTIONS.length} sectionScores={sectionScores} />;
   }

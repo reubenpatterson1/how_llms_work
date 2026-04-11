@@ -213,7 +213,7 @@ const SLIDES = [
     title: "Continue to Part 5",
     subtitle: "How to Deploy with LLMs",
     body: "Part 4 tested the Hello World Weather App at every level — functional, unit, E2E, edge cases, and load. The app now has comprehensive test coverage and a known performance envelope. Part 5 takes this tested app and deploys it: pull vs push strategies, code versioning for LLM-generated projects, environment variable management, and auto-scaling configuration.",
-    keyTakeaway: "Part 5 runs on port 5177. Start it with: cd deploying-with-llms && npm run dev",
+    keyTakeaway: "",
     nextModuleUrl: "http://localhost:5177",
   },
 ];
