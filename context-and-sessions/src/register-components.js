@@ -3,6 +3,8 @@
 import { registerComponent } from './component-registry.js'
 import AttentionBudgetAllocator from './components/AttentionBudgetAllocator.jsx'
 import ContextWindowPlayground from './components/ContextWindowPlayground.jsx'
+import LostInTheMiddleCurve from './components/LostInTheMiddleCurve.jsx'
 
 registerComponent('AttentionBudgetAllocator', AttentionBudgetAllocator)
 registerComponent('ContextWindowPlayground', ContextWindowPlayground)
+registerComponent('LostInTheMiddleCurve', LostInTheMiddleCurve)
