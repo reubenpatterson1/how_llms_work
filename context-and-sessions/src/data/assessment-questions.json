@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "sections": [
+    { "key": "A", "label": "Attention & Lost-in-the-Middle" },
+    { "key": "B", "label": "Context vs. Prompt" },
+    { "key": "C", "label": "Session Hygiene & Governance" }
+  ],
+  "questions": [
+    {
+      "id": "A1", "section": "A", "slideRef": 4,
+      "q": "A model advertises 200k tokens. A single fact is placed at token position 100,000 in a 200k-token context. Empirically, what is most likely?",
+      "options": [
+        "The model recalls the fact with probability near 1.0, as 100k is still well within the advertised window",
+        "The fact is likely missed: recall on middle-positioned facts in long contexts drops well below the start/end rates",
+        "The model treats all positions uniformly, so position 100,000 is no different from position 500",
+        "The model recalls facts best at the exact middle because that position is equidistant from both ends"
+      ],
+      "answer": 1,
+      "rationale": "Liu et al. 2023 found recall follows a U-curve: strong at start (primacy) and end (recency), weak in the middle. This holds across model sizes."
+    },
+    {
+      "id": "A2", "section": "A", "slideRef": 7,
+      "q": "A model advertises 128k tokens. Your application consistently puts constraints at tokens 40,000-60,000 and gets inconsistent behavior. What is the most likely cause?",
+      "options": [
+        "The model is misconfigured",
+        "Effective context is smaller than advertised; constraints in the middle are being forgotten",
+        "The constraints contradict training data",
+        "The temperature setting is too high"
+      ],
+      "answer": 1,
+      "rationale": "Effective context is often 20-40% of advertised. Constraints buried in the middle of a long context are exactly where recall degrades fastest."
+    },
+    {
+      "id": "A3", "section": "A", "slideRef": 6,
+      "q": "Why does the lost-in-the-middle effect exist structurally in transformer attention?",
+      "options": [
+        "Training data over-represents information at document boundaries, biasing attention there",
+        "Softmax distributes a fixed probability mass across every token; middle positions receive systematically less signal than ends due to positional encoding shape",
+        "Models are fine-tuned specifically to prioritize openings and conclusions",
+        "It is an artifact of RLHF alignment training"
+      ],
+      "answer": 1,
+      "rationale": "The U-curve is a structural property of attention over long sequences, not a training-data artifact. Softmax must sum to 1, so more tokens = smaller slices, and positional encodings tilt the distribution toward ends."
+    },
+    {
+      "id": "A4", "section": "A", "slideRef": 11,
+      "q": "You add 10,000 tokens of tool output to a context that previously had 2,000 tokens. What happens to the attention share of the original 2,000 tokens?",
+      "options": [
+        "Unchanged — each token gets the same fixed attention regardless of context size",
+        "It decreases; the new tokens claim attention mass previously held by the original tokens",
+        "It increases; the model learns to prioritize shorter sections in long contexts",
+        "It doubles, because attention is allocated per turn"
+      ],
+      "answer": 1,
+      "rationale": "Softmax attention sums to 1 across all tokens. Adding 10k new tokens means less mass is available for the original 2k."
+    },
+    {
+      "id": "A5", "section": "A", "slideRef": 5,
+      "q": "Liu et al. 2023's main finding applies most directly to which operation?",
+      "options": [
+        "Code generation",
+        "Retrieving a single specific fact from a long input",
+        "Translating between languages",
+        "Summarizing short documents"
+      ],
+      "answer": 1,
+      "rationale": "The paper studied single-needle retrieval across long contexts. The U-curve is most pronounced for precise recall tasks."
+    },
+    {
+      "id": "B1", "section": "B", "slideRef": 9,
+      "q": "A user types a 40-word message. The model receives: a 2,000-token system prompt, 12 prior turns (total ~8,000 tokens), a 5,000-token retrieved document, and the 40-word user message. What is 'the context' for this turn?",
+      "options": [
+        "Just the 40-word user message",
+        "The user message + retrieved document",
+        "Everything the model reads: system + prior turns + retrieved doc + user message",
+        "Only the current turn (user message + retrieved doc)"
+      ],
+      "answer": 2,
+      "rationale": "Context is the full sequence the model attends to — every prior turn, every tool output, every attachment, plus the current message. The user message is a small slice."
+    },
+    {
+      "id": "B2", "section": "B", "slideRef": 13,
+      "q": "Prompt engineering and context engineering are best understood as:",
+      "options": [
+        "Competing approaches — use one or the other",
+        "The same thing under different names",
+        "Two levers acting on the same underlying attention mechanism; they compound when combined",
+        "Prompt engineering is for simple tasks; context engineering is for RAG only"
+      ],
+      "answer": 2,
+      "rationale": "Both shape attention allocation. Prompt engineering makes the current turn's tokens more effective; context engineering decides which tokens get into the window at all."
+    },
+    {
+      "id": "B3", "section": "B", "slideRef": 15,
+      "q": "Which of the following is a CONTEXT engineering technique, not a prompt engineering one?",
+      "options": [
+        "Wrapping instructions in <constraints> tags",
+        "Adding few-shot examples",
+        "Summarizing old turns to compress history",
+        "Using a role prime like 'You are a senior security engineer'"
+      ],
+      "answer": 2,
+      "rationale": "Summarizing history shapes what's in the window. The others shape the current turn's content."
+    },
+    {
+      "id": "B4", "section": "B", "slideRef": 10,
+      "q": "In a typical chat session with tool use, the user turn is often:",
+      "options": [
+        "The majority of the context window",
+        "Roughly half of the context",
+        "Often the smallest slice; tool outputs and history dominate",
+        "Always exactly one-third"
+      ],
+      "answer": 2,
+      "rationale": "Tool outputs (file reads, searches) and accumulated history usually dwarf the user's actual typed message."
+    },
+    {
+      "id": "B5", "section": "B", "slideRef": 11,
+      "q": "A developer says: 'I kept my prompt short to minimize attention dilution.' Why might this reasoning be incomplete?",
+      "options": [
+        "It is complete — a short prompt is always optimal",
+        "A short user message does not mean a short context; system prompt, history, and tool outputs may still be huge",
+        "Short prompts are ignored by the model",
+        "Dilution only applies to tool outputs, not to the user turn"
+      ],
+      "answer": 1,
+      "rationale": "The user turn is often the smallest piece of the context. Keeping it short has minimal effect if the rest of the context is bloated."
+    },
+    {
+      "id": "C1", "section": "C", "slideRef": 19,
+      "q": "You are 20 turns into a session. A critical constraint was stated at turn 3 and never restated. The model is now producing output that violates it. What is the highest-leverage intervention?",
+      "options": [
+        "Start over with no context",
+        "Pin the invariant: re-state the constraint in the current turn so it lives in the recency window",
+        "Lower the model temperature",
+        "Add a second assistant message asking the model to be careful"
+      ],
+      "answer": 1,
+      "rationale": "Pinning invariants is the surgical fix: it puts the constraint back in the high-attention tail of the context without discarding useful history."
+    },
+    {
+      "id": "C2", "section": "C", "slideRef": 18,
+      "q": "Why does an organization use a shared API spec index that every LLM-assisted design pulls from, rather than letting each session paste specs inline?",
+      "options": [
+        "To save money on API calls",
+        "One source of truth prevents drift, reduces token spend across sessions, and enforces the canonical spec",
+        "Because the model cannot read JSON",
+        "To limit model training data"
+      ],
+      "answer": 1,
+      "rationale": "Centralized indices prevent N different teams paraphrasing the same spec and drifting apart. The model gets the canonical version on demand."
+    },
+    {
+      "id": "C3", "section": "C", "slideRef": 17,
+      "q": "A proposal: strip PII from inputs to an LLM before sending. The motivation is:",
+      "options": [
+        "Smaller prompts cost less",
+        "Context composition is a compliance boundary — PII in context is PII sent to the provider, and potentially logged/cached",
+        "PII tokens confuse the model",
+        "The model refuses PII outright, so we must strip it"
+      ],
+      "answer": 1,
+      "rationale": "Every LLM call is a data-egress event. Treat context as a compliance boundary: govern what enters, not just what leaves."
+    },
+    {
+      "id": "C4", "section": "C", "slideRef": 19,
+      "q": "A 40-turn session accumulated three unrelated concerns. The 'nuclear restart' intervention means:",
+      "options": [
+        "Forcibly close the session and blame the user",
+        "Summarize the relevant decisions, discard everything else, start fresh",
+        "Switch to a different model",
+        "Increase the context window allocation"
+      ],
+      "answer": 1,
+      "rationale": "Nuclear restart is summarize-and-fork: carry forward only the decisions that matter, drop the noise."
+    },
+    {
+      "id": "C5", "section": "C", "slideRef": 19,
+      "q": "A long session keeps 12 raw tool-output dumps totaling 80,000 tokens. The best FIRST intervention is:",
+      "options": [
+        "Nuclear restart",
+        "Prune tool outputs: keep the excerpts that were actually referenced; drop the raw dumps",
+        "Summarize every turn",
+        "Switch models"
+      ],
+      "answer": 1,
+      "rationale": "Raw tool dumps are the fastest-growing source of context bloat. Pruning them is a surgical fix that often avoids needing a restart."
+    }
+  ]
+}
