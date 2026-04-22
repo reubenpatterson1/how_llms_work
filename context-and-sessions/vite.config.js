@@ -5,6 +5,9 @@ export default defineConfig({
   plugins: [react()],
   base: '/part3/',
   server: { port: 5175 },
+  esbuild: {
+    jsx: 'automatic',
+  },
   test: {
     environment: 'jsdom',
     globals: true,
