@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "diagnoses": [
+    { "key": "lost_in_middle",      "label": "Lost in middle — no pinning" },
+    { "key": "tool_pollution",      "label": "Tool output pollution" },
+    { "key": "inbound_governance",  "label": "No inbound context governance" },
+    { "key": "scope_bleed",         "label": "Scope bleed between concerns" }
+  ],
+  "fixes": [
+    { "key": "pin_invariants",        "label": "Pin invariants + front/tail-load" },
+    { "key": "prune_tool_outputs",    "label": "Prune tool outputs + scope session" },
+    { "key": "external_memory_pii",   "label": "External memory with PII guardrail" },
+    { "key": "scope_then_restart",    "label": "Scope session + nuclear restart with summary" }
+  ],
+  "scenarios": [
+    {
+      "id": "D1",
+      "title": "The 30-turn fade",
+      "transcript": "A 30-turn architecture conversation. Turn 3 contains HARD CONSTRAINT: 90-day retention. By turn 25 the proposed design uses 30-day retention. No intermediate turns restate the constraint.",
+      "correctDiagnosis": "lost_in_middle",
+      "correctFix": "pin_invariants",
+      "recallTarget": 0.9,
+      "preset": "D1"
+    },
+    {
+      "id": "D2",
+      "title": "The 4-dump session",
+      "transcript": "A 15-turn session contains four full tool-output dumps (schema registry, cost spreadsheet, Debezium docs, DLQ blog-post compilation) totaling ~27k tokens. The model's final answer misses a constraint stated once, early.",
+      "correctDiagnosis": "tool_pollution",
+      "correctFix": "prune_tool_outputs",
+      "recallTarget": 0.85,
+      "preset": "D2"
+    },
+    {
+      "id": "D3",
+      "title": "The PII leak",
+      "transcript": "A user pastes a CSV containing customer names, emails, and phone numbers to ask about a data model. The model's output example uses those real names and emails verbatim. Logs show the data was sent upstream.",
+      "correctDiagnosis": "inbound_governance",
+      "correctFix": "external_memory_pii",
+      "recallTarget": 0.8,
+      "preset": "D3"
+    },
+    {
+      "id": "D4",
+      "title": "The two-topic tangle",
+      "transcript": "A session mixes a billing-bug fix and a new feature design. The model keeps applying constraints from one to the other; every response conflates the two concerns.",
+      "correctDiagnosis": "scope_bleed",
+      "correctFix": "scope_then_restart",
+      "recallTarget": 0.85,
+      "preset": "D4"
+    }
+  ]
+}
