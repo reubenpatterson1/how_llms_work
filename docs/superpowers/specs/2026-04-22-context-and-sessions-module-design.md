@@ -309,15 +309,20 @@ context-and-sessions/
     lib/
       assessment.js         # pure grading logic
       assessment.test.js
-      migrate-progress.js
-      migrate-progress.test.js
   tests/
     data-integrity.test.js
     slide-engine.test.js
     components-smoke.test.js
+
+deploy-landing/
+  migrate-progress.js       # extracted from inline <script> for testability
+  migrate-progress.test.js
+  tests/
     e2e/
       landing-renumber.spec.js
 ```
+
+Note: the migrator is extracted from the landing page's inline `<script>` into a small ES module + test, then loaded back into `index.html` via `<script type="module">`.
 
 ## 10. Open Questions & Flags for Implementation
 
