@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SLIDES } from './slides.jsx'
+import { COMPONENT_MAP } from './component-registry.js'
 
 const C = {
   bg: '#0B1120',
@@ -13,12 +14,6 @@ const C = {
 
 // Components register themselves here as they come online (Tasks 11-26).
 // Unknown component keys render a visible placeholder so future slides are obvious.
-const COMPONENT_MAP = {}
-
-function registerComponent(key, Component) {
-  COMPONENT_MAP[key] = Component
-}
-export { registerComponent }
 
 function TextSlide({ slide }) {
   return (
@@ -80,7 +75,7 @@ function ComponentSlide({ slide }) {
   )
 }
 
-function AssessmentSlide({ slide }) {
+function AssessmentSlide() {
   const Assessment = COMPONENT_MAP.ContextSessionsAssessment
   return Assessment
     ? <Assessment />
@@ -126,7 +121,7 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <div style={{ flex: 1, overflow: 'auto', paddingBottom: 56 }}>
         {slide.type === 'text' ? <TextSlide slide={slide} />
-         : slide.type === 'assessment' ? <AssessmentSlide slide={slide} />
+         : slide.type === 'assessment' ? <AssessmentSlide />
          : <ComponentSlide slide={slide} />}
       </div>
       <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
