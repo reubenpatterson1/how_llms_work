@@ -48,9 +48,9 @@
 <body>
 <div class="header">
   <h1>LLM Engineering Course</h1>
-  <p>A six-part interactive curriculum covering LLM theory through applied engineering practice.</p>
+  <p>A seven-part interactive curriculum covering LLM theory through applied engineering practice.</p>
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-  <div class="progress-label" id="progressLabel">0 / 6 modules completed</div>
+  <div class="progress-label" id="progressLabel">0 / 7 modules completed</div>
 </div>
 <div class="container">
   <div class="section-label">Course Modules</div>
@@ -61,14 +61,19 @@
   </div>
   <button class="reset-btn" onclick="if(confirm('Reset all progress? This cannot be undone.')){localStorage.removeItem('llm_course_progress');location.reload()}">Reset Progress</button>
 </div>
+<script type="module">
+  import { migrateProgressV1toV2 } from './migrate-progress.js'
+  migrateProgressV1toV2(window.localStorage)
+</script>
 <script>
 const MODULES = [
-  {id:'part1',num:1,title:'How LLMs Actually Work',desc:'Self-attention, context density, hallucination mechanics, and feature activation landscapes.',path:'/part1/',slides:23,recording:'https://drive.google.com/file/d/1X9PWy9aUfCaIb97KgC12U_S4neNzxSDB/view?usp=sharing'},
-  {id:'part2',num:2,title:'Working WITH LLMs',desc:'10-channel density methodology, comparative results, run-to-run consistency, and agentic systems.',path:'/part2/',slides:16,recording:'https://drive.google.com/file/d/1Cm0PhwRxaArwRjxv9DbK7vJpJcFvBFam/view'},
-  {id:'part3',num:3,title:'Building with LLMs',desc:'Decomposition, orchestration patterns, parallelism, and costing dashboards.',path:'/part3/',slides:24},
-  {id:'part4',num:4,title:'Testing with LLMs',desc:'Unit, functional, E2E, and load testing. The happy-path fallacy.',path:'/part4/',slides:22},
-  {id:'part5',num:5,title:'Deploying with LLMs',desc:'Environment management, versioning, pull/push deploy, and auto-scaling.',path:'/part5/',slides:19},
-  {id:'part6',num:6,title:'CI/CD with LLMs',desc:'Checkpoint pipelines, ownership models, speed-safety litmus, and logging.',path:'/part6/',slides:24}
+  { id:'part1', num:1, title:'How LLMs Actually Work', desc:'Self-attention, context density, hallucination mechanics, and feature activation landscapes.', path:'/part1/', slides:23, recording:'https://drive.google.com/file/d/1X9PWy9aUfCaIb97KgC12U_S4neNzxSDB/view?usp=sharing' },
+  { id:'part2', num:2, title:'Working WITH LLMs', desc:'10-channel density methodology, comparative results, run-to-run consistency, and agentic systems.', path:'/part2/', slides:16, recording:'https://drive.google.com/file/d/1Cm0PhwRxaArwRjxv9DbK7vJpJcFvBFam/view' },
+  { id:'part3', num:3, title:'Context & Sessions', desc:'Lost-in-the-middle, prompt vs. context engineering, session hygiene, and governance.', path:'/part3/', slides:23 },
+  { id:'part4', num:4, title:'Building with LLMs', desc:'Decomposition, orchestration patterns, parallelism, and costing dashboards.', path:'/part4/', slides:24 },
+  { id:'part5', num:5, title:'Testing with LLMs', desc:'Unit, functional, E2E, and load testing. The happy-path fallacy.', path:'/part5/', slides:22 },
+  { id:'part6', num:6, title:'Deploying with LLMs', desc:'Environment management, versioning, pull/push deploy, and auto-scaling.', path:'/part6/', slides:19 },
+  { id:'part7', num:7, title:'CI/CD with LLMs', desc:'Checkpoint pipelines, ownership models, speed-safety litmus, and logging.', path:'/part7/', slides:24 }
 ];
 
 const TOOLS = [
