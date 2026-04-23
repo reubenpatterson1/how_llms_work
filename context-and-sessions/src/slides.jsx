@@ -95,7 +95,7 @@ export const SLIDES = [
     id: 'anatomy-3d',
     type: 'component',
     component: 'ContextAnatomyBars3D',
-    instructions: 'Each column = one prompt type. Bars show what % of the context window each chunk type occupies. Click a column header to isolate it. Vague vs. dense changes the SHAPE; coding vs. rumination changes the SIZE and where the bulk lives.',
+    instructions: 'Same session, four moments in time. The gold bar = a constraint placed at turn 1. Watch its share of the context window collapse from 60% to 1% as history, tool outputs, and attachments accumulate. Click any column header to isolate it.',
   },
   {
     id: 'budget-intro',

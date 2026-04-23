@@ -32,16 +32,16 @@ import ContextAnatomyBars3D from '../../src/components/ContextAnatomyBars3D.jsx'
 describe('ContextAnatomyBars3D', () => {
   it('renders without crashing', () => {
     render(<ContextAnatomyBars3D />)
-    expect(screen.getByTestId('prompt-btn-vague')).toBeInTheDocument()
-    expect(screen.getByTestId('prompt-btn-dense')).toBeInTheDocument()
-    expect(screen.getByTestId('prompt-btn-coding')).toBeInTheDocument()
-    expect(screen.getByTestId('prompt-btn-rumination')).toBeInTheDocument()
+    expect(screen.getByTestId('prompt-btn-t1')).toBeInTheDocument()
+    expect(screen.getByTestId('prompt-btn-t2')).toBeInTheDocument()
+    expect(screen.getByTestId('prompt-btn-t10')).toBeInTheDocument()
+    expect(screen.getByTestId('prompt-btn-t20')).toBeInTheDocument()
   })
 
   it('toggling a prompt button does not throw', () => {
     render(<ContextAnatomyBars3D />)
-    fireEvent.click(screen.getByTestId('prompt-btn-coding'))
-    fireEvent.click(screen.getByTestId('prompt-btn-rumination'))
+    fireEvent.click(screen.getByTestId('prompt-btn-t10'))
+    fireEvent.click(screen.getByTestId('prompt-btn-t20'))
     // No assertion — just verifying no errors.
   })
 })

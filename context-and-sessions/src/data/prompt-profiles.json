@@ -1,34 +1,47 @@
 {
-  "version": 1,
+  "version": 2,
   "chunks": ["system", "history", "tool", "attachment", "rag", "user"],
-  "profiles": [
+  "constraint": {
+    "label": "HARD CONSTRAINT placed at turn 1",
+    "blurb": "e.g., \"90-day retention, idempotent on (source, external_id)\"",
+    "tokens": 480
+  },
+  "turns": [
     {
-      "key": "vague",
-      "label": "Vague",
-      "blurb": "\"write me a website\"",
-      "totalTokens": 600,
-      "breakdown": { "system": 25, "history": 0, "tool": 0, "attachment": 0, "rag": 0, "user": 75 }
+      "key": "t1",
+      "turnNumber": 1,
+      "label": "Turn 1",
+      "blurb": "Constraint placed here",
+      "totalTokens": 800,
+      "breakdown": { "system": 25, "history": 0,  "tool": 0,  "attachment": 0, "rag": 0, "user": 75 },
+      "constraintShare": 60
     },
     {
-      "key": "dense",
-      "label": "Dense",
-      "blurb": "React 18 + Vite + Stripe + WCAG-AA + LCP<2s …",
-      "totalTokens": 1800,
-      "breakdown": { "system": 15, "history": 0, "tool": 0, "attachment": 0, "rag": 0, "user": 85 }
+      "key": "t2",
+      "turnNumber": 2,
+      "label": "Turn 2",
+      "blurb": "Constraint moves into history",
+      "totalTokens": 1500,
+      "breakdown": { "system": 13, "history": 53, "tool": 0,  "attachment": 0, "rag": 0, "user": 34 },
+      "constraintShare": 32
     },
     {
-      "key": "coding",
-      "label": "Coding agent",
-      "blurb": "mid-session w/ file reads + tool runs",
-      "totalTokens": 45000,
-      "breakdown": { "system": 10, "history": 22, "tool": 52, "attachment": 3, "rag": 2, "user": 11 }
+      "key": "t10",
+      "turnNumber": 10,
+      "label": "Turn 10",
+      "blurb": "Tool dumps + accumulated turns dominate",
+      "totalTokens": 25000,
+      "breakdown": { "system": 1,  "history": 56, "tool": 36, "attachment": 4, "rag": 1, "user": 2 },
+      "constraintShare": 2
     },
     {
-      "key": "rumination",
-      "label": "Rumination",
-      "blurb": "40+ turn iterative session, accumulated history",
+      "key": "t20",
+      "turnNumber": 20,
+      "label": "Turn 20",
+      "blurb": "Constraint effectively invisible",
       "totalTokens": 80000,
-      "breakdown": { "system": 5, "history": 65, "tool": 12, "attachment": 3, "rag": 5, "user": 10 }
+      "breakdown": { "system": 1,  "history": 62, "tool": 31, "attachment": 4, "rag": 1, "user": 1 },
+      "constraintShare": 1
     }
   ]
 }
