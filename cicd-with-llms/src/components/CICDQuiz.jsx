@@ -282,10 +282,10 @@ export default function CICDQuiz() {
             Certificate of Completion — Full Series
           </div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-            Module 6: CI/CD Workflows for LLM Systems
+            Module 7: CI/CD Workflows for LLM Systems
           </h2>
           <p style={{ color: C.muted, fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
-            Congratulations! You have completed all 6 modules of the{' '}
+            Congratulations! You have completed all 7 modules of the{' '}
             <span style={{ color: C.accent, fontWeight: 600 }}>How LLMs Work</span> series.
             You now hold a complete, practitioner-level understanding of LLM engineering —
             from model internals to production CI/CD pipelines.
@@ -319,7 +319,7 @@ export default function CICDQuiz() {
           <button
             onClick={() => {
               const n = prompt("Enter your name for the certificate:");
-              if (n) downloadCertPDF({ title: "Certificate of Completion", subtitle: "CI/CD with LLMs \u2014 Module 6 (Series Complete)", name: n, body: "has completed all 6 modules of the LLM Engineering Course, demonstrating practitioner-level comprehension from model internals through production CI/CD pipelines for LLM-generated systems.", fields: [{ label: "Score", value: `${score}/12` }, { label: "Result", value: tier }, { label: "Date", value: today }, { label: "Certificate ID", value: certId }] });
+              if (n) downloadCertPDF({ title: "Certificate of Completion", subtitle: "CI/CD with LLMs \u2014 Module 7 (Series Complete)", name: n, body: "has completed all 7 modules of the LLM Engineering Course, demonstrating practitioner-level comprehension from model internals through production CI/CD pipelines for LLM-generated systems.", fields: [{ label: "Score", value: `${score}/12` }, { label: "Result", value: tier }, { label: "Date", value: today }, { label: "Certificate ID", value: certId }] });
             }}
             style={{
               background: C.accent, color: '#fff', border: 'none',

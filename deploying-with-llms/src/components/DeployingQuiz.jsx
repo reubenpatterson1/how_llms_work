@@ -273,7 +273,7 @@ export default function DeployingQuiz() {
             Certificate of Completion
           </h2>
           <p style={{ color: C.muted, fontSize: '14px', marginBottom: '24px' }}>
-            How to Deploy with LLMs — Module 5 of 6
+            How to Deploy with LLMs — Module 6 of 7
           </p>
           <div style={{
             padding: '20px', background: C.bg, borderRadius: '12px',
@@ -295,7 +295,7 @@ export default function DeployingQuiz() {
           <button
             onClick={() => {
               const n = prompt("Enter your name for the certificate:");
-              if (n) downloadCertPDF({ title: "Certificate of Completion", subtitle: "Deploying with LLMs \u2014 Module 5", name: n, body: "has demonstrated comprehension of deployment strategies, environment management, versioning, pull/push deploy patterns, and auto-scaling for LLM-generated applications.", fields: [{ label: "Score", value: `${score}/${total}` }, { label: "Result", value: tier }, { label: "Date", value: new Date().toLocaleDateString() }, { label: "Certificate ID", value: certId }] });
+              if (n) downloadCertPDF({ title: "Certificate of Completion", subtitle: "Deploying with LLMs \u2014 Module 6", name: n, body: "has demonstrated comprehension of deployment strategies, environment management, versioning, pull/push deploy patterns, and auto-scaling for LLM-generated applications.", fields: [{ label: "Score", value: `${score}/${total}` }, { label: "Result", value: tier }, { label: "Date", value: new Date().toLocaleDateString() }, { label: "Certificate ID", value: certId }] });
             }}
             style={{
               padding: '12px 28px', borderRadius: '8px', border: 'none',
