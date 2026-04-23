@@ -8,13 +8,17 @@ import { C } from '../lib/theme.js'
 //   samples: array of { position: 0..1, y: 0..1 } OR 2D array of shape [rows][cols] (y-values)
 //   width, depth: geometry size (default 4 x 2)
 //   colorFn(y) => hex (optional)
+//   needlePosition:
+//     null (no needle)
+//     OR scalar 0..1 (X-axis only, centered on depth — backward compatible)
+//     OR { x: 0..1, z: 0..1, y: 0..1 } (x = column/position, z = row/window, y = surface height)
 export default function RecallLandscape3D({
   samples,
   width = 4,
   depth = 2,
   height = 1.2,
   colorFn,
-  needlePosition = null,   // 0..1 or null
+  needlePosition = null,
 }) {
   const geometry = useMemo(() => {
     let grid
@@ -46,9 +50,28 @@ export default function RecallLandscape3D({
     return geom
   }, [samples, width, depth, height, colorFn])
 
-  const needleX = needlePosition !== null
-    ? (needlePosition - 0.5) * width
-    : null
+  // Normalize needlePosition into { x, z, y } where x,z ∈ [0,1] over the surface and y ∈ [0,1] height fraction.
+  let needleCoords = null
+  if (needlePosition !== null && needlePosition !== undefined) {
+    if (typeof needlePosition === 'number') {
+      needleCoords = { x: needlePosition, z: 0.5, y: null }
+    } else if (typeof needlePosition === 'object') {
+      needleCoords = {
+        x: typeof needlePosition.x === 'number' ? needlePosition.x : 0.5,
+        z: typeof needlePosition.z === 'number' ? needlePosition.z : 0.5,
+        y: typeof needlePosition.y === 'number' ? needlePosition.y : null,
+      }
+    }
+  }
+
+  const needleWorldX = needleCoords !== null ? (needleCoords.x - 0.5) * width : null
+  // Map z=0 -> back (+depth/2), z=1 -> front (-depth/2). Picked so larger window indices sit behind.
+  const needleWorldZ = needleCoords !== null ? (0.5 - needleCoords.z) * depth : null
+  const surfaceY = needleCoords !== null && needleCoords.y !== null ? needleCoords.y * height : null
+  // When we know the surface height, sit the cone base on the surface; otherwise float above.
+  const coneBaseY = surfaceY !== null ? surfaceY : height * 1.2
+  const coneHeight = 0.3
+  const coneCenterY = coneBaseY + coneHeight / 2
 
   return (
     <Canvas camera={{ position: [0, 3, 4], fov: 45 }} style={{ background: C.bg }}>
@@ -57,11 +80,19 @@ export default function RecallLandscape3D({
       <mesh rotation={[-Math.PI / 2, 0, 0]} geometry={geometry}>
         <meshStandardMaterial vertexColors side={THREE.DoubleSide} roughness={0.6} />
       </mesh>
-      {needleX !== null && (
-        <mesh position={[needleX, height * 1.2, 0]}>
-          <coneGeometry args={[0.08, 0.3, 12]} />
-          <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
-        </mesh>
+      {needleCoords !== null && (
+        <>
+          {/* Vertical drop line from surface (or cone base) down to y=0 so the (x,z) is unmistakable */}
+          <mesh position={[needleWorldX, coneBaseY / 2, needleWorldZ]}>
+            <cylinderGeometry args={[0.015, 0.015, coneBaseY, 8]} />
+            <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.3} />
+          </mesh>
+          {/* Cone marker at the surface height */}
+          <mesh position={[needleWorldX, coneCenterY, needleWorldZ]}>
+            <coneGeometry args={[0.08, coneHeight, 12]} />
+            <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
+          </mesh>
+        </>
       )}
       <AxisLabel text="position" position={[0, -0.1, depth / 2 + 0.3]} />
       <OrbitControls enablePan={false} />

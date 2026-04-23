@@ -49,6 +49,12 @@ export default function LostInTheMiddleCurve() {
     lookup({ model: 'claude-sonnet', window_size: windowSize, position: needlePos, noise_level: noise }),
     [windowSize, noise, needlePos])
 
+  const needleCoords = useMemo(() => ({
+    x: needlePos,
+    z: windowIdx / (WINDOW_SIZES.length - 1),
+    y: needleRecall,
+  }), [needlePos, windowIdx, needleRecall])
+
   return (
     <div style={{ padding: '16px 20px', fontFamily: FONT_SANS }}>
       <h2 style={{ color: C.text, fontSize: 20, margin: '0 0 12px 0' }}>Lost-in-the-Middle Recall Curve</h2>
@@ -74,8 +80,24 @@ export default function LostInTheMiddleCurve() {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div style={{ background: C.surfaceDeep, borderRadius: 8, height: 340, overflow: 'hidden' }}>
-          <RecallLandscape3D samples={surfaceSamples} depth={3} height={1.0} />
+        <div style={{ background: C.surfaceDeep, borderRadius: 8, height: 340, overflow: 'hidden',
+          display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '8px 12px 0 12px' }}>
+            <div style={{ color: C.textDim, fontSize: 12 }}>
+              Recall surface across window sizes × position
+            </div>
+            <div data-testid="needle-3d-readout"
+              style={{ color: C.textDim, fontSize: 12, marginTop: 4 }}>
+              At window = {windowSize.toLocaleString()} tok, position = {(needlePos * 100).toFixed(0)}%:
+              <span style={{ color: C.accent, fontFamily: FONT_MONO, marginLeft: 6 }}>
+                {(needleRecall * 100).toFixed(1)}% recall
+              </span>
+            </div>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <RecallLandscape3D samples={surfaceSamples} needlePosition={needleCoords}
+              depth={3} height={1.0} />
+          </div>
         </div>
       </div>
 
