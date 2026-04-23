@@ -775,7 +775,7 @@ def analytics_set_lock():
     data = request.get_json(silent=True) or {}
     module = data.get("module", "")
     locked = data.get("locked", False)
-    if module not in [f"part{i}" for i in range(1, 7)]:
+    if module not in [f"part{i}" for i in range(1, 8)]:
         return jsonify({"error": "Invalid module"}), 400
     set_module_lock(module, locked)
     return jsonify({"ok": True, "module": module, "locked": locked})
