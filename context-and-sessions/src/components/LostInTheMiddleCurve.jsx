@@ -46,9 +46,10 @@ export default function LostInTheMiddleCurve() {
     [windowSize, noise, needlePos])
 
   // zAnchor = where the needle *should* be (based on window-size selection).
-  // zDrift  = how far forward noise has blown it (0 at no-noise, up to NOISE_Z_DRIFT_MAX at full noise).
+  // Larger window → needle sits deeper (further back) in the surface well, matching the surface row layout.
+  // zDrift  = how far forward (toward "position" axis label) noise has blown it.
   // z       = actual render position = anchor + drift, clamped to [0,1].
-  const zAnchor = windowIdx / (WINDOW_SIZES.length - 1)
+  const zAnchor = 1 - windowIdx / (WINDOW_SIZES.length - 1)
   const zDrifted = Math.max(0, Math.min(1, zAnchor + noise * NOISE_Z_DRIFT_MAX))
 
   const needleCoords = useMemo(() => ({
