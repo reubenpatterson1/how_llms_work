@@ -1,0 +1,29 @@
+{
+  "turns": [
+    { "idx": 1,  "role": "user", "text": "Hi, I need help designing an event ingestion pipeline.", "critical": false, "tokens": 80 },
+    { "idx": 2,  "role": "user", "text": "HARD CONSTRAINT: events must be idempotent on (source, external_id) and we retain only 90 days. This is non-negotiable — any design that violates this is wrong.", "critical": true, "tokens": 140 },
+    { "idx": 3,  "role": "assistant", "text": "Understood — idempotency on (source, external_id) with 90-day retention. What's the expected volume?", "critical": false, "tokens": 110 },
+    { "idx": 4,  "role": "user", "text": "~5M events/day, bursty.", "critical": false, "tokens": 30 },
+    { "idx": 5,  "role": "tool", "text": "[Raw dump of 8000 tokens from schema registry — 12 event types, all fields, full type definitions]", "critical": false, "tokens": 8000, "isRawTool": true },
+    { "idx": 6,  "role": "assistant", "text": "Reviewed the schema registry. Proposing Kafka → consumer → Postgres.", "critical": false, "tokens": 120 },
+    { "idx": 7,  "role": "user", "text": "What about cost?", "critical": false, "tokens": 20 },
+    { "idx": 8,  "role": "tool", "text": "[Raw dump of 6000 tokens — cost model spreadsheet export with every line-item]", "critical": false, "tokens": 6000, "isRawTool": true },
+    { "idx": 9,  "role": "assistant", "text": "Cost estimate: $X/mo baseline...", "critical": false, "tokens": 150 },
+    { "idx": 10, "role": "user", "text": "Actually can we also talk about the billing dashboard migration?", "critical": false, "tokens": 40, "scopeBleed": true },
+    { "idx": 11, "role": "assistant", "text": "Sure, the billing dashboard is a React app on Vercel...", "critical": false, "tokens": 200, "scopeBleed": true },
+    { "idx": 12, "role": "user", "text": "OK back to the pipeline — should we use Debezium?", "critical": false, "tokens": 35 },
+    { "idx": 13, "role": "tool", "text": "[Raw dump of 7500 tokens — Debezium config examples, all connectors]", "critical": false, "tokens": 7500, "isRawTool": true },
+    { "idx": 14, "role": "assistant", "text": "Debezium fits for CDC but here we ingest external events, so a Kafka producer from the webhook handler is simpler.", "critical": false, "tokens": 180 },
+    { "idx": 15, "role": "user", "text": "Cool. Schema evolution strategy?", "critical": false, "tokens": 30 },
+    { "idx": 16, "role": "assistant", "text": "Use a schema registry with backward-compatible changes only...", "critical": false, "tokens": 240 },
+    { "idx": 17, "role": "user", "text": "DLQ pattern?", "critical": false, "tokens": 15 },
+    { "idx": 18, "role": "tool", "text": "[Raw dump of 5500 tokens — DLQ patterns from 4 different blog posts]", "critical": false, "tokens": 5500, "isRawTool": true },
+    { "idx": 19, "role": "assistant", "text": "Standard pattern: retry 3x with backoff, then DLQ topic.", "critical": false, "tokens": 90 },
+    { "idx": 20, "role": "user", "text": "Security?", "critical": false, "tokens": 10 },
+    { "idx": 21, "role": "assistant", "text": "HMAC signatures on inbound webhooks, rotate keys quarterly...", "critical": false, "tokens": 160 },
+    { "idx": 22, "role": "user", "text": "PII concerns?", "critical": false, "tokens": 15 },
+    { "idx": 23, "role": "assistant", "text": "For PII in events, we'd need to classify and scrub before storage...", "critical": false, "tokens": 180 },
+    { "idx": 24, "role": "user", "text": "OK, give me the final design.", "critical": false, "tokens": 30 },
+    { "idx": 25, "role": "assistant", "text": "Here's the final design: Kafka topic per source, consumers idempotent on event_id with a 30-day retention window...", "critical": false, "tokens": 350, "violatesCritical": true }
+  ]
+}

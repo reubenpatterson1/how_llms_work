@@ -56,7 +56,7 @@ def init_db():
             );
         """)
         # Seed lock rows if missing
-        for i in range(1, 7):
+        for i in range(1, 8):
             mod = f"part{i}"
             db.execute(
                 "INSERT OR IGNORE INTO module_locks (module, locked, updated_at) VALUES (?, 0, ?)",
@@ -124,7 +124,7 @@ def get_dashboard_data():
 
         # Completion funnel
         funnel = {}
-        for i in range(1, 7):
+        for i in range(1, 8):
             mod = f"part{i}"
             funnel[mod] = {
                 "started": db.execute(

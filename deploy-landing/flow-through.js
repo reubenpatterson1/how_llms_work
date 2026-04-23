@@ -1,6 +1,6 @@
 (function(){
-  var MODULES=['part1','part2','part3','part4','part5','part6'];
-  var LABELS=['Part 1','Part 2','Part 3','Part 4','Part 5','Part 6'];
+  var MODULES=['part1','part2','part3','part4','part5','part6','part7'];
+  var LABELS=['Part 1','Part 2','Part 3','Part 4','Part 5','Part 6','Part 7'];
   var current=window.__LLM_MODULE_ID__;
   var idx=MODULES.indexOf(current);
   if(idx<0)return;
@@ -58,7 +58,7 @@
   var bar=document.createElement('div');
   bar.id='llm-flow-bar';
   bar.innerHTML='<a href="/" style="color:#94a3b8;text-decoration:none;font-size:.85rem">&larr; Course Home</a>'+
-    '<span style="color:#64748b;font-size:.85rem">'+LABELS[idx]+' of 6</span>'+
+    '<span style="color:#64748b;font-size:.85rem">'+LABELS[idx]+' of 7</span>'+
     '<button id="llm-complete-btn" style="display:none;padding:6px 16px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s">Complete &amp; Continue &rarr;</button>';
   bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(15,23,42,.95);backdrop-filter:blur(8px);border-bottom:1px solid #334155;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif';
   document.body.appendChild(bar);

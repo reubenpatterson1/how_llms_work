@@ -52,7 +52,7 @@
     <div class="card-header" style="margin-bottom: 16px;">
       <div class="card-title">Completion Funnel</div>
     </div>
-    <div id="funnel-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;"></div>
+    <div id="funnel-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;"></div>
   </div>
 
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
@@ -106,10 +106,11 @@
 const MODULE_NAMES = {
   part1: "How LLMs Work",
   part2: "Work With LLMs",
-  part3: "Building",
-  part4: "Testing",
-  part5: "Deploying",
-  part6: "CI/CD",
+  part3: "Context & Sessions",
+  part4: "Building",
+  part5: "Testing",
+  part6: "Deploying",
+  part7: "CI/CD",
 };
 
 const EVENT_COLORS = {
@@ -146,7 +147,7 @@ function renderSummary(d) {
 function renderModuleLocks(locks) {
   const el = document.getElementById('module-locks');
   el.innerHTML = '';
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 7; i++) {
     const mod = 'part' + i;
     const locked = !!locks[mod];
     const col = document.createElement('div');
@@ -172,7 +173,7 @@ async function toggleLock(module, locked) {
 }
 
 async function setAllLocks(locked) {
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 7; i++) {
     await fetch(PFX + '/api/analytics/locks', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ module: 'part' + i, locked })
@@ -225,12 +226,12 @@ function renderUserProgress(users) {
     <div class="result-row">
       <span style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:11px;">${u.user_id}</span>
       <div class="progress-dots" style="flex:1;">
-        ${[1,2,3,4,5,6].map(i => {
+        ${[1,2,3,4,5,6,7].map(i => {
           const done = u.modules_completed >= i;
           return `<div class="progress-dot" style="background:${done ? '#22C55E30' : 'var(--border)'};color:${done ? '#22C55E' : '#475569'};border:1px solid ${done ? '#22C55E50' : 'var(--border)'}">${i}</div>`;
         }).join('')}
       </div>
-      <span style="color:var(--text-dim);font-size:10px;">${u.modules_completed}/6 modules · ${u.quizzes_taken} quizzes</span>
+      <span style="color:var(--text-dim);font-size:10px;">${u.modules_completed}/7 modules · ${u.quizzes_taken} quizzes</span>
       <span style="color:var(--text-dim);font-size:9px;">${timeAgo(u.last_seen)}</span>
     </div>
   `).join('');
