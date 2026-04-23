@@ -9,6 +9,7 @@ import RecallLandscape3D from './RecallLandscape3D.jsx'
 
 const lookup = createRecallLookup(tableData)
 const WINDOW_SIZES = [4000, 8000, 16000, 32000, 64000, 100000, 150000, 200000]
+const NOISE_Z_DRIFT_MAX = 0.35
 
 export default function LostInTheMiddleCurve() {
   const [windowIdx, setWindowIdx] = useState(5)   // 100k
@@ -44,11 +45,17 @@ export default function LostInTheMiddleCurve() {
     lookup({ model: 'claude-sonnet', window_size: windowSize, position: needlePos, noise_level: noise }),
     [windowSize, noise, needlePos])
 
+  // zAnchor = where the needle *should* be (based on window-size selection).
+  // zDrift  = how far forward noise has blown it (0 at no-noise, up to NOISE_Z_DRIFT_MAX at full noise).
+  // z       = actual render position = anchor + drift, clamped to [0,1].
+  const zAnchor = windowIdx / (WINDOW_SIZES.length - 1)
+  const zDrifted = Math.max(0, Math.min(1, zAnchor + noise * NOISE_Z_DRIFT_MAX))
+
   const needleCoords = useMemo(() => ({
     x: needlePos,
-    z: windowIdx / (WINDOW_SIZES.length - 1),
+    z: zDrifted,
     y: needleRecall,
-  }), [needlePos, windowIdx, needleRecall])
+  }), [needlePos, zDrifted, needleRecall])
 
   return (
     <div style={{ padding: '16px 20px', fontFamily: FONT_SANS }}>
@@ -88,12 +95,23 @@ export default function LostInTheMiddleCurve() {
                 {(needleRecall * 100).toFixed(1)}% recall
               </span>
             </div>
+            {noise > 0.02 && (
+              <div style={{ color: C.textFaint, fontSize: 11, marginTop: 2 }}>
+                Noise has displaced the needle forward by{' '}
+                <span style={{ color: C.yellow }}>
+                  {Math.round(noise * NOISE_Z_DRIFT_MAX * 100)}%
+                </span>{' '}
+                of the Z range — watch the grey ring behind it marks the true spot.
+              </div>
+            )}
             <div style={{ color: C.textFaint, fontSize: 11, marginTop: 2 }}>
-              Green disk = 100% recall ceiling. Gold rod = how far noise has pushed recall below the peak.
+              Green disk = 100% recall ceiling. Gold rod = how far noise pushed recall below the peak.
+              Grey ring on the floor = the needle&apos;s true spot; noise blows it forward.
             </div>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <RecallLandscape3D samples={surfaceSamples} needlePosition={needleCoords}
+              anchorZ={zAnchor}
               depth={3} height={1.0} />
           </div>
         </div>

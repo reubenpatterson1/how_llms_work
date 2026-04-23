@@ -19,6 +19,7 @@ export default function RecallLandscape3D({
   height = 1.2,
   colorFn,
   needlePosition = null,
+  anchorZ = null,
 }) {
   const geometry = useMemo(() => {
     let grid
@@ -67,6 +68,7 @@ export default function RecallLandscape3D({
   const needleWorldX = needleCoords !== null ? (needleCoords.x - 0.5) * width : null
   // Map z=0 -> back (+depth/2), z=1 -> front (-depth/2). Picked so larger window indices sit behind.
   const needleWorldZ = needleCoords !== null ? (0.5 - needleCoords.z) * depth : null
+  const anchorWorldZ = (typeof anchorZ === 'number') ? (0.5 - anchorZ) * depth : null
   const surfaceY = needleCoords !== null && needleCoords.y !== null ? needleCoords.y * height : null
   // When we know the surface height, sit the cone base on the surface; otherwise float above.
   const coneBaseY = surfaceY !== null ? surfaceY : height * 1.2
@@ -109,6 +111,28 @@ export default function RecallLandscape3D({
             <coneGeometry args={[0.10, 0.35, 16]} />
             <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
           </mesh>
+          {anchorWorldZ !== null && (
+            <>
+              {/* Floor ring marking where the needle SHOULD be (no-noise anchor). */}
+              <mesh position={[needleWorldX, 0.005, anchorWorldZ]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.08, 0.11, 24]} />
+                <meshStandardMaterial color="#64748B" transparent opacity={0.85} side={THREE.DoubleSide} />
+              </mesh>
+              {/* Drift trail on the floor from anchor → drifted needle position. */}
+              {Math.abs(anchorWorldZ - needleWorldZ) > 0.01 && (
+                <mesh
+                  position={[
+                    needleWorldX,
+                    0.005,
+                    (anchorWorldZ + needleWorldZ) / 2,
+                  ]}
+                  rotation={[0, 0, 0]}>
+                  <boxGeometry args={[0.02, 0.005, Math.abs(anchorWorldZ - needleWorldZ)]} />
+                  <meshStandardMaterial color="#FBBF24" transparent opacity={0.55} />
+                </mesh>
+              )}
+            </>
+          )}
         </>
       )}
       <AxisLabel text="position" position={[0, -0.1, depth / 2 + 0.3]} />
