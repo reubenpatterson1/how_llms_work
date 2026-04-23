@@ -21,12 +21,14 @@ export function computeBudget(chunks) {
   const shares = {}
   for (const w of weighted) shares[w.id] = total > 0 ? w.mass / total : 0
 
-  const userChunk = chunks.find((c) => c.type === 'user')
+  // Aggregate across ALL user chunks: each contributes its share * (critical/total).
+  // The result is the fraction of the total attention budget that lands on critical tokens.
   let attentionPerCritical = 0
-  if (userChunk) {
-    const critical = userChunk.criticalTokens ?? 0
-    const total = Math.max(1, userChunk.tokens)
-    attentionPerCritical = (shares[userChunk.id] ?? 0) * (critical / total)
+  for (const uc of chunks) {
+    if (uc.type !== 'user') continue
+    const critical = uc.criticalTokens ?? 0
+    const ucTotal = Math.max(1, uc.tokens)
+    attentionPerCritical += (shares[uc.id] ?? 0) * (critical / ucTotal)
   }
 
   return { shares, attentionPerCritical }

@@ -56,4 +56,29 @@ describe('computeBudget', () => {
     const { attentionPerCritical } = computeBudget(chunks)
     expect(attentionPerCritical).toBe(0)
   })
+
+  it('attentionPerCritical aggregates across multiple user chunks', () => {
+    const chunks = [
+      { id: 'sys', type: 'system', tokens: 200 },
+      { id: 'u1',  type: 'user',   tokens: 100, criticalTokens: 50 },
+      { id: 'u2',  type: 'user',   tokens: 200, criticalTokens: 80 },
+    ]
+    const { shares, attentionPerCritical } = computeBudget(chunks)
+    const expected = shares.u1 * (50 / 100) + shares.u2 * (80 / 200)
+    expect(attentionPerCritical).toBeCloseTo(expected, 6)
+  })
+
+  it('adding a second user chunk with critical tokens INCREASES attentionPerCritical', () => {
+    const single = [
+      { id: 'sys', type: 'system', tokens: 200 },
+      { id: 'u1',  type: 'user',   tokens: 100, criticalTokens: 50 },
+    ]
+    const dual = [
+      ...single,
+      { id: 'u2', type: 'user', tokens: 100, criticalTokens: 50 },
+    ]
+    const a = computeBudget(single).attentionPerCritical
+    const b = computeBudget(dual).attentionPerCritical
+    expect(b).toBeGreaterThan(a)
+  })
 })
