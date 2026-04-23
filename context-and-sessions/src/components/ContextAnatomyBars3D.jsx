@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { C, CHUNK_COLORS, FONT_MONO, FONT_SANS } from '../lib/theme.js'
 import { tokenAnalogShort } from '../lib/token-analogs.js'
 import profileData from '../data/prompt-profiles.json'
@@ -44,7 +45,7 @@ function buildScene(container) {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x0b1120)
   const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 200)
-  // Elevated 3/4 view, no orbit controls.
+  // Elevated 3/4 view; user can orbit, zoom, and pan.
   camera.position.set(11, 10, 14)
   camera.lookAt(0, 2, 0)
 
@@ -52,6 +53,24 @@ function buildScene(container) {
   renderer.setSize(W, H)
   renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2))
   container.appendChild(renderer.domElement)
+
+  let controls = null
+  if (typeof OrbitControls === 'function' && renderer.domElement && renderer.domElement.addEventListener) {
+    try {
+      controls = new OrbitControls(camera, renderer.domElement)
+      controls.target.set(0, 2, 0)
+      controls.enableDamping = true
+      controls.dampingFactor = 0.08
+      controls.enablePan = true
+      controls.enableZoom = true
+      controls.minDistance = 6
+      controls.maxDistance = 40
+      controls.maxPolarAngle = Math.PI / 2 - 0.05  // don't let camera dip below the floor
+      controls.update()
+    } catch {
+      controls = null
+    }
+  }
 
   scene.add(new THREE.AmbientLight(0x334455, 0.8))
   const dir = new THREE.DirectionalLight(0xffeedd, 0.95)
@@ -211,7 +230,7 @@ function buildScene(container) {
     scene.add(sprite)
   }
 
-  return { scene, camera, renderer, bars, constraintBars, colHeaderSprites, colConstraintSprites }
+  return { scene, camera, renderer, controls, bars, constraintBars, colHeaderSprites, colConstraintSprites }
 }
 
 export default function ContextAnatomyBars3D() {
@@ -232,11 +251,17 @@ export default function ContextAnatomyBars3D() {
     let frameId
     const animate = () => {
       frameId = requestAnimationFrame(animate)
+      if (s.controls) s.controls.update()
       s.renderer.render(s.scene, s.camera)
     }
     animate()
 
-    return () => { if (frameId) cancelAnimationFrame(frameId) }
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId)
+      if (s.controls && typeof s.controls.dispose === 'function') {
+        try { s.controls.dispose() } catch { /* noop */ }
+      }
+    }
   }, [])
 
   useEffect(() => {
