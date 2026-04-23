@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { C, FONT_SANS, FONT_MONO } from '../lib/theme.js'
 import { createRecallLookup } from '../lib/recall-lookup.js'
+import { tokenAnalog } from '../lib/token-analogs.js'
 import tableData from '../data/window-playground-table.json'
 import RecallLandscape3D from './RecallLandscape3D.jsx'
 
@@ -88,7 +89,7 @@ export default function LostInTheMiddleCurve() {
             </div>
             <div data-testid="needle-3d-readout"
               style={{ color: C.textDim, fontSize: 12, marginTop: 4 }}>
-              At window = {windowSize.toLocaleString()} tok, position = {(needlePos * 100).toFixed(0)}%:
+              At window = {windowSize.toLocaleString()} tok ({tokenAnalog(windowSize)}), position = {(needlePos * 100).toFixed(0)}%:
               <span style={{ color: C.accent, fontFamily: FONT_MONO, marginLeft: 6 }}>
                 {(needleRecall * 100).toFixed(1)}% recall
               </span>
@@ -105,10 +106,10 @@ export default function LostInTheMiddleCurve() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <Slider label={`Window: ${windowSize.toLocaleString()} tok`}
+        <Slider label={`Window: ${windowSize.toLocaleString()} tok ≈ ${tokenAnalog(windowSize)}`}
           min="0" max={WINDOW_SIZES.length - 1} value={windowIdx}
           onChange={(e) => setWindowIdx(+e.target.value)} testId="window-slider" />
-        <Slider label={`Noise: ${(noise * 100).toFixed(0)}%`}
+        <Slider label={`Noise: ${(noise * 100).toFixed(0)}% ≈ ${tokenAnalog(Math.round(noise * windowSize))} of distractors`}
           min="0" max="1" step="0.01" value={noise}
           onChange={(e) => setNoise(+e.target.value)} testId="noise-slider" />
         <Slider label={`Needle: ${(needlePos * 100).toFixed(0)}%`}
