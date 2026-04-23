@@ -4,8 +4,8 @@ import App from '../src/App.jsx'
 import { SLIDES } from '../src/slides.jsx'
 
 describe('SLIDES data', () => {
-  it('has exactly 23 entries', () => {
-    expect(SLIDES).toHaveLength(23)
+  it('has exactly 24 entries', () => {
+    expect(SLIDES).toHaveLength(24)
   })
 
   it('has unique ids', () => {
@@ -25,8 +25,8 @@ describe('SLIDES data', () => {
     }
   })
 
-  it('has exactly 5 component slides', () => {
-    expect(SLIDES.filter((s) => s.type === 'component')).toHaveLength(5)
+  it('has exactly 6 component slides', () => {
+    expect(SLIDES.filter((s) => s.type === 'component')).toHaveLength(6)
   })
 
   it('has exactly 1 assessment slide', () => {

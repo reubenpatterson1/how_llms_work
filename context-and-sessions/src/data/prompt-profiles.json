@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "chunks": ["system", "history", "tool", "attachment", "rag", "user"],
+  "profiles": [
+    {
+      "key": "vague",
+      "label": "Vague",
+      "blurb": "\"write me a website\"",
+      "totalTokens": 600,
+      "breakdown": { "system": 25, "history": 0, "tool": 0, "attachment": 0, "rag": 0, "user": 75 }
+    },
+    {
+      "key": "dense",
+      "label": "Dense",
+      "blurb": "React 18 + Vite + Stripe + WCAG-AA + LCP<2s …",
+      "totalTokens": 1800,
+      "breakdown": { "system": 15, "history": 0, "tool": 0, "attachment": 0, "rag": 0, "user": 85 }
+    },
+    {
+      "key": "coding",
+      "label": "Coding agent",
+      "blurb": "mid-session w/ file reads + tool runs",
+      "totalTokens": 45000,
+      "breakdown": { "system": 10, "history": 22, "tool": 52, "attachment": 3, "rag": 2, "user": 11 }
+    },
+    {
+      "key": "rumination",
+      "label": "Rumination",
+      "blurb": "40+ turn iterative session, accumulated history",
+      "totalTokens": 80000,
+      "breakdown": { "system": 5, "history": 65, "tool": 12, "attachment": 3, "rag": 5, "user": 10 }
+    }
+  ]
+}

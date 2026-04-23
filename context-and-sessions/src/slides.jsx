@@ -1,4 +1,4 @@
-// All 23 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
+// All 24 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
 // Each component slide has id + type: "component" + component (string key) + instructions.
 // Each assessment slide has id + type: "assessment".
 export const SLIDES = [
@@ -90,6 +90,12 @@ export const SLIDES = [
       { label: 'User turn', desc: 'What you actually typed — usually the smallest slice' },
     ],
     keyTakeaway: 'The user turn is often the smallest fraction of what the model reads.',
+  },
+  {
+    id: 'anatomy-3d',
+    type: 'component',
+    component: 'ContextAnatomyBars3D',
+    instructions: 'Each column = one prompt type. Bars show what % of the context window each chunk type occupies. Click a column header to isolate it. Vague vs. dense changes the SHAPE; coding vs. rumination changes the SIZE and where the bulk lives.',
   },
   {
     id: 'budget-intro',
