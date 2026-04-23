@@ -3,18 +3,12 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot, ResponsiveContain
 import { C, FONT_SANS, FONT_MONO } from '../lib/theme.js'
 import { createRecallLookup } from '../lib/recall-lookup.js'
 import { tokenAnalog } from '../lib/token-analogs.js'
+import { humanSerialPosition } from '../lib/human-memory.js'
 import tableData from '../data/window-playground-table.json'
 import RecallLandscape3D from './RecallLandscape3D.jsx'
 
 const lookup = createRecallLookup(tableData)
 const WINDOW_SIZES = [4000, 8000, 16000, 32000, 64000, 100000, 150000, 200000]
-
-function humanSerialPosition(position) {
-  // Classic U-curve from human memory research (approximation)
-  const primacy = 0.6 * Math.exp(-Math.pow((position - 0) / 0.12, 2) / 2)
-  const recency = 0.75 * Math.exp(-Math.pow((position - 1) / 0.10, 2) / 2)
-  return 0.35 + Math.max(primacy, recency) * 0.5
-}
 
 export default function LostInTheMiddleCurve() {
   const [windowIdx, setWindowIdx] = useState(5)   // 100k
@@ -31,7 +25,7 @@ export default function LostInTheMiddleCurve() {
       return {
         position: p,
         recall: lookup({ model: 'claude-sonnet', window_size: windowSize, position: p, noise_level: noise }),
-        human: humanSerialPosition(p),
+        human: humanSerialPosition(p, windowSize, noise),
       }
     })
   }, [windowSize, noise])
@@ -119,7 +113,7 @@ export default function LostInTheMiddleCurve() {
           alignItems: 'center', gap: 8, cursor: 'pointer' }}>
           <input type="checkbox" checked={showHuman}
             onChange={(e) => setShowHuman(e.target.checked)} data-testid="human-toggle" />
-          Overlay human memory curve
+          Overlay human memory curve (what YOU&apos;d recall)
         </label>
       </div>
       <div style={{ marginTop: 12, color: C.textDim, fontSize: 13 }}>
