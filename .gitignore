@@ -9,3 +9,5 @@ __pycache__
 .pytest_cache
 architect/.provider_config.json
 .worktrees/
+deploy-landing/test-results/
+deploy-landing/playwright-report/
