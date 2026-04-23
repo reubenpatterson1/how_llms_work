@@ -93,6 +93,9 @@ export default function LostInTheMiddleCurve() {
                 {(needleRecall * 100).toFixed(1)}% recall
               </span>
             </div>
+            <div style={{ color: C.textFaint, fontSize: 11, marginTop: 2 }}>
+              Green disk = 100% recall ceiling. Gold rod = how far noise has pushed recall below the peak.
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <RecallLandscape3D samples={surfaceSamples} needlePosition={needleCoords}

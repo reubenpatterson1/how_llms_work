@@ -70,8 +70,6 @@ export default function RecallLandscape3D({
   const surfaceY = needleCoords !== null && needleCoords.y !== null ? needleCoords.y * height : null
   // When we know the surface height, sit the cone base on the surface; otherwise float above.
   const coneBaseY = surfaceY !== null ? surfaceY : height * 1.2
-  const coneHeight = 0.3
-  const coneCenterY = coneBaseY + coneHeight / 2
 
   return (
     <Canvas camera={{ position: [0, 3, 4], fov: 45 }} style={{ background: C.bg }}>
@@ -82,14 +80,33 @@ export default function RecallLandscape3D({
       </mesh>
       {needleCoords !== null && (
         <>
-          {/* Vertical drop line from surface (or cone base) down to y=0 so the (x,z) is unmistakable */}
+          {/* Ground-reference drop line (floor → surface), kept thin so it doesn't steal attention */}
           <mesh position={[needleWorldX, coneBaseY / 2, needleWorldZ]}>
-            <cylinderGeometry args={[0.015, 0.015, coneBaseY, 8]} />
-            <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.3} />
+            <cylinderGeometry args={[0.010, 0.010, Math.max(coneBaseY, 0.001), 8]} />
+            <meshStandardMaterial color="#64748B" transparent opacity={0.5} />
           </mesh>
-          {/* Cone marker at the surface height */}
-          <mesh position={[needleWorldX, coneCenterY, needleWorldZ]}>
-            <coneGeometry args={[0.08, coneHeight, 12]} />
+
+          {/* Ceiling marker: a small disk at the theoretical-max height */}
+          <mesh position={[needleWorldX, height * 1.05, needleWorldZ]}>
+            <cylinderGeometry args={[0.12, 0.12, 0.02, 24]} />
+            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={0.4} />
+          </mesh>
+
+          {/* Ceiling → cone: the "noise is pushing me down" indicator */}
+          {surfaceY !== null && (
+            <mesh position={[
+                needleWorldX,
+                (height * 1.05 + surfaceY) / 2,
+                needleWorldZ,
+              ]}>
+              <cylinderGeometry args={[0.022, 0.022, Math.max(height * 1.05 - surfaceY, 0.001), 12]} />
+              <meshStandardMaterial color="#FBBF24" emissive="#FBBF24" emissiveIntensity={0.4} />
+            </mesh>
+          )}
+
+          {/* Cone marker, slightly larger for visibility */}
+          <mesh position={[needleWorldX, coneBaseY + 0.35 / 2, needleWorldZ]}>
+            <coneGeometry args={[0.10, 0.35, 16]} />
             <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
           </mesh>
         </>
