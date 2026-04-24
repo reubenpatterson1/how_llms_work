@@ -164,7 +164,7 @@ export const SLIDES = [
     id: 'mono-vs-decomp',
     type: 'component',
     component: 'MonolithicVsDecomposed',
-    instructions: 'Placeholder — the side-by-side comparison ships in the next build.',
+    instructions: "Pick a complexity level. Watch Vibe's constraint recall fall and hallucinations climb; Engineered stays flat because each agent's context never grows past its spec slice.",
   },
   {
     id: 'turn-stack-towers',
