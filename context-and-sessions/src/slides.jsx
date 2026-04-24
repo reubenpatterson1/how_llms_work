@@ -181,11 +181,6 @@ export const SLIDES = [
     instructions: 'Ten practices across Tools, RAG, Memory, Context, Prompt, Governance. Click any card to see a before/after and how it reinforces constraints, restricts confabulation, and holds quality.',
   },
   {
-    id: 'assessment',
-    type: 'assessment',
-    instructions: '15 MCQ + 4 diagnostic scenarios. Pass threshold: 80% overall AND 75% on diagnostics.',
-  },
-  {
     id: 'recap',
     type: 'text',
     title: 'Recap & Bridge to Module 4',
@@ -198,5 +193,10 @@ export const SLIDES = [
     type: 'component',
     component: 'BuildFrameworkPrompt',
     instructions: 'The take-home artifact. Read the file on the left; the right panel explains what to notice. Copy it, adapt it, commit it at your repo root, and hand it to your orchestrator.',
+  },
+  {
+    id: 'assessment',
+    type: 'assessment',
+    instructions: '15 MCQ + 4 diagnostic scenarios. Pass threshold: 80% overall AND 75% on diagnostics.',
   },
 ]
