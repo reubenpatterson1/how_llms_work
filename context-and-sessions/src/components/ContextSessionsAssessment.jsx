@@ -8,9 +8,9 @@ const C = {
 }
 
 const SECTIONS = [
-  { name: 'Attention & Lost-in-the-Middle', icon: '◈' },
-  { name: 'Context vs. Prompt', icon: '⊞' },
-  { name: 'Session Hygiene & Governance', icon: '⬡' },
+  { name: 'Remediation Techniques', icon: '◈' },
+  { name: 'Scoping & Decomposition', icon: '⊞' },
+  { name: 'Guardrails & Governance', icon: '⬡' },
 ]
 
 const SECTION_KEY_TO_INDEX = { A: 0, B: 1, C: 2 }
