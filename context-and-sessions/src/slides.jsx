@@ -1,4 +1,4 @@
-// All 23 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
+// All 24 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
 // Each component slide has id + type: "component" + component (string key) + instructions.
 // Each assessment slide has id + type: "assessment".
 export const SLIDES = [
@@ -190,5 +190,11 @@ export const SLIDES = [
     subtitle: 'You now have the hidden mechanic',
     body: 'Lost-in-the-middle is not a mystery — it is attention budget arithmetic. Once you see it, the fixes write themselves: keep contexts short, pin invariants, prune tool outputs, scope sessions, externalize what is common. The natural conclusion of these practices is decomposition: build not one long session, but many short ones, coordinated by a wave plan with tight inputs and tested outputs. That is exactly where Module 4 begins.',
     keyTakeaway: 'Context hygiene is the prerequisite for agentic systems. Module 4 takes the wave plan and makes it run.',
+  },
+  {
+    id: 'build-framework',
+    type: 'component',
+    component: 'BuildFrameworkPrompt',
+    instructions: 'The take-home artifact. Read the file on the left; the right panel explains what to notice. Copy it, adapt it, commit it at your repo root, and hand it to your orchestrator.',
   },
 ]
