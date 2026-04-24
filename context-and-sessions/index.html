@@ -9,5 +9,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <!--
+      Course-level floating nav bar (← Course Home, module counter, Complete & Continue).
+      The DOM-append keeps the src string as runtime data so Vite's base-path rewrite
+      doesn't mangle it into /part3/flow-through.js. Works in prod; harmlessly 404s in local dev.
+    -->
+    <script>
+      window.__LLM_MODULE_ID__ = 'part3';
+      (function () {
+        var s = document.createElement('script');
+        s.src = '/flow-through.js';
+        s.async = false;
+        document.body.appendChild(s);
+      })();
+    </script>
   </body>
 </html>
