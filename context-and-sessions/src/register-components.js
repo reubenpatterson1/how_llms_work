@@ -5,14 +5,20 @@ import AttentionBudgetAllocator from './components/AttentionBudgetAllocator.jsx'
 import ContextAnatomyBars3D from './components/ContextAnatomyBars3D.jsx'
 import ContextSessionsAssessment from './components/ContextSessionsAssessment.jsx'
 import ContextWindowPlayground from './components/ContextWindowPlayground.jsx'
+import DecomposeWavePlan3D from './components/DecomposeWavePlan3D.jsx'
 import LeverComparisonTool from './components/LeverComparisonTool.jsx'
 import LostInTheMiddleCurve from './components/LostInTheMiddleCurve.jsx'
+import MonolithicVsDecomposed from './components/MonolithicVsDecomposed.jsx'
 import SessionHygieneSimulator from './components/SessionHygieneSimulator.jsx'
+import TurnStackTowers3D from './components/TurnStackTowers3D.jsx'
 
 registerComponent('AttentionBudgetAllocator', AttentionBudgetAllocator)
 registerComponent('ContextAnatomyBars3D', ContextAnatomyBars3D)
 registerComponent('ContextSessionsAssessment', ContextSessionsAssessment)
 registerComponent('ContextWindowPlayground', ContextWindowPlayground)
+registerComponent('DecomposeWavePlan3D', DecomposeWavePlan3D)
 registerComponent('LeverComparisonTool', LeverComparisonTool)
 registerComponent('LostInTheMiddleCurve', LostInTheMiddleCurve)
+registerComponent('MonolithicVsDecomposed', MonolithicVsDecomposed)
 registerComponent('SessionHygieneSimulator', SessionHygieneSimulator)
+registerComponent('TurnStackTowers3D', TurnStackTowers3D)
