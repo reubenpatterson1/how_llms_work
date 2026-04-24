@@ -149,7 +149,7 @@ function buildScene(container) {
   }
 
   // Floating label above the monolithic tower.
-  const monoLabel = makeLabelSprite('Monolithic — Turn 1', '#e8c4b8', { fontSize: 20, w: 512, h: 128 })
+  const monoLabel = makeLabelSprite('Vibe — Turn 1', '#e8c4b8', { fontSize: 20, w: 512, h: 128 })
   monoLabel.position.set(monoX, 11.2, 0)
   if (monoLabel.scale && monoLabel.scale.set) monoLabel.scale.set(6.5, 1.6, 1)
   scene.add(monoLabel)
@@ -244,7 +244,7 @@ function buildScene(container) {
   }
 
   // Section header for the decomposed region.
-  const decompHeader = makeLabelSprite('Decomposed — many agents, each scoped', '#e8c4b8', { fontSize: 18, w: 512, h: 64 })
+  const decompHeader = makeLabelSprite('Engineered — many agents, each scoped', '#e8c4b8', { fontSize: 18, w: 512, h: 64 })
   decompHeader.position.set(decompStartX + (MAX_AGENTS - 1) * decompGapX / 2, 11.2, 0)
   if (decompHeader.scale && decompHeader.scale.set) decompHeader.scale.set(7, 0.85, 1)
   scene.add(decompHeader)
@@ -320,7 +320,7 @@ export default function TurnStackTowers3D() {
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         const lines = [
-          `Monolithic — Turn ${turn}`,
+          `Vibe — Turn ${turn}`,
           `${monoTotal.toLocaleString()} tok accumulated`,
           `Constraint buried at depth: ${Math.max(0, depth)} layers`,
         ]
@@ -452,12 +452,12 @@ export default function TurnStackTowers3D() {
         {/* Summary readouts */}
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12, fontFamily: FONT_MONO, fontSize: 12 }}>
           <div style={{ color: C.textDim }}>
-            <span style={{ color: C.red }}>Monolithic</span> total: <strong style={{ color: C.text }}>{monoTotal.toLocaleString()}</strong> tok
+            <span style={{ color: C.red }}>Vibe</span> total: <strong style={{ color: C.text }}>{monoTotal.toLocaleString()}</strong> tok
             {' • '}tower height: <strong style={{ color: C.text }}>{towerHeightApprox}</strong>
             {' • '}constraint depth: <strong style={{ color: CONSTRAINT_COLOR }}>{constraintDepth}</strong> layers
           </div>
           <div style={{ color: C.textDim }}>
-            <span style={{ color: C.green }}>Decomposed</span> total: <strong style={{ color: C.text }}>{decompTotal.toLocaleString()}</strong> tok across <strong style={{ color: C.text }}>{visibleAgents}</strong> agents
+            <span style={{ color: C.green }}>Engineered</span> total: <strong style={{ color: C.text }}>{decompTotal.toLocaleString()}</strong> tok across <strong style={{ color: C.text }}>{visibleAgents}</strong> agents
             {' • '}avg stack: <strong style={{ color: C.text }}>{avgStackHeight}</strong>
           </div>
         </div>
@@ -474,9 +474,9 @@ export default function TurnStackTowers3D() {
             lineHeight: 1.5,
           }}
         >
-          At turn 1 both sides hold the same constraint. By turn 40 the monolithic tower is 30+ layers
+          At turn 1 both sides hold the same constraint. By turn 40 the vibe tower is 30+ layers
           tall and the constraint sits near the base — far from the model&rsquo;s recency window. The
-          decomposed side grew in width, not height: each agent&rsquo;s constraint stays near the top.
+          engineered side grew in width, not height: each agent&rsquo;s constraint stays near the top.
         </div>
       </div>
     </div>
