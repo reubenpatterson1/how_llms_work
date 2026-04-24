@@ -17,6 +17,22 @@ const GROWTH_START_TURN = 20       // new agents stop appearing; existing ones s
 const AGENT_GROWTH_TOKENS_PER_TURN = [100, 350, 700, 200, 500]
 const CONSTRAINT_COLOR = '#FBBF24' // gold
 
+// Per-agent internal chunk mixes (proportions of internalTokens, each mix sums to 1.0).
+// Order-aligned with AGENT_NAMES = ['DB', 'API', 'Auth', 'Pay', 'Cart'].
+const AGENT_INTERNAL_MIXES = [
+  // DB — spec/tool dominant, some rag for schema docs
+  { tool: 0.55, history: 0.10, rag: 0.20, attachment: 0.05, user: 0.10 },
+  // API — tool heavy, rag for API specs
+  { tool: 0.45, history: 0.15, rag: 0.25, attachment: 0.05, user: 0.10 },
+  // Auth — rag-heavy (policies), history, tool
+  { tool: 0.25, history: 0.20, rag: 0.35, attachment: 0.05, user: 0.15 },
+  // Pay — tool dominates (Stripe calls), rag for compliance
+  { tool: 0.55, history: 0.10, rag: 0.25, attachment: 0.05, user: 0.05 },
+  // Cart — user + history + attachment heavy
+  { tool: 0.25, history: 0.25, rag: 0.10, attachment: 0.20, user: 0.20 },
+]
+const INTERNAL_ORDER = ['tool', 'history', 'rag', 'attachment', 'user']
+
 // Shared token→height scale so the visual contrast between the tall mono tower
 // and the short decomposed stacks is quantitatively fair. Tuned so turn-40
 // monolithic height ~ 9 units (TURN_TOKENS_MONO * MAX_TURNS / SCALE = 72000/8000).
@@ -178,7 +194,6 @@ function buildScene(container) {
     const appearanceTurn = Math.min(MAX_TURNS, 1 + i * 4)
     const internalTokens = AGENT_TOKENS - CONSTRAINT_TOKENS - 200 // system=200, constraint=480, internal≈2820
     const hSystem = Math.max(MIN_LAYER_H, 200 / SCALE)
-    const hInternal = Math.max(MIN_LAYER_H, internalTokens / SCALE)
     const hConstraint = Math.max(MIN_LAYER_H, CONSTRAINT_TOKENS / SCALE)
 
     const meshes = []
@@ -200,23 +215,40 @@ function buildScene(container) {
       scene.add(mesh)
       meshes.push(mesh)
     }
-    // Internal / tool-output layer.
-    {
-      const geo = new THREE.BoxGeometry(agentStackW, hInternal, agentStackW)
-      const color = new THREE.Color(CHUNK_COLORS.tool)
+
+    // Internal sublayers (bottom-up: tool → history → rag → attachment → user)
+    const mix = AGENT_INTERNAL_MIXES[i]
+    const internalLayers = []
+    let runningY = hSystem
+    INTERNAL_ORDER.forEach((type) => {
+      const proportion = mix?.[type] ?? 0
+      if (proportion <= 0) return
+      const tokens = proportion * internalTokens
+      const h = Math.max(MIN_LAYER_H, tokens / SCALE)
+      const geo = new THREE.BoxGeometry(agentStackW, h, agentStackW)
+      const color = new THREE.Color(CHUNK_COLORS[type])
       const mat = new THREE.MeshPhongMaterial({
         color,
-        emissive: color.clone().multiplyScalar(0.2),
+        emissive: color.clone().multiplyScalar(0.18),
         transparent: true,
         opacity: 0.85,
         shininess: 55,
       })
       const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(x, hSystem + hInternal / 2, 0)
+      mesh.position.set(x, runningY + h / 2, 0)
       mesh.visible = false
       scene.add(mesh)
+      internalLayers.push({
+        mesh,
+        type,
+        proportion,
+        baseTokens: tokens,
+        baseH: h,
+      })
       meshes.push(mesh)
-    }
+      runningY += h
+    })
+
     // Constraint / spec-slice (gold, top — always visually reachable).
     let topMesh
     {
@@ -230,7 +262,7 @@ function buildScene(container) {
         shininess: 90,
       })
       const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(x, hSystem + hInternal + hConstraint / 2, 0)
+      mesh.position.set(x, runningY + hConstraint / 2, 0)
       mesh.visible = false
       scene.add(mesh)
       meshes.push(mesh)
@@ -238,7 +270,7 @@ function buildScene(container) {
     }
 
     // Per-agent label above its stack.
-    const topY = hSystem + hInternal + hConstraint
+    const topY = runningY + hConstraint
     const label = makeLabelSprite(`${AGENT_NAMES[i]}\n${AGENT_TOKENS} tok`, '#e8c4b8', { fontSize: 16, w: 256, h: 80 })
     label.position.set(x, topY + 0.9, 0)
     if (label.scale && label.scale.set) label.scale.set(1.8, 0.7, 1)
@@ -248,15 +280,14 @@ function buildScene(container) {
     agents.push({
       meshes,
       topMesh,
-      internalMesh: meshes[1],
+      internalLayers,
       idx: i,
       label,
-      baseInternalTokens: internalTokens,
-      baseHInternal: hInternal,
       hSystem,
       hConstraint,
       baseX: x,
       baseTotalTokens: AGENT_TOKENS,
+      baseInternalTokens: internalTokens,
       growthTokensPerTurn: AGENT_GROWTH_TOKENS_PER_TURN[i] || 0,
       appearanceTurn,
     })
@@ -330,22 +361,24 @@ export default function TurnStackTowers3D() {
       // Compute growth past the threshold.
       const growthTurns = Math.max(0, turn - GROWTH_START_TURN)
       const extraTokens = growthTurns * a.growthTokensPerTurn
-      const currentInternalTokens = a.baseInternalTokens + extraTokens
       const currentTotalTokens = a.baseTotalTokens + extraTokens
-      const hInternalNow = Math.max(MIN_LAYER_H, currentInternalTokens / SCALE)
 
-      // Scale internal mesh relative to its base geometry height.
-      const scaleY = hInternalNow / a.baseHInternal
-      if (a.internalMesh) {
-        a.internalMesh.scale.y = scaleY
-        a.internalMesh.position.y = a.hSystem + hInternalNow / 2
-      }
-      // Reposition the gold constraint on top of the grown internal.
+      // Scale each internal sublayer proportionally and repack them.
+      let runningY = a.hSystem
+      a.internalLayers.forEach((layer) => {
+        const currentTokens = layer.baseTokens + extraTokens * layer.proportion
+        const hNow = Math.max(MIN_LAYER_H, currentTokens / SCALE)
+        const scaleY = hNow / layer.baseH
+        layer.mesh.scale.y = scaleY
+        layer.mesh.position.y = runningY + hNow / 2
+        runningY += hNow
+      })
+      // Constraint sits on top.
       if (a.topMesh) {
-        a.topMesh.position.y = a.hSystem + hInternalNow + a.hConstraint / 2
+        a.topMesh.position.y = runningY + a.hConstraint / 2
       }
-      // Lift the label to track the new top.
-      const topY = a.hSystem + hInternalNow + a.hConstraint
+      // Label tracks the new top.
+      const topY = runningY + a.hConstraint
       a.label.position.y = topY + 0.9
 
       // After the growth threshold, rewrite the agent label to reflect the new tokens.
