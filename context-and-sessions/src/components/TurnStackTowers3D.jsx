@@ -8,8 +8,13 @@ const MAX_TURNS = 40
 const TURN_TOKENS_MONO = 1800      // avg tokens added to the monolithic tower per turn
 const CONSTRAINT_TOKENS = 480      // the fixed constraint size
 const MONO_CONSTRAINT_TURN = 1     // constraint placed at turn 1
-const AGENT_TOKENS = 3500          // each decomposed agent's total session size
-const MAX_AGENTS = 10              // cap for visual scale
+const AGENT_TOKENS = 3500          // each decomposed agent's starting session size
+const MAX_AGENTS = 5               // 5 agents appear by turn 17, then grow independently
+const GROWTH_START_TURN = 20       // new agents stop appearing; existing ones start growing
+// Per-agent iteration growth rate (tokens added per turn after GROWTH_START_TURN).
+// Order matches AGENT_NAMES. Chosen so the spread is obvious but all stay well below
+// the vibe tower's final height (~9 units at turn 40).
+const AGENT_GROWTH_TOKENS_PER_TURN = [100, 350, 700, 200, 500]
 const CONSTRAINT_COLOR = '#FBBF24' // gold
 
 // Shared token→height scale so the visual contrast between the tall mono tower
@@ -240,7 +245,21 @@ function buildScene(container) {
     label.visible = false
     scene.add(label)
 
-    agents.push({ meshes, topMesh, idx: i, label, totalTokens: AGENT_TOKENS, appearanceTurn })
+    agents.push({
+      meshes,
+      topMesh,
+      internalMesh: meshes[1],
+      idx: i,
+      label,
+      baseInternalTokens: internalTokens,
+      baseHInternal: hInternal,
+      hSystem,
+      hConstraint,
+      baseX: x,
+      baseTotalTokens: AGENT_TOKENS,
+      growthTokensPerTurn: AGENT_GROWTH_TOKENS_PER_TURN[i] || 0,
+      appearanceTurn,
+    })
   }
 
   // Section header for the decomposed region.
@@ -300,10 +319,62 @@ export default function TurnStackTowers3D() {
     })
 
     // Decomposed agents: visible when appearanceTurn <= turn.
+    // After GROWTH_START_TURN, each agent's internal layer grows at its own rate,
+    // and the constraint (topmost) + label ride up with it.
     s.agents.forEach((a) => {
       const visible = a.appearanceTurn <= turn
       a.meshes.forEach((m) => { m.visible = visible })
       a.label.visible = visible
+      if (!visible) return
+
+      // Compute growth past the threshold.
+      const growthTurns = Math.max(0, turn - GROWTH_START_TURN)
+      const extraTokens = growthTurns * a.growthTokensPerTurn
+      const currentInternalTokens = a.baseInternalTokens + extraTokens
+      const currentTotalTokens = a.baseTotalTokens + extraTokens
+      const hInternalNow = Math.max(MIN_LAYER_H, currentInternalTokens / SCALE)
+
+      // Scale internal mesh relative to its base geometry height.
+      const scaleY = hInternalNow / a.baseHInternal
+      if (a.internalMesh) {
+        a.internalMesh.scale.y = scaleY
+        a.internalMesh.position.y = a.hSystem + hInternalNow / 2
+      }
+      // Reposition the gold constraint on top of the grown internal.
+      if (a.topMesh) {
+        a.topMesh.position.y = a.hSystem + hInternalNow + a.hConstraint / 2
+      }
+      // Lift the label to track the new top.
+      const topY = a.hSystem + hInternalNow + a.hConstraint
+      a.label.position.y = topY + 0.9
+
+      // After the growth threshold, rewrite the agent label to reflect the new tokens.
+      if (a.label.material && a.label.material.map) {
+        const canvas = document.createElement('canvas')
+        canvas.width = 256
+        canvas.height = 80
+        const ctx = canvas.getContext && canvas.getContext('2d')
+        if (ctx) {
+          ctx.fillStyle = '#e8c4b8'
+          ctx.font = 'bold 16px IBM Plex Mono, monospace'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          const lines = [AGENT_NAMES[a.idx], `${currentTotalTokens.toLocaleString()} tok`]
+          const lh = 22
+          const total = lh * lines.length
+          lines.forEach((ln, i) => {
+            ctx.fillText(ln, canvas.width / 2, canvas.height / 2 - total / 2 + lh / 2 + i * lh)
+          })
+        }
+        const tex = new THREE.CanvasTexture(canvas)
+        if (tex && THREE.LinearFilter !== undefined) tex.minFilter = THREE.LinearFilter
+        const oldMap = a.label.material.map
+        a.label.material.map = tex
+        a.label.material.needsUpdate = true
+        if (oldMap && typeof oldMap.dispose === 'function') {
+          try { oldMap.dispose() } catch { /* noop */ }
+        }
+      }
     })
 
     // Update floating mono label.
@@ -378,8 +449,13 @@ export default function TurnStackTowers3D() {
   const towerHeightApprox = (turn * TURN_TOKENS_MONO / SCALE).toFixed(1)
   const constraintDepth = Math.max(0, turn - MONO_CONSTRAINT_TURN)
   const visibleAgents = Math.min(MAX_AGENTS, Math.max(1, Math.floor(turn / 4) + 1))
-  const decompTotal = visibleAgents * AGENT_TOKENS
-  const avgStackHeight = (AGENT_TOKENS / SCALE).toFixed(2)
+  const growthTurns = Math.max(0, turn - GROWTH_START_TURN)
+  // Per-agent tokens = base + its own growth rate × growthTurns, only counting visible agents.
+  const decompTotal = Array.from({ length: visibleAgents }, (_, i) =>
+    AGENT_TOKENS + (AGENT_GROWTH_TOKENS_PER_TURN[i] || 0) * growthTurns
+  ).reduce((a, b) => a + b, 0)
+  const avgStackTokens = decompTotal / Math.max(1, visibleAgents)
+  const avgStackHeight = (avgStackTokens / SCALE).toFixed(2)
 
   const btnStyle = (disabled) => ({
     padding: '8px 16px',
