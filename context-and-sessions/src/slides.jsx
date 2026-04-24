@@ -131,7 +131,7 @@ export const SLIDES = [
     id: 'decompose-wave-plan',
     type: 'component',
     component: 'DecomposeWavePlan3D',
-    instructions: 'Placeholder — the full interactive decomposer ships in the next build.',
+    instructions: 'Live tool embedded below. First principles on the cards; the iframe is the real Decomposition Agent — run an intake, then Run Decompose to see the wave plan.',
   },
   {
     id: 'agent-anatomy',
