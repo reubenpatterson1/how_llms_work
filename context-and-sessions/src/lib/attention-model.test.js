@@ -20,7 +20,9 @@ describe('MODEL_PROFILES', () => {
     for (const p of Object.values(MODEL_PROFILES)) {
       expect(typeof p.base_rate_at_4k).toBe('number')
       expect(typeof p.base_rate_at_200k).toBe('number')
-      expect(typeof p.middle_valley_depth).toBe('number')
+      expect(typeof p.middle_valley_depth_base).toBe('number')
+      expect(typeof p.window_depth_scale).toBe('number')
+      expect(typeof p.noise_depth_scale).toBe('number')
       expect(typeof p.noise_sensitivity).toBe('number')
     }
   })
@@ -69,5 +71,30 @@ describe('recall', () => {
     const genericMiddle = recall({ position: 0.5, window_size: 32000, noise_level: 0, model: MODEL_PROFILES['generic-short'] })
     const claudeMiddle = recall({ position: 0.5, window_size: 32000, noise_level: 0, model: claude })
     expect(genericMiddle).toBeLessThan(claudeMiddle)
+  })
+
+  it('absolute noise volume (noise_level * window_size) matters beyond the base_rate ratio', () => {
+    // At equal noise_level, a larger window has more absolute noise tokens,
+    // which deepens the valley beyond what base_rate shrinkage alone would do.
+    const N = 0.5
+    const shortMid = recall({ position: 0.5, window_size: 4000, noise_level: N, model: claude })
+    const longMid = recall({ position: 0.5, window_size: 200000, noise_level: N, model: claude })
+    // Expected plain: long < short because base_rate drops and valley deepens.
+    expect(longMid).toBeLessThan(shortMid)
+    // Key new property: the recall ratio must be tighter than the base-rate ratio,
+    // i.e. absolute noise + window-depth scaling compound the loss.
+    const baseRateRatio = claude.base_rate_at_200k / claude.base_rate_at_4k
+    const recallRatio = longMid / shortMid
+    expect(recallRatio).toBeLessThan(baseRateRatio)
+  })
+
+  it('valley deepens as window grows (ratio middle/start decreases with W)', () => {
+    const startShort = recall({ position: 0, window_size: 4000, noise_level: 0, model: claude })
+    const middleShort = recall({ position: 0.5, window_size: 4000, noise_level: 0, model: claude })
+    const startLong = recall({ position: 0, window_size: 200000, noise_level: 0, model: claude })
+    const middleLong = recall({ position: 0.5, window_size: 200000, noise_level: 0, model: claude })
+    const ratioShort = middleShort / startShort
+    const ratioLong = middleLong / startLong
+    expect(ratioShort).toBeGreaterThan(ratioLong)
   })
 })

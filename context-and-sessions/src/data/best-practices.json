@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "categories": ["Tools", "RAG", "Memory", "Context", "Prompt", "Governance"],
+  "practices": [
+    {
+      "id": "tools-over-reasoning",
+      "title": "Call tools, don't reason",
+      "category": "Tools",
+      "glyph": "⚙",
+      "tagline": "Validated tools replace guesswork. The LLM orchestrates; the tool decides.",
+      "beforeExample": "User: Is this function O(n²) or O(n log n)?\nLLM: [reasons through the code, may be wrong]",
+      "afterExample": "User: Run benchmark_tool on this fn, report Big-O.\nLLM: → benchmark_tool(code)\n  returns { time: \"n log n\", evidence: ... }",
+      "reinforces": "Correctness is measured, not inferred.",
+      "restricts": "No free-form reasoning that invents facts.",
+      "quality": "Ground truth injected by the tool becomes a constraint in subsequent turns."
+    },
+    {
+      "id": "rag-for-canonicals",
+      "title": "RAG for canonical docs",
+      "category": "RAG",
+      "glyph": "⬢",
+      "tagline": "Fetch specs on demand. Never paste a 3k-token OpenAPI into a prompt.",
+      "beforeExample": "User: Here's our API spec [3000 tokens of OpenAPI].\n  Add a users endpoint.",
+      "afterExample": "User: Add a users endpoint per the API spec index.\nLLM: → rag.search(\"users endpoint conventions\")\n  pulls 400 relevant tokens. Cites chunk IDs.",
+      "reinforces": "The canonical spec is the source of truth, and it stays up to date.",
+      "restricts": "No drift — all ten agents reading the same index see the same rules.",
+      "quality": "Context budget preserved for the current turn; retrieval is precise."
+    },
+    {
+      "id": "memory-files",
+      "title": "Memory files for sticky state",
+      "category": "Memory",
+      "glyph": "◐",
+      "tagline": "MEMORY.md carries decisions across sessions without bloating context.",
+      "beforeExample": "Every new session: re-explain the whole project.\nThe model re-learns the same facts 40 times.",
+      "afterExample": "MEMORY.md pinned at session start:\n  - We use Postgres 15, not Mongo.\n  - HARD: 90-day retention.\n  - JWT is RS256, never HS256.",
+      "reinforces": "Hard-won decisions persist without re-derivation.",
+      "restricts": "Model can't re-invent architectural choices each session.",
+      "quality": "Consistency across sessions costs ~200 tokens, not ~20k."
+    },
+    {
+      "id": "clear-context",
+      "title": "Clear context after scoped work",
+      "category": "Context",
+      "glyph": "↺",
+      "tagline": "Finish a task → new chat. Don't let sessions metastasize.",
+      "beforeExample": "Same chat for 3 days. Features, bugs, architecture, billing.\n  Turn 60: constraint from turn 3 is long forgotten.",
+      "afterExample": "One chat per concern. When done:\n  - Summarize decisions into MEMORY.md\n  - Start fresh chat for next concern",
+      "reinforces": "Critical invariants stay in the recency window.",
+      "restricts": "No lost-in-middle degradation across tasks.",
+      "quality": "Each session operates at peak recall for its scope."
+    },
+    {
+      "id": "declare-scope",
+      "title": "Declare scope upfront",
+      "category": "Context",
+      "glyph": "⧉",
+      "tagline": "State the boundary at turn 1. Refuse to wander.",
+      "beforeExample": "User: Fix this billing bug.\n[20 turns later] User: Also add a new feature.\nLLM: [context now covers both, constraints from each dilute each other]",
+      "afterExample": "User: SCOPE: billing bug only. Out of scope:\n  new features, refactors, unrelated cleanup.\n[new concern appears] → user starts a new chat",
+      "reinforces": "The boundary itself is a constraint the model checks against.",
+      "restricts": "No scope creep → no cross-contamination of concerns.",
+      "quality": "Focused sessions produce focused, testable deliverables."
+    },
+    {
+      "id": "summarize-prune",
+      "title": "Summarize & prune history",
+      "category": "Context",
+      "glyph": "✂",
+      "tagline": "Compress aged turns. Keep the decisions, drop the chatter.",
+      "beforeExample": "Turn 1–25 verbatim in every subsequent prompt.\n  90% of context is \"yes, let me try\" and \"hmm, that didn't work.\"",
+      "afterExample": "Every N turns, summarize:\n  [SUMMARY of turns 1–25]\n  - Decided: Postgres 15, RS256 JWT, 90d retention.\n  - Rejected: Mongo (licensing), HS256 (rotation).\nThen drop the verbatim turns.",
+      "reinforces": "Key decisions surface to the recency window.",
+      "restricts": "Noise-token budget shrinks dramatically.",
+      "quality": "Context stays dense; attention stays focused."
+    },
+    {
+      "id": "input-guardrails",
+      "title": "Input guardrails",
+      "category": "Governance",
+      "glyph": "⛨",
+      "tagline": "Validate what enters the context before the model sees it.",
+      "beforeExample": "User pastes CSV with real names, SSNs, emails.\nLLM: [reads PII, includes in generated code samples]",
+      "afterExample": "Pipe user input through pii_redactor first.\nOnly redacted content reaches the prompt.\nPolicy-checked before assembly.",
+      "reinforces": "Compliance is a property of the context, not a hope.",
+      "restricts": "Governance violations can't even be attempted.",
+      "quality": "Context is safe to log, cache, and replay."
+    },
+    {
+      "id": "output-schemas",
+      "title": "Output schemas, not prose",
+      "category": "Governance",
+      "glyph": "⊟",
+      "tagline": "Structured returns. A validator rejects what doesn't match.",
+      "beforeExample": "LLM returns: \"I think we should probably use...\"\nCaller: parses free-form prose, hopes for the best.",
+      "afterExample": "Prompt: return as { decision, reason, confidence, alternatives }\nValidator rejects malformed returns → LLM retries.",
+      "reinforces": "The shape of correct output is unambiguous.",
+      "restricts": "No hedging prose; no creative alternate formats.",
+      "quality": "Downstream systems consume structured data reliably."
+    },
+    {
+      "id": "explicit-constraints",
+      "title": "MUST / MUST NOT lists",
+      "category": "Prompt",
+      "glyph": "◈",
+      "tagline": "Hard rules as enumerated bullets, not prose.",
+      "beforeExample": "Please try to make sure the code handles edge cases,\n  and preferably uses our coding style.",
+      "afterExample": "MUST:\n  - Return { ok, data, error } shape\n  - Idempotent on (source, external_id)\nMUST NOT:\n  - Use console.log\n  - Call external APIs without retry",
+      "reinforces": "Rules are attention-grabbing, scannable, pinnable.",
+      "restricts": "Prose hedges disappear; model is less tempted to \"interpret.\"",
+      "quality": "Violation is detectable, automatable, and fixable in one pass."
+    },
+    {
+      "id": "cite-grounding",
+      "title": "Cite your grounding",
+      "category": "Prompt",
+      "glyph": "⤴",
+      "tagline": "Every decision traces back to a spec section or retrieved chunk.",
+      "beforeExample": "LLM: We'll use AES-256 because it's industry standard.\n[no trace — could be invented]",
+      "afterExample": "LLM: AES-256 per security-spec.md §4.2 (retrieved).\nSchema length 80 per data-model.md §schema.email.\n[Every decision has a source tag]",
+      "reinforces": "Every output token is traceable to a constraint or fact.",
+      "restricts": "Confabulation has nowhere to hide — unsourced claims stand out.",
+      "quality": "Review becomes \"verify the citations,\" not \"re-derive everything.\""
+    }
+  ]
+}

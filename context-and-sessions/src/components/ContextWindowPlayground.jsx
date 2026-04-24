@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { C, FONT_SANS, FONT_MONO } from '../lib/theme.js'
 import { createRecallLookup } from '../lib/recall-lookup.js'
+import { tokenAnalog } from '../lib/token-analogs.js'
 import tableData from '../data/window-playground-table.json'
 import RecallLandscape3D from './RecallLandscape3D.jsx'
 
@@ -58,6 +59,7 @@ export default function ContextWindowPlayground() {
             Window size: <span style={{ color: C.accent, fontFamily: FONT_MONO }}>
               {windowSize.toLocaleString()} tok
             </span>
+            <span style={{ color: C.textFaint, marginLeft: 8 }}>≈ {tokenAnalog(windowSize)}</span>
           </label>
           <input type="range" min="0" max={WINDOW_SIZES.length - 1} value={windowIdx}
             onChange={(e) => setWindowIdx(+e.target.value)} data-testid="window-slider"
@@ -90,6 +92,9 @@ export default function ContextWindowPlayground() {
             style={{ color: needleRecall > 0.7 ? C.green : needleRecall > 0.4 ? C.yellow : C.red,
               fontSize: 28, fontFamily: FONT_MONO, fontWeight: 700 }}>
             {(needleRecall * 100).toFixed(1)}%
+          </div>
+          <div style={{ color: C.textFaint, fontSize: 11, marginTop: 4 }}>
+            Imagine asking a reader to recall one sentence from {tokenAnalog(windowSize)}.
           </div>
         </div>
       </div>

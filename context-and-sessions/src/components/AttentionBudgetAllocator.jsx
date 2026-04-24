@@ -48,7 +48,7 @@ export default function AttentionBudgetAllocator() {
     <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto', fontFamily: FONT_SANS }}>
       <h2 style={{ color: C.text, fontSize: 24, marginBottom: 4 }}>Attention Budget Allocator</h2>
       <p style={{ color: C.textDim, fontSize: 14, marginBottom: 24 }}>
-        Every chunk competes for the same 100% of attention. Try to keep attention-per-critical-token above 5%.
+        Every piece of context competes for the same 100% of attention. Try to keep attention-per-critical-token above 5%.
       </p>
 
       {/* Stacked bar */}
@@ -125,7 +125,7 @@ export default function AttentionBudgetAllocator() {
         <div style={{ marginTop: 24, padding: '12px 16px', background: C.surface,
           border: `1px solid ${C.border}`, borderRadius: 8 }}>
           <label style={{ color: C.textDim, fontSize: 13, display: 'block', marginBottom: 8 }}>
-            Critical tokens inside the user chunk:
+            Critical tokens inside the user message:
           </label>
           {chunks.filter((c) => c.type === 'user').map((c) => (
             <div key={c.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

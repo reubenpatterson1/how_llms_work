@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "chunks": ["system", "history", "tool", "attachment", "rag", "user"],
+  "constraint": {
+    "label": "HARD CONSTRAINT placed at turn 1",
+    "blurb": "e.g., \"90-day retention, idempotent on (source, external_id)\"",
+    "tokens": 480
+  },
+  "turns": [
+    {
+      "key": "t1",
+      "turnNumber": 1,
+      "label": "Turn 1",
+      "blurb": "Constraint placed here",
+      "totalTokens": 800,
+      "breakdown": { "system": 25, "history": 0,  "tool": 0,  "attachment": 0, "rag": 0, "user": 75 },
+      "constraintShare": 60
+    },
+    {
+      "key": "t2",
+      "turnNumber": 2,
+      "label": "Turn 2",
+      "blurb": "Constraint moves into history",
+      "totalTokens": 1500,
+      "breakdown": { "system": 13, "history": 53, "tool": 0,  "attachment": 0, "rag": 0, "user": 34 },
+      "constraintShare": 32
+    },
+    {
+      "key": "t10",
+      "turnNumber": 10,
+      "label": "Turn 10",
+      "blurb": "Tool dumps + accumulated turns dominate",
+      "totalTokens": 25000,
+      "breakdown": { "system": 1,  "history": 56, "tool": 36, "attachment": 4, "rag": 1, "user": 2 },
+      "constraintShare": 2
+    },
+    {
+      "key": "t20",
+      "turnNumber": 20,
+      "label": "Turn 20",
+      "blurb": "Constraint effectively invisible",
+      "totalTokens": 80000,
+      "breakdown": { "system": 1,  "history": 62, "tool": 31, "attachment": 4, "rag": 1, "user": 1 },
+      "constraintShare": 1
+    }
+  ]
+}

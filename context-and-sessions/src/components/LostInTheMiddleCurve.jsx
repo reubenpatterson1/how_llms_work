@@ -2,18 +2,14 @@ import { useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceDot, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { C, FONT_SANS, FONT_MONO } from '../lib/theme.js'
 import { createRecallLookup } from '../lib/recall-lookup.js'
+import { tokenAnalog } from '../lib/token-analogs.js'
+import { humanSerialPosition } from '../lib/human-memory.js'
 import tableData from '../data/window-playground-table.json'
 import RecallLandscape3D from './RecallLandscape3D.jsx'
 
 const lookup = createRecallLookup(tableData)
 const WINDOW_SIZES = [4000, 8000, 16000, 32000, 64000, 100000, 150000, 200000]
-
-function humanSerialPosition(position) {
-  // Classic U-curve from human memory research (approximation)
-  const primacy = 0.6 * Math.exp(-Math.pow((position - 0) / 0.12, 2) / 2)
-  const recency = 0.75 * Math.exp(-Math.pow((position - 1) / 0.10, 2) / 2)
-  return 0.35 + Math.max(primacy, recency) * 0.5
-}
+const NOISE_Z_DRIFT_MAX = 0.35
 
 export default function LostInTheMiddleCurve() {
   const [windowIdx, setWindowIdx] = useState(5)   // 100k
@@ -30,7 +26,7 @@ export default function LostInTheMiddleCurve() {
       return {
         position: p,
         recall: lookup({ model: 'claude-sonnet', window_size: windowSize, position: p, noise_level: noise }),
-        human: humanSerialPosition(p),
+        human: humanSerialPosition(p, windowSize, noise),
       }
     })
   }, [windowSize, noise])
@@ -49,11 +45,18 @@ export default function LostInTheMiddleCurve() {
     lookup({ model: 'claude-sonnet', window_size: windowSize, position: needlePos, noise_level: noise }),
     [windowSize, noise, needlePos])
 
+  // zAnchor = where the needle *should* be (based on window-size selection).
+  // Larger window → needle sits on the back row of the surface (camera-far) where the well is deepest.
+  // zDrift  = noise pushes the needle forward toward the "position" axis label (camera-near = z near 0).
+  // z       = actual render position, clamped to [0,1].
+  const zAnchor = 1 - windowIdx / (WINDOW_SIZES.length - 1)
+  const zDrifted = Math.max(0, Math.min(1, zAnchor - noise * NOISE_Z_DRIFT_MAX))
+
   const needleCoords = useMemo(() => ({
     x: needlePos,
-    z: windowIdx / (WINDOW_SIZES.length - 1),
+    z: zDrifted,
     y: needleRecall,
-  }), [needlePos, windowIdx, needleRecall])
+  }), [needlePos, zDrifted, needleRecall])
 
   return (
     <div style={{ padding: '16px 20px', fontFamily: FONT_SANS }}>
@@ -88,24 +91,38 @@ export default function LostInTheMiddleCurve() {
             </div>
             <div data-testid="needle-3d-readout"
               style={{ color: C.textDim, fontSize: 12, marginTop: 4 }}>
-              At window = {windowSize.toLocaleString()} tok, position = {(needlePos * 100).toFixed(0)}%:
+              At window = {windowSize.toLocaleString()} tok ({tokenAnalog(windowSize)}), position = {(needlePos * 100).toFixed(0)}%:
               <span style={{ color: C.accent, fontFamily: FONT_MONO, marginLeft: 6 }}>
                 {(needleRecall * 100).toFixed(1)}% recall
               </span>
             </div>
+            {noise > 0.02 && (
+              <div style={{ color: C.textFaint, fontSize: 11, marginTop: 2 }}>
+                Noise has displaced the needle forward by{' '}
+                <span style={{ color: C.yellow }}>
+                  {Math.round(noise * NOISE_Z_DRIFT_MAX * 100)}%
+                </span>{' '}
+                of the Z range — watch the grey ring behind it marks the true spot.
+              </div>
+            )}
+            <div style={{ color: C.textFaint, fontSize: 11, marginTop: 2 }}>
+              Green disk = 100% recall ceiling. Gold rod = how far noise pushed recall below the peak.
+              Grey ring on the floor = the needle&apos;s true spot; noise blows it forward.
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <RecallLandscape3D samples={surfaceSamples} needlePosition={needleCoords}
+              anchorZ={zAnchor}
               depth={3} height={1.0} />
           </div>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <Slider label={`Window: ${windowSize.toLocaleString()} tok`}
+        <Slider label={`Window: ${windowSize.toLocaleString()} tok ≈ ${tokenAnalog(windowSize)}`}
           min="0" max={WINDOW_SIZES.length - 1} value={windowIdx}
           onChange={(e) => setWindowIdx(+e.target.value)} testId="window-slider" />
-        <Slider label={`Noise: ${(noise * 100).toFixed(0)}%`}
+        <Slider label={`Noise: ${(noise * 100).toFixed(0)}% ≈ ${tokenAnalog(Math.round(noise * windowSize))} of distractors`}
           min="0" max="1" step="0.01" value={noise}
           onChange={(e) => setNoise(+e.target.value)} testId="noise-slider" />
         <Slider label={`Needle: ${(needlePos * 100).toFixed(0)}%`}
@@ -115,7 +132,7 @@ export default function LostInTheMiddleCurve() {
           alignItems: 'center', gap: 8, cursor: 'pointer' }}>
           <input type="checkbox" checked={showHuman}
             onChange={(e) => setShowHuman(e.target.checked)} data-testid="human-toggle" />
-          Overlay human memory curve
+          Overlay human memory curve (what YOU&apos;d recall)
         </label>
       </div>
       <div style={{ marginTop: 12, color: C.textDim, fontSize: 13 }}>
