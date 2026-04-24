@@ -1,229 +1,190 @@
 {
-  "version": 1,
+  "version": 2,
   "sections": [
-    {
-      "key": "A",
-      "label": "Attention & Lost-in-the-Middle"
-    },
-    {
-      "key": "B",
-      "label": "Context vs. Prompt"
-    },
-    {
-      "key": "C",
-      "label": "Session Hygiene & Governance"
-    }
+    { "key": "A", "label": "Remediation Techniques" },
+    { "key": "B", "label": "Scoping & Decomposition" },
+    { "key": "C", "label": "Guardrails & Governance" }
   ],
   "questions": [
     {
-      "id": "A1",
-      "section": "A",
-      "slideRef": 4,
-      "q": "A model advertises 200k tokens. A single fact is placed at token position 100,000 in a 200k-token context. Empirically, what is most likely?",
+      "id": "A1", "section": "A", "slideRef": 18,
+      "q": "You have 8 agents that all need the same 2,000-token API specification. The spec updates roughly once a month. What is the best way to give it to them?",
       "options": [
-        "The model recalls the fact with probability near 1.0, as 100k is still well within the advertised window",
-        "The fact is likely missed: recall on middle-positioned facts in long contexts drops well below the start/end rates",
-        "The model treats all positions uniformly, so position 100,000 is no different from position 500",
-        "The model recalls facts best at the exact middle because that position is equidistant from both ends"
+        "Paste the spec into each agent's system prompt.",
+        "Create a RAG index over the spec; each agent calls rag_search on demand and cites the returned chunk.",
+        "Write the entire spec to MEMORY.md; agents read it at session start.",
+        "Hard-code the spec as a string constant inside the orchestrator."
       ],
       "answer": 1,
-      "explanation": "Liu et al. 2023 found recall follows a U-curve: strong at start (primacy) and end (recency), weak in the middle. This holds across model sizes."
+      "explanation": "RAG is the right fit when the source is (a) large, (b) shared across many agents, and (c) updates on a cadence. Each agent gets only the chunks it needs, never sees a stale copy, and all citations trace back to a single canonical source. Pasting or hard-coding drifts; MEMORY.md is for short sticky decisions, not 2k-token specs."
     },
     {
-      "id": "A2",
-      "section": "A",
-      "slideRef": 7,
-      "q": "A model advertises 128k tokens. Your application consistently puts constraints at tokens 40,000-60,000 and gets inconsistent behavior. What is the most likely cause?",
+      "id": "A2", "section": "A", "slideRef": 21,
+      "q": "A session is 25 turns deep with four raw tool-output dumps (~6k tokens each). The model is now ignoring a HARD constraint stated at turn 2. Which remediation sequence is most effective?",
       "options": [
-        "The model is misconfigured",
-        "Effective context is smaller than advertised; constraints in the middle are being forgotten",
-        "The constraints contradict training data",
-        "The temperature setting is too high"
-      ],
-      "answer": 1,
-      "explanation": "Effective context is often 20-40% of advertised. Constraints buried in the middle of a long context are exactly where recall degrades fastest."
-    },
-    {
-      "id": "A3",
-      "section": "A",
-      "slideRef": 6,
-      "q": "Why does the lost-in-the-middle effect exist structurally in transformer attention?",
-      "options": [
-        "Training data over-represents information at document boundaries, biasing attention there",
-        "Softmax distributes a fixed probability mass across every token; middle positions receive systematically less signal than ends due to positional encoding shape",
-        "Models are fine-tuned specifically to prioritize openings and conclusions",
-        "It is an artifact of RLHF alignment training"
-      ],
-      "answer": 1,
-      "explanation": "The U-curve is a structural property of attention over long sequences, not a training-data artifact. Softmax must sum to 1, so more tokens = smaller slices, and positional encodings tilt the distribution toward ends."
-    },
-    {
-      "id": "A4",
-      "section": "A",
-      "slideRef": 11,
-      "q": "You add 10,000 tokens of tool output to a context that previously had 2,000 tokens. What happens to the attention share of the original 2,000 tokens?",
-      "options": [
-        "Unchanged — each token gets the same fixed attention regardless of context size",
-        "It decreases; the new tokens claim attention mass previously held by the original tokens",
-        "It increases; the model learns to prioritize shorter sections in long contexts",
-        "It doubles, because attention is allocated per turn"
-      ],
-      "answer": 1,
-      "explanation": "Softmax attention sums to 1 across all tokens. Adding 10k new tokens means less mass is available for the original 2k."
-    },
-    {
-      "id": "A5",
-      "section": "A",
-      "slideRef": 5,
-      "q": "Liu et al. 2023's main finding applies most directly to which operation?",
-      "options": [
-        "Code generation",
-        "Retrieving a single specific fact from a long input",
-        "Translating between languages",
-        "Summarizing short documents"
-      ],
-      "answer": 1,
-      "explanation": "The paper studied single-needle retrieval across long contexts. The U-curve is most pronounced for precise recall tasks."
-    },
-    {
-      "id": "B1",
-      "section": "B",
-      "slideRef": 9,
-      "q": "A user types a 40-word message. The model receives: a 2,000-token system prompt, 12 prior turns (total ~8,000 tokens), a 5,000-token retrieved document, and the 40-word user message. What is 'the context' for this turn?",
-      "options": [
-        "Just the 40-word user message",
-        "The user message + retrieved document",
-        "Everything the model reads: system + prior turns + retrieved doc + user message",
-        "Only the current turn (user message + retrieved doc)"
+        "Nuclear restart: abandon the session, write decisions to MEMORY.md, start fresh.",
+        "Pin the turn-2 constraint by re-stating it in the current turn.",
+        "Prune tool outputs first (keep only the excerpts actually referenced), then pin the constraint, then continue.",
+        "Add more MUST rules to the current prompt so the model 'tries harder'."
       ],
       "answer": 2,
-      "explanation": "Context is the full sequence the model attends to — every prior turn, every tool output, every attachment, plus the current message. The user message is a small slice."
+      "explanation": "Ordered remediation: the biggest noise source is the 24k tokens of raw tool dumps, so prune first. Then pin the constraint so it lands in the recency window. Only jump to a nuclear restart if pruning + pinning doesn't recover. Adding more rules to a crowded context doesn't fix the attention budget problem."
     },
     {
-      "id": "B2",
-      "section": "B",
-      "slideRef": 13,
-      "q": "Prompt engineering and context engineering are best understood as:",
+      "id": "A3", "section": "A", "slideRef": 7,
+      "q": "A learner argues: \"Why not just use a 1M-token model and stop worrying about context hygiene?\" What is the strongest technical rebuttal?",
       "options": [
-        "Competing approaches — use one or the other",
-        "The same thing under different names",
-        "Two levers acting on the same underlying attention mechanism; they compound when combined",
-        "Prompt engineering is for simple tasks; context engineering is for RAG only"
+        "Bigger contexts cost more per call.",
+        "The lost-in-the-middle effect gets WORSE as the window grows — valley depth scales with absolute context size, not just advertised length.",
+        "Bigger models are slower.",
+        "Small models are more accurate than large ones."
+      ],
+      "answer": 1,
+      "explanation": "This is the load-bearing finding from the module: advertised length is a ceiling, effective length is the empirical window where recall stays usable, and at longer windows the middle degrades FASTER than the ends recover. A 1M-token model buried constraint at token 400,000 is essentially invisible. Hygiene practices are what keep effective context high."
+    },
+    {
+      "id": "A4", "section": "A", "slideRef": 21,
+      "q": "Your coding-agent session has run 45 turns and you've made 12 architectural decisions across the session. You need to continue working tomorrow. What's the right handoff?",
+      "options": [
+        "Keep the same chat open; just scroll up when you need to remember something.",
+        "Summarize the 12 decisions into MEMORY.md, then start a fresh session tomorrow with MEMORY.md pre-loaded.",
+        "Let the model summarize automatically when you next ask it something.",
+        "Export the full chat transcript and paste it into tomorrow's prompt."
+      ],
+      "answer": 1,
+      "explanation": "Sessions should not outlive their scope. MEMORY.md carries the DECISIONS (not the chatter) forward at ~200 tokens; a fresh session next day operates at peak recall for whatever comes next. Scrolling doesn't help the model — it doesn't re-read. Pasting the full transcript reintroduces the bloat you're trying to escape."
+    },
+    {
+      "id": "A5", "section": "A", "slideRef": 21,
+      "q": "A team pastes the same 500-token coding-style rules into every agent's prompt. The rules almost never change. A teammate suggests making them a RAG index. What's the better implementation, and why?",
+      "options": [
+        "RAG index — every retrieval is fresh and citable.",
+        "MEMORY.md — the rules are sticky and load once per session.",
+        "A lint tool — if the rules are enforceable by code, the model doesn't need to 'remember' them at all; the tool rejects violations post-hoc.",
+        "Keep pasting them — it's simple and it works."
       ],
       "answer": 2,
-      "explanation": "Both shape attention allocation. Prompt engineering makes the current turn's tokens more effective; context engineering decides which tokens get into the window at all."
+      "explanation": "The practice hierarchy: if a rule can be ENFORCED by a tool (linter, validator, test), make it a tool — the model can forget it and the code still has to pass. RAG and MEMORY are for facts the model must REASON about. Hard rules with deterministic checks belong in tools."
     },
     {
-      "id": "B3",
-      "section": "B",
-      "slideRef": 15,
-      "q": "Which of the following is a CONTEXT engineering technique, not a prompt engineering one?",
+      "id": "B1", "section": "B", "slideRef": 15,
+      "q": "You give a single agent the full e-commerce spec (DB, API, auth, payments, cart, admin, i18n, tests, deploy) in one prompt. What is the FIRST failure mode to expect?",
       "options": [
-        "Wrapping instructions in <constraints> tags",
-        "Adding few-shot examples",
-        "Summarizing old turns to compress history",
-        "Using a role prime like 'You are a senior security engineer'"
+        "The model refuses because the spec is too complex.",
+        "The model produces a working prototype with no obvious issues.",
+        "Some early-spec constraints are silently ignored as later sections bury them; the output looks plausible but violates specific requirements.",
+        "The model asks a clarifying question for each of the nine concerns."
       ],
       "answer": 2,
-      "explanation": "Summarizing history shapes what's in the window. The others shape the current turn's content."
+      "explanation": "Classic lost-in-middle at scale. The model generates confidently while violating buried constraints — often the MUST/MUST NOT rules. That's why decomposition matters: each agent sees only its slice of the spec and can't violate what it wasn't handed."
     },
     {
-      "id": "B4",
-      "section": "B",
-      "slideRef": 10,
-      "q": "In a typical chat session with tool use, the user turn is often:",
+      "id": "B2", "section": "B", "slideRef": 16,
+      "q": "In the decompose tool's wave plan, \"Wave 0\" is always:",
       "options": [
-        "The majority of the context window",
-        "Roughly half of the context",
-        "Often the smallest slice; tool outputs and history dominate",
-        "Always exactly one-third"
+        "The first implementation agent that starts coding.",
+        "Interface contracts — shared types, schemas, and handlers all later agents compile against.",
+        "Unit tests for the full system.",
+        "A broken-up version of the system prompt."
+      ],
+      "answer": 1,
+      "explanation": "Wave 0 locks every shared contract before any parallel implementation runs. It's what lets Waves 1+ run in parallel without drift — every Wave-1 agent compiles against the same fixed types. Without Wave 0, two parallel agents invent incompatible schemas."
+    },
+    {
+      "id": "B3", "section": "B", "slideRef": 17,
+      "q": "An agent's spec includes `allowed_paths: src/auth/**` and `forbidden: touching src/api`. Why is this structurally better than a prose instruction like \"focus on auth\"?",
+      "options": [
+        "Path guards are enforceable by tooling; natural-language 'focus' relies on the model behaving.",
+        "It makes the prompt shorter.",
+        "The agent runs faster with fewer files in scope.",
+        "The agent is more creative when the boundary is explicit."
+      ],
+      "answer": 0,
+      "explanation": "Structural constraints > hopeful prose. A path guard is a tool-level check — the commit action literally refuses writes outside allowed_paths. 'Focus on auth' is a wish the model can ignore under load (classic lost-in-middle risk at turn 30)."
+    },
+    {
+      "id": "B4", "section": "B", "slideRef": 24,
+      "q": "Two of your ten Wave-1 agents return with tests_failing. What does the build_framework.md playbook specify?",
+      "options": [
+        "Retry both with the same prompt; maybe the model gets lucky.",
+        "Spawn a diagnostic-agent per failure with the error context, apply the diagnosis as a delta prompt, max 2 retries, then escalate to a human.",
+        "Merge their output anyway — the integration wave will clean it up.",
+        "Discard their work and have one big agent redo both modules."
+      ],
+      "answer": 1,
+      "explanation": "The playbook is explicit: retrying with the same prompt just reproduces the failure. Spawn a scoped diagnostic agent (its own bounded session), apply the diagnosis as a delta, cap retries, escalate if still failing. This is why the handoff envelope includes failure_logs — so the diagnostic agent gets concrete inputs, not 'tests failed, try again.'"
+    },
+    {
+      "id": "B5", "section": "B", "slideRef": 18,
+      "q": "You have 5 agents that all need to apply the same compliance policy (GDPR-style PII handling). Which implementation keeps them the most CONSISTENT across runs?",
+      "options": [
+        "A paragraph at the top of each system prompt, copy-pasted.",
+        "A RAG index over policies/*.md — each agent retrieves the relevant rule on demand and cites the chunk.",
+        "A pre-context input guardrail (pii_redactor tool) that mutates the context before the model sees it.",
+        "Both (b) and (c) layered: the redactor mutates input before the model sees it (defense-in-depth), and the RAG policy index is cited in model reasoning for any decision that touches PII."
+      ],
+      "answer": 3,
+      "explanation": "Defense-in-depth beats single-layer guards. Redactor tool is mechanical (doesn't depend on the model 'remembering'); RAG policy index keeps the model's reasoning traceable and auditable. Pasting drifts; tool alone can't reason about grey areas; RAG alone can be bypassed if the model never retrieves. Together they make compliance both structural AND documented."
+    },
+    {
+      "id": "C1", "section": "C", "slideRef": 18,
+      "q": "A session processes user-uploaded CSVs that may contain PII. Where does the guardrail belong?",
+      "options": [
+        "In the system prompt: 'You MUST NOT reveal PII.'",
+        "In the output schema validator — reject any return payload containing PII.",
+        "In the input preprocessor — redact PII before the context is assembled; the model never sees it.",
+        "In the model's RLHF training."
       ],
       "answer": 2,
-      "explanation": "Tool outputs (file reads, searches) and accumulated history usually dwarf the user's actual typed message."
+      "explanation": "Inbound guardrail. Prompt-based 'don't' is wish-based compliance. Output validation is too late (PII has already been processed and potentially logged). Preprocessing ensures the PII never enters the attention budget — context composition IS the compliance boundary."
     },
     {
-      "id": "B5",
-      "section": "B",
-      "slideRef": 11,
-      "q": "A developer says: 'I kept my prompt short to minimize attention dilution.' Why might this reasoning be incomplete?",
+      "id": "C2", "section": "C", "slideRef": 21,
+      "q": "Which practice makes confabulation VISIBLE in the output rather than trying to prevent it upstream?",
       "options": [
-        "It is complete — a short prompt is always optimal",
-        "A short user message does not mean a short context; system prompt, history, and tool outputs may still be huge",
-        "Short prompts are ignored by the model",
-        "Dilution only applies to tool outputs, not to the user turn"
+        "Pasting the full spec in every prompt.",
+        "Requiring every decision in the output to cite its source (spec section or retrieved-chunk ID).",
+        "Using a more capable model.",
+        "Lowering temperature to 0."
       ],
       "answer": 1,
-      "explanation": "The user turn is often the smallest piece of the context. Keeping it short has minimal effect if the rest of the context is bloated."
+      "explanation": "Citations externalize grounding. An output that says 'use AES-256 per security-spec.md §4.2' is verifiable; 'use AES-256 because it's industry standard' is unsourced. Unsourced claims stand out on review. Big models and low temp don't force traceability — the prompt pattern does."
     },
     {
-      "id": "C1",
-      "section": "C",
-      "slideRef": 19,
-      "q": "You are 20 turns into a session. A critical constraint was stated at turn 3 and never restated. The model is now producing output that violates it. What is the highest-leverage intervention?",
+      "id": "C3", "section": "C", "slideRef": 21,
+      "q": "A teammate writes: 'You MUST use Postgres 15. Oh and try to handle edge cases. And don't use console.log. And make it fast. Try to follow our coding style if you can.' What's the single biggest structural improvement?",
       "options": [
-        "Start over with no context",
-        "Pin the invariant: re-state the constraint in the current turn so it lives in the recency window",
-        "Lower the model temperature",
-        "Add a second assistant message asking the model to be careful"
+        "Make the prompt longer, with more detail on each point.",
+        "Split into explicit MUST / MUST NOT enumerated bullet lists; drop the 'try to' / 'if you can' hedges.",
+        "Paste several examples of working code.",
+        "Wrap each constraint in XML tags."
       ],
       "answer": 1,
-      "explanation": "Pinning invariants is the surgical fix: it puts the constraint back in the high-attention tail of the context without discarding useful history."
+      "explanation": "Hedged prose dilutes hard rules. 'MUST use Postgres 15' is attention-grabbing and auditable; 'try to handle edge cases' is a suggestion the model will negotiate away under pressure. Enumerated MUST/MUST NOT lists are scannable, pinnable, and make violations detectable. XML tags are a formatting nicety — they help but don't fix the hedge problem."
     },
     {
-      "id": "C2",
-      "section": "C",
-      "slideRef": 18,
-      "q": "Why does an organization use a shared API spec index that every LLM-assisted design pulls from, rather than letting each session paste specs inline?",
+      "id": "C4", "section": "C", "slideRef": 24,
+      "q": "Before the orchestrator commits an agent's output containing a retention-related decision, what does the framework specify for the constraint check?",
       "options": [
-        "To save money on API calls",
-        "One source of truth prevents drift, reduces token spend across sessions, and enforces the canonical spec",
-        "Because the model cannot read JSON",
-        "To limit model training data"
+        "Trust the agent's handoff envelope if it reports tests_passing.",
+        "Run rag_search('constraints.md §retention'), verify the output satisfies it, and log { constraint_id, satisfied, evidence }.",
+        "Run the project's full test suite and accept if it passes.",
+        "Ask a human reviewer to approve every commit."
       ],
       "answer": 1,
-      "explanation": "Centralized indices prevent N different teams paraphrasing the same spec and drifting apart. The model gets the canonical version on demand."
+      "explanation": "Pre-commit constraint verification is a deterministic gate, not a hope. The orchestrator fetches the canonical constraint (RAG), checks the output against it, and logs evidence for audit. Tests don't catch spec-level violations (test suites test behavior, not constraint adherence). The handoff envelope is self-reported — trust but verify."
     },
     {
-      "id": "C3",
-      "section": "C",
-      "slideRef": 17,
-      "q": "A proposal: strip PII from inputs to an LLM before sending. The motivation is:",
+      "id": "C5", "section": "C", "slideRef": 18,
+      "q": "In a long coding session, file-read tool outputs balloon to ~60% of the context. The user is still iterating. What's the FIRST practice to apply?",
       "options": [
-        "Smaller prompts cost less",
-        "Context composition is a compliance boundary — PII in context is PII sent to the provider, and potentially logged/cached",
-        "PII tokens confuse the model",
-        "The model refuses PII outright, so we must strip it"
+        "Switch to a bigger model — let it absorb the noise.",
+        "Prune tool outputs: keep only the excerpts that were actually referenced by the subsequent turns; drop the rest.",
+        "Disable tools for the rest of the session.",
+        "Add more MUST constraints to the prompt so the signal outweighs the tool noise."
       ],
       "answer": 1,
-      "explanation": "Every LLM call is a data-egress event. Treat context as a compliance boundary: govern what enters, not just what leaves."
-    },
-    {
-      "id": "C4",
-      "section": "C",
-      "slideRef": 19,
-      "q": "A 40-turn session accumulated three unrelated concerns. The 'nuclear restart' intervention means:",
-      "options": [
-        "Forcibly close the session and blame the user",
-        "Summarize the relevant decisions, discard everything else, start fresh",
-        "Switch to a different model",
-        "Increase the context window allocation"
-      ],
-      "answer": 1,
-      "explanation": "Nuclear restart is summarize-and-fork: carry forward only the decisions that matter, drop the noise."
-    },
-    {
-      "id": "C5",
-      "section": "C",
-      "slideRef": 19,
-      "q": "A long session keeps 12 raw tool-output dumps totaling 80,000 tokens. The best FIRST intervention is:",
-      "options": [
-        "Nuclear restart",
-        "Prune tool outputs: keep the excerpts that were actually referenced; drop the raw dumps",
-        "Summarize every turn",
-        "Switch models"
-      ],
-      "answer": 1,
-      "explanation": "Raw tool dumps are the fastest-growing source of context bloat. Pruning them is a surgical fix that often avoids needing a restart."
+      "explanation": "Pruning is the surgical fix. Tool output at 60% is the dominant budget consumer — every other token in the window has its share diluted. Keep the excerpts referenced in reasoning, drop the raw dumps. Bigger models just push the problem back. Disabling tools cripples the agent. Adding more constraints doesn't change the noise floor."
     }
   ]
 }
