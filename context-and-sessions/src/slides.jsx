@@ -173,10 +173,10 @@ export const SLIDES = [
     instructions: 'Drag the turn slider, or hit Play. Watch the left tower climb past the buried constraint while the right stacks stay short with constraints always near the top. Click-drag to rotate.',
   },
   {
-    id: 'simulator',
+    id: 'best-practices',
     type: 'component',
-    component: 'SessionHygieneSimulator',
-    instructions: 'This session has a critical fact at turn 2, then accumulates noise. Toggle interventions to get recall on the turn-2 fact above 90%.',
+    component: 'BestPracticesPlaybook',
+    instructions: 'Ten practices across Tools, RAG, Memory, Context, Prompt, Governance. Click any card to see a before/after and how it reinforces constraints, restricts confabulation, and holds quality.',
   },
   {
     id: 'assessment',
