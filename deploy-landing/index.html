@@ -42,6 +42,18 @@
   .tool-card p{font-size:.85rem;color:#94a3b8;line-height:1.4}
   .reset-btn{display:block;margin:3rem auto 0;padding:.5rem 1.5rem;background:transparent;border:1px solid #475569;color:#64748b;border-radius:8px;cursor:pointer;font-size:.8rem;transition:all .2s}
   .reset-btn:hover{border-color:#ef4444;color:#ef4444}
+  .sessions-section{margin-bottom:.5rem}
+  .sessions-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem}
+  .session-card{background:linear-gradient(135deg,rgba(167,139,250,.10),rgba(96,165,250,.06));border:1px solid rgba(167,139,250,.35);border-radius:12px;padding:1.1rem 1.35rem;display:flex;flex-direction:column;gap:.35rem;transition:transform .2s,border-color .2s}
+  .session-card:hover{border-color:rgba(167,139,250,.6);transform:translateY(-1px)}
+  .session-card .session-date{color:#c4b5fd;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+  .session-card h3{font-size:1rem;font-weight:600;color:#e2e8f0;margin-bottom:.1rem}
+  .session-card .session-time{color:#94a3b8;font-size:.85rem}
+  .session-card .session-actions{display:flex;gap:.5rem;align-items:center;margin-top:.6rem;flex-wrap:wrap}
+  .session-card .btn-join{background:linear-gradient(135deg,#3b82f6,#a78bfa);color:#fff;padding:.45rem 1rem;border-radius:6px;text-decoration:none;font-size:.82rem;font-weight:600}
+  .session-card .btn-join:hover{filter:brightness(1.1)}
+  .session-card .btn-cal{color:#94a3b8;font-size:.78rem;text-decoration:none;border:1px solid #334155;padding:.4rem .75rem;border-radius:6px}
+  .session-card .btn-cal:hover{color:#e2e8f0;border-color:#475569}
   @media(max-width:600px){.module-card{flex-wrap:wrap;gap:1rem}.module-badge{width:100%;text-align:center}}
 </style>
 </head>
@@ -53,6 +65,10 @@
   <div class="progress-label" id="progressLabel">0 / 7 modules completed</div>
 </div>
 <div class="container">
+  <div class="sessions-section" id="sessionsSection" style="display:none">
+    <div class="section-label">Live Sessions</div>
+    <div class="sessions-grid" id="sessionsGrid"></div>
+  </div>
   <div class="section-label">Course Modules</div>
   <div class="module-grid" id="moduleGrid"></div>
   <div class="tools-section" id="toolsSection" style="display:none">
@@ -81,13 +97,59 @@ const TOOLS = [
   {id:'tool2',title:'Decomposition Visualizer',desc:'Interactive wave-plan visualizer showing dependency-ordered parallel build planning.',path:'/decompose/'}
 ];
 
+// Live sessions. `endUtcMs` hides a card automatically once its session is over.
+const SESSIONS = [
+  {
+    id:'s1',
+    title:'LLM Engineering — Module 3 Q&A',
+    dateLabel:'Tue, April 28, 2026',
+    timeLabel:'10:00 – 11:00 AM MT',
+    meetUrl:'https://meet.google.com/xdq-nrzj-hwy',
+    calendarUrl:'https://calendar.google.com/calendar/render?action=TEMPLATE&text=LLM+Engineering+%E2%80%94+Module+3+Q%26A&dates=20260428T160000Z/20260428T170000Z&details=Live+Q%26A+session+for+Module+3.%0A%0AJoin+via+Google+Meet%3A+https%3A%2F%2Fmeet.google.com%2Fxdq-nrzj-hwy&location=https://meet.google.com/xdq-nrzj-hwy',
+    endUtcMs: Date.UTC(2026,3,28,17,0,0),
+  },
+  {
+    id:'s2',
+    title:'LLM Engineering — Module 3 Q&A',
+    dateLabel:'Wed, April 29, 2026',
+    timeLabel:'7:30 – 8:30 AM MT',
+    meetUrl:'https://meet.google.com/guj-brwj-qtn',
+    calendarUrl:'https://calendar.google.com/calendar/render?action=TEMPLATE&text=LLM+Engineering+%E2%80%94+Module+3+Q%26A&dates=20260429T133000Z/20260429T143000Z&details=Live+Q%26A+session+for+Module+3.%0A%0AJoin+via+Google+Meet%3A+https%3A%2F%2Fmeet.google.com%2Fguj-brwj-qtn&location=https://meet.google.com/guj-brwj-qtn',
+    endUtcMs: Date.UTC(2026,3,29,14,30,0),
+  },
+];
+
 function getProgress(){
   try{return JSON.parse(localStorage.getItem('llm_course_progress'))||{}}catch(e){return{}}
 }
 
 var serverLocks={};
 
+function renderSessions(){
+  const now=Date.now();
+  const upcoming=SESSIONS.filter(s=>!s.endUtcMs||s.endUtcMs>now);
+  const section=document.getElementById('sessionsSection');
+  if(!upcoming.length){section.style.display='none';return;}
+  section.style.display='block';
+  const grid=document.getElementById('sessionsGrid');
+  grid.innerHTML='';
+  upcoming.forEach(s=>{
+    const card=document.createElement('div');
+    card.className='session-card';
+    card.innerHTML=
+      '<div class="session-date">'+s.dateLabel+'</div>'
+      +'<h3>'+s.title+'</h3>'
+      +'<div class="session-time">'+s.timeLabel+'</div>'
+      +'<div class="session-actions">'
+      +  '<a class="btn-join" href="'+s.meetUrl+'" target="_blank" rel="noopener">Join Meet &rarr;</a>'
+      +  '<a class="btn-cal" href="'+s.calendarUrl+'" target="_blank" rel="noopener">+ Add to Calendar</a>'
+      +'</div>';
+    grid.appendChild(card);
+  });
+}
+
 function render(){
+  renderSessions();
   const progress=getProgress();
   const completed=MODULES.filter(m=>progress[m.id]).length;
   document.getElementById('progressFill').style.width=((completed/MODULES.length)*100)+'%';
