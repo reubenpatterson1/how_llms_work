@@ -7,6 +7,7 @@ import BuildFrameworkPrompt from './components/BuildFrameworkPrompt.jsx'
 import ContextAnatomyBars3D from './components/ContextAnatomyBars3D.jsx'
 import ContextSessionsAssessment from './components/ContextSessionsAssessment.jsx'
 import ContextWindowPlayground from './components/ContextWindowPlayground.jsx'
+import ConversationDriftPath3D from './components/ConversationDriftPath3D.jsx'
 import DecomposeWavePlan3D from './components/DecomposeWavePlan3D.jsx'
 import LeverComparisonTool from './components/LeverComparisonTool.jsx'
 import LostInTheMiddleCurve from './components/LostInTheMiddleCurve.jsx'
@@ -20,6 +21,7 @@ registerComponent('BuildFrameworkPrompt', BuildFrameworkPrompt)
 registerComponent('ContextAnatomyBars3D', ContextAnatomyBars3D)
 registerComponent('ContextSessionsAssessment', ContextSessionsAssessment)
 registerComponent('ContextWindowPlayground', ContextWindowPlayground)
+registerComponent('ConversationDriftPath3D', ConversationDriftPath3D)
 registerComponent('DecomposeWavePlan3D', DecomposeWavePlan3D)
 registerComponent('LeverComparisonTool', LeverComparisonTool)
 registerComponent('LostInTheMiddleCurve', LostInTheMiddleCurve)

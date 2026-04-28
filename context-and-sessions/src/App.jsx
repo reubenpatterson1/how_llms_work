@@ -22,7 +22,20 @@ function TextSlide({ slide }) {
         {slide.title}
       </h1>
       {slide.subtitle && (
-        <p style={{ fontSize: 20, color: C.accent, marginBottom: 24 }}>{slide.subtitle}</p>
+        slide.subtitleHref ? (
+          <p style={{ fontSize: 20, color: C.accent, marginBottom: 24 }}>
+            <a
+              href={slide.subtitleHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: C.accent, textDecoration: 'none', borderBottom: `1px dashed ${C.accent}55` }}
+            >
+              {slide.subtitle}
+            </a>
+          </p>
+        ) : (
+          <p style={{ fontSize: 20, color: C.accent, marginBottom: 24 }}>{slide.subtitle}</p>
+        )
       )}
       {slide.body && (
         <p style={{ fontSize: 18, lineHeight: 1.7, color: C.textDim, marginBottom: 24 }}>

@@ -1,4 +1,4 @@
-// All 25 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
+// All 26 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
 // Each component slide has id + type: "component" + component (string key) + instructions.
 // Each assessment slide has id + type: "assessment".
 export const SLIDES = [
@@ -40,6 +40,7 @@ export const SLIDES = [
     type: 'text',
     title: 'Lost-in-the-Middle',
     subtitle: 'Liu et al. 2023 — "Lost in the Middle: How Language Models Use Long Contexts"',
+    subtitleHref: 'https://arxiv.org/abs/2307.03172',
     body: 'The finding: when a single relevant fact is placed at varying positions in a long input, models recall it reliably when it sits near the start (primacy) or near the end (recency), but accuracy drops sharply when it sits in the middle. The result is a U-shaped curve, and it holds across model sizes and architectures.',
     keyTakeaway: 'Attention is not uniform across the context window. The middle is darker than the ends.',
   },
@@ -126,6 +127,12 @@ export const SLIDES = [
     type: 'component',
     component: 'PromptContextOptimizations',
     instructions: 'Toggle prompt and context techniques side-by-side. The attention bar shows how much of your context the model actually attends to. Watch for the cross-column synergies that appear at the bottom.',
+  },
+  {
+    id: 'multi-turn-drift',
+    type: 'component',
+    component: 'ConversationDriftPath3D',
+    instructions: 'Based on Laban et al. 2025. Drag the turn slider; toggle summarization; press Nuclear Restart when drift crosses the yellow shell. Without checkpoints there is nothing to restart from — the paper finds models do not recover from drift on their own.',
   },
   {
     id: 'decompose-intro',
