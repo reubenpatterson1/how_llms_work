@@ -11,6 +11,7 @@ import DecomposeWavePlan3D from './components/DecomposeWavePlan3D.jsx'
 import LeverComparisonTool from './components/LeverComparisonTool.jsx'
 import LostInTheMiddleCurve from './components/LostInTheMiddleCurve.jsx'
 import MonolithicVsDecomposed from './components/MonolithicVsDecomposed.jsx'
+import PromptContextOptimizations from './components/PromptContextOptimizations.jsx'
 import TurnStackTowers3D from './components/TurnStackTowers3D.jsx'
 
 registerComponent('AttentionBudgetAllocator', AttentionBudgetAllocator)
@@ -23,4 +24,5 @@ registerComponent('DecomposeWavePlan3D', DecomposeWavePlan3D)
 registerComponent('LeverComparisonTool', LeverComparisonTool)
 registerComponent('LostInTheMiddleCurve', LostInTheMiddleCurve)
 registerComponent('MonolithicVsDecomposed', MonolithicVsDecomposed)
+registerComponent('PromptContextOptimizations', PromptContextOptimizations)
 registerComponent('TurnStackTowers3D', TurnStackTowers3D)

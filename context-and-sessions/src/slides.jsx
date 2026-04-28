@@ -122,6 +122,12 @@ export const SLIDES = [
     keyTakeaway: 'Prompt engineering makes each token count. Context engineering decides which tokens get to compete in the first place.',
   },
   {
+    id: 'optimization-techniques',
+    type: 'component',
+    component: 'PromptContextOptimizations',
+    instructions: 'Toggle prompt and context techniques side-by-side. The attention bar shows how much of your context the model actually attends to. Watch for the cross-column synergies that appear at the bottom.',
+  },
+  {
     id: 'decompose-intro',
     type: 'text',
     title: 'From Dense Spec to Wave Plan',
