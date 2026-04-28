@@ -1,4 +1,4 @@
-// All 24 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
+// All 25 slides for Module 3. Each text slide has id + type + title + {subtitle | body | bullets | keyTakeaway}.
 // Each component slide has id + type: "component" + component (string key) + instructions.
 // Each assessment slide has id + type: "assessment".
 export const SLIDES = [
