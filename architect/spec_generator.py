@@ -29,11 +29,19 @@ class SpecGenerator:
             lines.append("")
 
             for sub_id, sub in channel.sub_dimensions.items():
+                # Emit sub-dimension labels so the decomposer's pattern extractor
+                # can find structured components (Database:, Endpoints:, Entity:, ...).
+                # The label is derived from the sub-dim id (snake_case → Title Case).
+                sub_label = sub_id.replace("_", " ").title()
                 if sub.constraints:
                     for constraint in sub.constraints:
-                        lines.append(f"- {constraint}")
+                        # Avoid double-labelling if the constraint already contains the label.
+                        if constraint.lower().lstrip("- ").startswith(sub_label.lower() + ":"):
+                            lines.append(f"- {constraint}")
+                        else:
+                            lines.append(f"- {sub_label}: {constraint}")
                 elif sub.resolution > 0:
-                    lines.append(f"- {sub.description}: [partially specified, {sub.resolution:.0%}]")
+                    lines.append(f"- {sub_label}: [partially specified, {sub.resolution:.0%}]")
 
             lines.append("")
 

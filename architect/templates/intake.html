@@ -76,6 +76,24 @@
       </div>
     </div>
 
+    <!-- Load saved spec.md (resume across sessions/phases) -->
+    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 6px;">
+        <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);">Resume from spec.md</span>
+        <span id="load-spec-status" style="margin-left:auto; font-size: 9px; font-family:'IBM Plex Mono',monospace; color: var(--text-muted);"></span>
+      </div>
+      <input type="file" id="load-spec-file" accept=".md,.markdown,.txt" style="display:none;" />
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="phase-btn" onclick="document.getElementById('load-spec-file').click()"
+          style="flex:1;padding:6px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-dim);cursor:pointer;">⬆ Load .md</button>
+        <button type="button" class="phase-btn" id="load-spec-btn" onclick="loadSpecSubmit()" disabled
+          style="flex:1;padding:6px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-muted);cursor:not-allowed;opacity:0.6;">Load into session</button>
+      </div>
+      <textarea id="load-spec-textarea" rows="3" placeholder="…or paste spec.md markdown"
+        style="width:100%;box-sizing:border-box;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;resize:vertical;"></textarea>
+      <div id="load-spec-meta" style="font-size:10px;color:var(--text-muted);margin-top:4px;min-height:14px;"></div>
+    </div>
+
     <!-- Density header -->
     <div style="padding: 20px; border-bottom: 1px solid var(--border); text-align: center;">
       <div class="density-ring" id="intake-density-ring" style="margin: 0 auto 8px;"></div>
@@ -104,7 +122,7 @@
 
     <!-- Actions -->
     <div style="padding: 16px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-      <a href="/spec" class="btn btn-ghost" style="text-decoration: none; text-align: center; width: 100%;">
+      <a href="{{ pfx }}/spec" class="btn btn-ghost" style="text-decoration: none; text-align: center; width: 100%;">
         View Specification
       </a>
       <button class="btn btn-danger" onclick="resetAndRestart()" style="width: 100%;">
@@ -117,6 +135,93 @@
 <script>
 let isProcessing = false;
 let currentPhase = 'mvp';
+let pendingSpecText = '';
+
+function refreshLoadSpecStatus() {
+  const btn = document.getElementById('load-spec-btn');
+  const status = document.getElementById('load-spec-status');
+  const meta = document.getElementById('load-spec-meta');
+  const ok = pendingSpecText && pendingSpecText.length >= 50;
+  if (ok) {
+    btn.disabled = false;
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.background = 'rgba(96,165,250,0.12)';
+    btn.style.color = 'var(--accent)';
+    btn.style.cursor = 'pointer';
+    btn.style.opacity = 1;
+    status.textContent = (pendingSpecText.length / 1000).toFixed(1) + 'k chars';
+    meta.textContent = 'Loading replaces the current intake state.';
+    meta.style.color = 'var(--orange)';
+  } else {
+    btn.disabled = true;
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--bg)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.cursor = 'not-allowed';
+    btn.style.opacity = 0.6;
+    status.textContent = '';
+    meta.textContent = pendingSpecText ? 'Spec is too short (need ≥ 50 chars).' : '';
+    meta.style.color = 'var(--text-muted)';
+  }
+}
+async function loadSpecSubmit() {
+  if (!pendingSpecText || pendingSpecText.length < 50) return;
+  if (!confirm('Load this spec.md? Current intake state will be replaced for this session.')) return;
+  const btn = document.getElementById('load-spec-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/load-spec', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sid: SID, spec_text: pendingSpecText, phase: currentPhase}),
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      alert('Load failed: ' + (data.error || 'unknown'));
+      btn.textContent = 'Load into session';
+      btn.disabled = false;
+      return;
+    }
+    document.getElementById('load-spec-meta').textContent =
+      'Loaded ' + data.constraints_loaded + ' constraints into ' +
+      (data.channels_with_content || []).length + ' channels.';
+    document.getElementById('load-spec-meta').style.color = 'var(--green)';
+    // Refresh side panel + history.
+    if (typeof refreshChannels === 'function') await refreshChannels();
+    if (typeof loadHistory === 'function') await loadHistory();
+    if (typeof loadPhaseState === 'function') await loadPhaseState();
+    btn.textContent = 'Load into session';
+  } catch (e) {
+    alert('Load failed: ' + e.message);
+    btn.textContent = 'Load into session';
+    btn.disabled = false;
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.getElementById('load-spec-file');
+  const ta = document.getElementById('load-spec-textarea');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        pendingSpecText = String(ev.target.result || '').trim();
+        ta.value = pendingSpecText;
+        refreshLoadSpecStatus();
+      };
+      reader.readAsText(f);
+    });
+  }
+  if (ta) {
+    ta.addEventListener('input', () => {
+      pendingSpecText = ta.value.trim();
+      refreshLoadSpecStatus();
+    });
+  }
+  refreshLoadSpecStatus();
+});
 let phaseInfo = {
   poc: { label: 'PoC', threshold: 0.6, desc: 'Proof of Concept — Target: 60% on core channels' },
   mvp: { label: 'MVP', threshold: 0.8, desc: 'MVP — Target: 80% on critical channels' },

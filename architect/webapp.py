@@ -26,6 +26,11 @@ from .llm_judge import (
 from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
+from .spec_parser import (
+    parse_markdown_to_registry,
+    parse_markdown_summary,
+    parse_density_score,
+)
 from .analytics import record_event, get_dashboard_data, get_module_locks, set_module_lock
 
 # Quality weight per phase: higher = more forgiving of unfilled sub-dimensions
@@ -95,6 +100,24 @@ _global_config: ProviderConfig = _load_config()
 
 # ── Session state management ──
 _sessions: dict[str, dict] = {}
+
+
+def _build_state(registry: ChannelRegistry, phase: ProjectPhase) -> dict:
+    """Construct a session state dict around a (possibly pre-populated) registry."""
+    engine = IntakeEngine(registry)
+    engine.set_llm_config(_global_config)
+    judge = LLMJudge(registry, config=_global_config, phase=phase)
+    engine.threshold = judge.completion_threshold
+    engine.set_critical_channels(judge.critical_channels)
+    engine.set_quality_weight(PHASE_QUALITY_WEIGHT.get(phase, 0.0))
+    return {
+        "registry": registry,
+        "engine": engine,
+        "judge": judge,
+        "phase": phase,
+        "history": [],
+        "created": time.time(),
+    }
 
 
 def _get_state(sid: str) -> dict:
@@ -443,19 +466,111 @@ def api_spec_download():
     )
 
 
+@app.route("/api/load-spec", methods=["POST"])
+def api_load_spec():
+    """Replace the session's registry with one re-hydrated from a spec.md.
+
+    Body: { sid?, spec_text, phase? }
+    - spec_text: full markdown of a previously-generated Dense Architecture Specification.
+    - phase: optional ProjectPhase to set on the new session ("poc"|"mvp"|"preprod"). Defaults to current session phase, or MVP.
+    """
+    body = request.get_json(silent=True) or {}
+    spec_text = (body.get("spec_text") or "").strip()
+    if not spec_text or len(spec_text) < 50:
+        return jsonify({"ok": False, "error": "spec_text is required and must contain at least 50 characters."}), 400
+
+    sid = body.get("sid") or request.args.get("sid") or session.get("sid", "default")
+    phase_str = body.get("phase")
+
+    try:
+        if phase_str:
+            phase = ProjectPhase(phase_str)
+        else:
+            phase = _sessions.get(sid, {}).get("phase", ProjectPhase.MVP)
+    except ValueError:
+        return jsonify({"ok": False, "error": f"Unknown phase: {phase_str}"}), 400
+
+    try:
+        registry = parse_markdown_to_registry(spec_text)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Could not parse spec: {e}"}), 400
+
+    summary = parse_markdown_summary(spec_text)
+    declared_density = parse_density_score(spec_text)
+    new_state = _build_state(registry, phase)
+    _sessions[sid] = new_state
+
+    return jsonify({
+        "ok": True,
+        "sid": sid,
+        "phase": phase.value,
+        "phase_label": PROJECT_PHASE_LABELS[phase],
+        "density_score": registry.overall_density_score(),
+        "declared_density_score": declared_density,
+        "constraints_loaded": summary["total_constraints"],
+        "channels_with_content": summary["channels_with_content"],
+        "constraints_per_channel": summary["constraints_per_channel"],
+    })
+
+
 @app.route("/api/decompose", methods=["POST"])
 def api_decompose():
-    """Run decomposition agent on current session spec."""
-    sid = request.args.get("sid", session.get("sid", "default"))
-    state = _get_state(sid)
-    registry = state["registry"]
-    gen = SpecGenerator(registry)
-    spec_text = gen.generate()
-    phase = request.json.get("phase", "mvp") if request.is_json else "mvp"
+    """Run decomposition agent on current session spec OR an uploaded spec.
+
+    If the request body includes a non-empty `spec_text`, that text is used
+    directly and the in-memory session registry is bypassed. This lets users
+    decompose a spec.md they generated elsewhere (or from a session that has
+    since expired) without re-running the intake flow.
+    """
+    body = request.get_json(silent=True) or {}
+    uploaded_spec = (body.get("spec_text") or "").strip()
+    phase = body.get("phase", "mvp")
+    # SID resolution: body wins (front-end always sends it), then query arg, then cookie, then default.
+    # Without this, the per-tab sessionStorage SID was being dropped and decompose always read the
+    # empty "default" registry — see "PoC intake doesn't show up in Decompose" bug.
+    sid = body.get("sid") or request.args.get("sid") or session.get("sid", "default")
+
+    if uploaded_spec:
+        # Direct upload path. Decomposer accepts an Optional[ChannelRegistry].
+        spec_text = uploaded_spec
+        registry = None
+        spec_source = "uploaded"
+    else:
+        state = _get_state(sid)
+        registry = state["registry"]
+        gen = SpecGenerator(registry)
+        spec_text = gen.generate()
+        spec_source = "session"
+
+    if not spec_text or len(spec_text.strip()) < 50:
+        return jsonify({
+            "ok": False,
+            "error": "No spec available. Either complete the Intake flow first or paste/upload a spec.md in the panel.",
+        }), 400
+
     try:
-        plan = run_decompose_programmatic(spec_text, registry, phase=phase)
+        # Pass the configured LLM provider so prose-style specs (e.g. early-stage
+        # PoC specs without "Field: Value" patterns) can still produce components.
+        # Falls back to regex inside the engine if the LLM call returns nothing.
+        plan = run_decompose_programmatic(spec_text, registry, phase=phase,
+                                          llm_config=_global_config)
+        if plan.metrics.total_components == 0:
+            return jsonify({
+                "ok": False,
+                "spec_source": spec_source,
+                "spec_chars": len(spec_text),
+                "error": (
+                    "Decomposer extracted 0 components from this spec. "
+                    "Likely cause: the spec is sparse / conversational. "
+                    "Densify it (use 'Field: Value' patterns like 'Database: SQLite', "
+                    "'Entity: City', 'Endpoint: GET /weather') and try again, or run "
+                    "the intake flow to produce a denser spec automatically."
+                ),
+            }), 422
         return jsonify({
             "ok": True,
+            "spec_source": spec_source,
+            "spec_chars": len(spec_text),
             "wave_plan": plan.to_dict(),
             "markdown": plan.to_markdown(),
             "build_package": plan.to_build_package(spec_text),

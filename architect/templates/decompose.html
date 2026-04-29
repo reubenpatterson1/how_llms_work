@@ -63,7 +63,7 @@
           Complete the intake session first, then click <strong>Run Decompose</strong> to split the spec into parallel build waves.
         </div>
         <div style="margin-top: 24px;">
-          <a href="/intake" style="color: var(--accent); font-size: 13px; text-decoration: none;">→ Go to Intake</a>
+          <a href="{{ pfx }}/intake" style="color: var(--accent); font-size: 13px; text-decoration: none;">→ Go to Intake</a>
         </div>
       </div>
 
@@ -78,6 +78,31 @@
 
     <!-- Side panel -->
     <div style="display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- Upload spec (bypass session state if intake spec isn't visible) -->
+      <div class="card" id="upload-card">
+        <div class="card-title" style="margin-bottom: 8px; display:flex; align-items:center; gap:8px;">
+          ⬆ Upload Spec
+          <span id="upload-status" style="margin-left:auto; font-size:10px; font-family:'IBM Plex Mono',monospace; color: var(--text-dim); padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border);">using session</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-dim); line-height: 1.55; margin-bottom: 10px;">
+          Have a finished <code style="color:var(--cyan);">spec.md</code> from a prior intake? Upload or paste it
+          here to decompose without re-running the flow.
+        </div>
+        <input type="file" id="spec-file" accept=".md,.markdown,.txt"
+          style="display:none;" />
+        <div style="display:flex; gap:6px; margin-bottom: 8px;">
+          <button class="btn btn-ghost" type="button" onclick="document.getElementById('spec-file').click()"
+            style="flex:1; font-size: 12px; padding: 6px 10px;">Choose .md file</button>
+          <button class="btn btn-ghost" type="button" id="clear-spec-btn" onclick="clearUploadedSpec()" disabled
+            style="font-size: 12px; padding: 6px 10px; opacity: 0.5;">Clear</button>
+        </div>
+        <textarea id="spec-textarea" rows="5" placeholder="…or paste your spec markdown here"
+          style="width:100%; box-sizing:border-box; font-family:'IBM Plex Mono',monospace; font-size: 11px;
+            background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+            padding: 8px; resize: vertical; margin: 0;"></textarea>
+        <div id="upload-meta" style="font-size: 10px; color: var(--text-dim); margin-top: 6px; min-height: 14px;"></div>
+      </div>
 
       <!-- Principle callouts -->
       <div class="card">
@@ -126,6 +151,62 @@
   let currentPhase = 'mvp';
   let markdownOutput = '';
   let buildPackage = '';
+  let uploadedSpec = '';
+
+  function fmtSize(n) {
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k chars';
+    return n + ' chars';
+  }
+  function refreshUploadStatus() {
+    const status = document.getElementById('upload-status');
+    const meta = document.getElementById('upload-meta');
+    const clear = document.getElementById('clear-spec-btn');
+    if (uploadedSpec && uploadedSpec.length >= 50) {
+      status.textContent = 'using upload';
+      status.style.color = 'var(--orange)';
+      status.style.borderColor = 'var(--orange)';
+      meta.textContent = 'Loaded ' + fmtSize(uploadedSpec.length) + ' — Run Decompose will use the uploaded spec.';
+      clear.disabled = false;
+      clear.style.opacity = 1;
+    } else {
+      status.textContent = 'using session';
+      status.style.color = 'var(--text-dim)';
+      status.style.borderColor = 'var(--border)';
+      meta.textContent = uploadedSpec ? 'Spec is too short (need ≥ 50 chars).' : '';
+      clear.disabled = true;
+      clear.style.opacity = 0.5;
+    }
+  }
+  function clearUploadedSpec() {
+    uploadedSpec = '';
+    document.getElementById('spec-textarea').value = '';
+    document.getElementById('spec-file').value = '';
+    refreshUploadStatus();
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('spec-file');
+    const ta = document.getElementById('spec-textarea');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          uploadedSpec = String(ev.target.result || '').trim();
+          ta.value = uploadedSpec;
+          refreshUploadStatus();
+        };
+        reader.readAsText(f);
+      });
+    }
+    if (ta) {
+      ta.addEventListener('input', () => {
+        uploadedSpec = ta.value.trim();
+        refreshUploadStatus();
+      });
+    }
+    refreshUploadStatus();
+  });
 
   function setPhase(phase) {
     currentPhase = phase;
@@ -148,10 +229,12 @@
     document.getElementById('wave-cards').style.display = 'none';
 
     try {
+      const payload = { phase: currentPhase, sid: SID };
+      if (uploadedSpec && uploadedSpec.length >= 50) payload.spec_text = uploadedSpec;
       const res = await fetch('/api/decompose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phase: currentPhase }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
 
@@ -265,11 +348,11 @@
   }
 
   function downloadBuildPackage() {
-    const blob = new Blob([buildPackage], { type: 'text/markdown' });
+    const blob = new Blob([buildPackage], { type: 'text/yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `build-package-${currentPhase}.md`;
+    a.download = `build-package-${currentPhase}.yaml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

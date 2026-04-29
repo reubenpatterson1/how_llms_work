@@ -234,8 +234,10 @@
   </nav>
 
   <script>
-    const SID = sessionStorage.getItem('arch_sid') || 'sid_' + Math.random().toString(36).slice(2, 10);
-    sessionStorage.setItem('arch_sid', SID);
+    // localStorage so SID survives across tabs + reloads.
+    // (sessionStorage was per-tab, causing intake state to vanish when /decompose opened in another tab.)
+    const SID = localStorage.getItem('arch_sid') || 'sid_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('arch_sid', SID);
     const PFX = '{{ pfx }}';
     const _origFetch = window.fetch;
     window.fetch = function(url, opts) {
