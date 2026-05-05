@@ -729,6 +729,14 @@ def ws_connect():
     emit("connected", {"sid": sid})
 
 
+@socketio.on("join")
+def on_join(data):
+    room = data.get("room")
+    if room:
+        from flask_socketio import join_room
+        join_room(room)
+
+
 @socketio.on("send_message")
 def ws_send_message(data):
     """Process message via WebSocket for real-time updates."""
