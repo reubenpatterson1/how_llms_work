@@ -1,0 +1,8 @@
+import fetch from 'node-fetch';
+
+export async function getThing() {
+  // call upstream, transform, return shaped object
+  return { field1: 0, field2: '', fetchedAt: new Date().toISOString() };
+}
+
+export default getThing;

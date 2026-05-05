@@ -1,0 +1,9 @@
+import express from 'express';
+
+const router = express.Router();
+
+router.get('/path', async (req, res) => {
+  res.status(200).json({ result: 'value' });
+});
+
+export default router;

@@ -1,0 +1,7 @@
+from flask import Blueprint, jsonify
+
+bp = Blueprint('thing', __name__)
+
+@bp.get('/path')
+def handler():
+    return jsonify({'result': 'value'}), 200

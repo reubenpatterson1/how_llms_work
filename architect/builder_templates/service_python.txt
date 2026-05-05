@@ -1,0 +1,9 @@
+import os
+import requests
+from datetime import datetime, timezone
+
+def get_thing():
+    response = requests.get('https://api.example.com/thing', timeout=10)
+    response.raise_for_status()
+    data = response.json()
+    return {'field1': data['x'], 'field2': data['y'], 'fetched_at': datetime.now(timezone.utc).isoformat()}
