@@ -1,0 +1,87 @@
+# Build Package — YAML DAG Format
+# Hand-authored for HelloWorld walkthrough; equivalent to Decompose output
+
+metadata:
+  name: hello-world  # spec slug — drives unique K8s name + ingress host + ECR tag (combined with run_id-short)
+  phase: poc
+  total_components: 4
+  total_waves: 2
+  max_parallelism: 3
+  time_savings_percent: 33
+  estimated_sequential_minutes: 1
+  estimated_parallel_minutes: 0.7
+
+spec:
+  purpose:
+    - 'Objective: Display "Hello, World!" with current time and weather for hardcoded New York'
+    - "Users: Internal fubo employees as teaching artifact"
+  data_model:
+    - "Entities: GreetingState (in-memory) with text, time, weatherTemp, weatherDescription, lastFetchedAt"
+  api:
+    - "Endpoints: GET /api/weather returns weather for hardcoded New York"
+    - "Endpoints: GET /healthz returns {status: ok}"
+    - "Endpoints: GET / returns the HelloWorld HTML page"
+  tech_stack:
+    - "Language: JavaScript (ES2022)"
+    - "Framework: Express 4 on Node 20"
+
+rules:
+  - "Every architectural decision MUST trace to a constraint in spec"
+  - "Prefer explicit over implicit in all generated code"
+  - "No defaults: every value must come from this spec"
+
+dag:
+  weather-service:
+    name: weather-service
+    type: service
+    wave: 0
+    complexity: low
+    constraints:
+      - "External APIs: OpenWeatherMap current-weather API, key in OPENWEATHER_API_KEY env var"
+      - "Hardcoded city: New York"
+      - "Response shape: {temp_f: number, description: string, fetchedAt: ISO8601}"
+    prompt: |
+      Build a service module that fetches current weather from OpenWeatherMap for the hardcoded city "New York"
+      using the API key from the OPENWEATHER_API_KEY environment variable. Return an object shaped
+      {temp_f, description, fetchedAt}. Convert the API's Kelvin response to Fahrenheit.
+
+  health-handler:
+    name: health-handler
+    type: handler
+    wave: 0
+    complexity: low
+    constraints:
+      - "Endpoint: GET /healthz"
+      - "Response: {status: ok}"
+    prompt: |
+      Build an Express route handler that responds to GET /healthz with HTTP 200
+      and JSON body {"status":"ok"}.
+
+  weather-handler:
+    name: weather-handler
+    type: handler
+    wave: 1
+    complexity: low
+    constraints:
+      - "Endpoint: GET /api/weather"
+      - "Calls weather-service from wave 0"
+    prompt: |
+      Build an Express route handler that responds to GET /api/weather by calling the
+      getWeather function exported from ./weather-service and returning its result as JSON.
+      On error from the service, respond with HTTP 502 and {error: "weather upstream failed"}.
+
+  app-server:
+    name: app-server
+    type: handler
+    wave: 1
+    complexity: low
+    constraints:
+      - "Express server listening on PORT env var (default 3000)"
+      - "Mounts handlers from wave 0 and wave 1"
+      - "Serves the HelloWorld HTML page at GET /"
+    prompt: |
+      Build the Express application entry point that creates an Express app, mounts the
+      health-handler at /healthz and the weather-handler at /api/weather, serves a static HTML page
+      at GET / showing "Hello, World!" plus a div for current time (updated client-side via setInterval)
+      and a div for current weather (fetched once on load from /api/weather and re-fetched every 60s).
+      Listen on process.env.PORT or 3000.
