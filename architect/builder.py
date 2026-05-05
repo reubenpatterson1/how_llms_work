@@ -5,6 +5,7 @@ with type/language-specific shape examples, dispatches to local Ollama wave-by-w
 post-processes output, writes files into a workspace, and assembles the project skeleton.
 """
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -72,4 +73,44 @@ def parse_build_package(path: str) -> BuildPackage:
         waves=waves,
         language=language,
         spec_slug=_slugify(name),
+    )
+
+
+_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "builder_templates")
+
+
+def _load_shape_template(component_type: str, language: str) -> str:
+    candidate = os.path.join(_TEMPLATE_DIR, f"{component_type}_{language}.txt")
+    if not os.path.exists(candidate):
+        # Fall back to service template for the language
+        candidate = os.path.join(_TEMPLATE_DIR, f"service_{language}.txt")
+    with open(candidate, "r") as f:
+        return f.read().strip()
+
+
+def wrap_prompt(
+    component: dict,
+    language: str,
+    runtime: str,
+    allowed_packages: list[str],
+    target_relpath: str,
+) -> str:
+    shape = _load_shape_template(component["type"], language)
+    constraints_block = "\n".join(f"- {c}" for c in component.get("constraints", []))
+    if not constraints_block:
+        constraints_block = "- (none)"
+
+    return (
+        "You are generating one source file. Output the file CONTENTS ONLY — "
+        "no markdown fences, no prose, no explanation, no comments outside the code. "
+        "The first character of your response must be the first character of the file.\n\n"
+        f"Target file: {target_relpath}\n"
+        f"Runtime: {runtime}\n"
+        f"Allowed packages (already installed): {', '.join(allowed_packages) if allowed_packages else '(none)'}\n\n"
+        "File shape (mimic this exactly):\n"
+        f"{shape}\n\n"
+        f"Component purpose: {component.get('id', 'unnamed')} ({component.get('type', 'unknown')})\n"
+        f"Architecture constraints:\n{constraints_block}\n\n"
+        f"Original component prompt: {component.get('prompt', '').strip()}\n\n"
+        f"Produce {target_relpath} now."
     )
