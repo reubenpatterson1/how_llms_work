@@ -210,6 +210,45 @@ def build_start():
     return jsonify({"run_id": run_id, "workspace": workspace})
 
 
+@app.get("/deploy")
+def deploy_page():
+    run_id = request.args.get("run")
+    if not run_id:
+        return ("Missing required query param: run", 400)
+    workspace = os.path.join(os.path.dirname(__file__), "workspaces", run_id)
+    if not os.path.isdir(workspace):
+        return (f"Workspace not found: {run_id}", 404)
+
+    # Resolve resource name: <spec_slug>-<run_short>
+    # Why: ensures cluster Application name, ECR tag, and ingress host are unique per run AND per user,
+    # so two people building the same spec don't overwrite each other's deploys (see plan note + spec §6 step 1).
+    # The package path was passed at build time and persisted in the workspace as `_package.yaml`.
+    pkg_path = os.path.join(workspace, "_package.yaml")
+    if not os.path.exists(pkg_path):
+        return (f"Workspace {run_id} missing _package.yaml — re-run build", 404)
+    package = _builder.parse_build_package(pkg_path)
+    run_short = run_id[:6]
+    resource_name = f"{package.spec_slug}-{run_short}"  # e.g. "hello-world-abc123"
+
+    cfg = _bdcfg.load()
+    healthcheck_path = _deployer.derive_healthcheck_path(workspace) or "/"
+    port = _deployer.derive_port(workspace) or 3000
+    image = f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{package.spec_slug}:{run_short}"
+    host = f"{resource_name}-{cfg.default_namespace}.tools.fubotv.net"
+
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "deploy_template.yaml")
+    rendered = _deployer.render_yaml(
+        template_path=template_path,
+        name=resource_name,
+        namespace=cfg.default_namespace,
+        image=image,
+        port=port,
+        host=host,
+        healthcheck_path=healthcheck_path,
+    )
+    return render_template("deploy.html", run_id=run_id, rendered_yaml=rendered, host=host)
+
+
 @app.route("/settings")
 def settings_page():
     if not session.get("settings_auth"):

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Deploy — Architect</title>
+  <link rel="stylesheet" href="{{ pfx }}/static/architect.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/editor/editor.main.css">
+</head>
+<body>
+  <h1>Deploy</h1>
+  <p>Run: {{ run_id }}</p>
+  <div id="editor" style="height:60vh;border:1px solid #334155;"></div>
+  <div style="margin-top:1rem;display:flex;gap:.5rem;">
+    <button id="image-build">1. Build Image</button>
+    <button id="image-push" disabled>2. Push to ECR</button>
+    <button id="apply" disabled>3. Apply</button>
+  </div>
+  <pre id="log" style="background:#020617;padding:1rem;margin-top:1rem;max-height:30vh;overflow:auto;"></pre>
+  <p id="live-link" style="margin-top:1rem;font-weight:600;"></p>
+
+  <script>window.RUN_ID = {{ run_id | tojson }}; window.HOST = {{ host | tojson }}; window.PFX = {{ pfx | tojson }};</script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>
+  <script>
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs' }});
+    require(['vs/editor/editor.main'], function() {
+      window.EDITOR = monaco.editor.create(document.getElementById('editor'), {
+        value: {{ rendered_yaml | tojson }},
+        language: 'yaml',
+        theme: 'vs-dark',
+        minimap: { enabled: false },
+      });
+    });
+  </script>
+  <script src="{{ pfx }}/static/deploy.js"></script>
+</body>
+</html>
