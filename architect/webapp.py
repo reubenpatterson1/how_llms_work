@@ -12,6 +12,7 @@ Production-level dashboard with:
 import json
 import os
 import time
+import uuid
 from flask import Flask, render_template, request, jsonify, session, Response, redirect
 from flask_socketio import SocketIO, emit
 
@@ -169,6 +170,44 @@ def build_page():
     if not package:
         return ("Missing required query param: package", 400)
     return render_template("build.html", package=package)
+
+
+@app.post("/build/start")
+def build_start():
+    body = request.get_json(silent=True) or {}
+    package = body.get("package")
+    if not package:
+        return jsonify({"error": "Missing 'package'"}), 400
+    run_id = uuid.uuid4().hex[:12]
+    workspace = os.path.join(
+        os.path.dirname(__file__), "workspaces", f"{run_id}"
+    )
+    os.makedirs(workspace, exist_ok=True)
+
+    # Persist the package YAML into the workspace so /deploy can re-read spec_slug
+    # for resource naming without needing the user to pass the package path again.
+    import shutil as _shutil
+    _shutil.copyfile(package, os.path.join(workspace, "_package.yaml"))
+
+    cfg = _bdcfg.load()
+    ollama = _builder.OllamaClient(base_url=cfg.ollama_base_url, model=cfg.ollama_model)
+
+    def emit_to_room(event, payload):
+        socketio.emit(event, payload, to=f"build:{run_id}")
+
+    def task():
+        try:
+            _builder.run_build(
+                package_path=package,
+                workspace=workspace,
+                ollama=ollama,
+                emit=emit_to_room,
+            )
+        except Exception as e:
+            emit_to_room("build:fatal", {"error": str(e)})
+
+    socketio.start_background_task(task)
+    return jsonify({"run_id": run_id, "workspace": workspace})
 
 
 @app.route("/settings")
