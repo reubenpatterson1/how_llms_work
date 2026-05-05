@@ -27,6 +27,9 @@ from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
 from .analytics import record_event, get_dashboard_data, get_module_locks, set_module_lock
+from . import builder as _builder
+from . import deployer as _deployer
+from . import build_deploy_config as _bdcfg
 
 # Quality weight per phase: higher = more forgiving of unfilled sub-dimensions
 # PoC: mostly quality-based (don't penalize missing subs)
@@ -158,6 +161,14 @@ def spec_page():
 @app.route("/decompose")
 def decompose_page():
     return render_template("decompose.html")
+
+
+@app.get("/build")
+def build_page():
+    package = request.args.get("package")
+    if not package:
+        return ("Missing required query param: package", 400)
+    return render_template("build.html", package=package)
 
 
 @app.route("/settings")

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Build — Architect</title>
+  <link rel="stylesheet" href="{{ pfx }}/static/architect.css">
+</head>
+<body>
+  <h1>Build</h1>
+  <p>Package: {{ package }}</p>
+  <div id="wave-grid"></div>
+  <button id="start-build">Start Build</button>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    window.PACKAGE_PATH = {{ package | tojson }};
+    window.PFX = {{ pfx | tojson }};
+  </script>
+  <script src="{{ pfx }}/static/build.js"></script>
+</body>
+</html>
