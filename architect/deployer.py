@@ -3,6 +3,9 @@
 import os
 import re
 import subprocess
+import time
+
+import requests
 
 
 def render_yaml(
@@ -128,3 +131,21 @@ def kubectl_apply(yaml_path: str) -> str:
     if cp.returncode != 0:
         raise DeployError(f"kubectl apply failed: {cp.stderr.strip() or cp.stdout.strip()}")
     return cp.stdout
+
+
+class IngressTimeout(DeployError):
+    """Ingress did not become ready within the deadline."""
+
+
+def poll_ingress(url: str, timeout_s: int = 120, interval_s: int = 5) -> float:
+    started = time.time()
+    while True:
+        try:
+            r = requests.get(url, timeout=5, allow_redirects=False)
+            if r.status_code in (200, 302):
+                return time.time() - started
+        except requests.RequestException:
+            pass
+        if time.time() - started >= timeout_s:
+            raise IngressTimeout(f"{url} did not become ready within {timeout_s}s")
+        time.sleep(interval_s)
