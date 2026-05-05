@@ -114,3 +114,35 @@ def wrap_prompt(
         f"Original component prompt: {component.get('prompt', '').strip()}\n\n"
         f"Produce {target_relpath} now."
     )
+
+
+class PostProcessError(Exception):
+    """Raised when LLM output cannot be cleaned into usable code."""
+
+
+_FENCE_RE = re.compile(r"```(?:[a-zA-Z0-9_+-]*)?\s*\n(.*?)\n```", re.DOTALL)
+
+
+def post_process_output(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        raise PostProcessError("LLM returned empty output")
+
+    # If fenced anywhere, take the first fenced block
+    fence_match = _FENCE_RE.search(text)
+    if fence_match:
+        return fence_match.group(1).strip() + "\n"
+
+    # No fence — heuristic: if it starts with code-like content (import/from/class/function/const/let/var/def),
+    # accept as-is. Otherwise it's prose and we error.
+    code_starters = (
+        "import ", "from ", "export ", "const ", "let ", "var ", "function ",
+        "class ", "def ", "async ", "#!", "//", "/*", "@", "public ", "private ",
+    )
+    first_nonblank = next((line for line in text.splitlines() if line.strip()), "")
+    if first_nonblank.lstrip().startswith(code_starters):
+        return text + "\n"
+
+    raise PostProcessError(
+        f"LLM output looks like prose, not code. First line: {first_nonblank[:80]!r}"
+    )
