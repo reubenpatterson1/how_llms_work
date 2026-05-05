@@ -8,6 +8,8 @@ post-processes output, writes files into a workspace, and assembles the project 
 import json
 import os
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any
 import yaml
@@ -223,3 +225,103 @@ def assemble_project(workspace: str, language: str, port: int, packages: list[st
 
     with open(os.path.join(workspace, ".env.example"), "w") as f:
         f.write("OPENWEATHER_API_KEY=\n")
+
+
+_LANG_TO_EXT = {"javascript": "js", "python": "py", "typescript": "ts"}
+_LANG_TO_PORT = {"javascript": 3000, "python": 5000, "typescript": 3000}
+_DEFAULT_PACKAGES_BY_LANG = {
+    "javascript": ["express", "node-fetch", "dotenv"],
+    "python": ["flask", "requests"],
+    "typescript": ["express", "node-fetch", "dotenv"],
+}
+
+
+def _build_component(
+    component: dict,
+    package: BuildPackage,
+    workspace: str,
+    ollama: OllamaClient,
+    runtime: str,
+    emit,
+) -> dict:
+    component_id = component["id"]
+    ext = _LANG_TO_EXT[package.language]
+    target_relpath = f"src/{component_id}.{ext}"
+    target_path = os.path.join(workspace, target_relpath)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+    emit("build:component:start", {"component_id": component_id})
+    started = time.time()
+    try:
+        wrapped = wrap_prompt(
+            component,
+            language=package.language,
+            runtime=runtime,
+            allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+            target_relpath=target_relpath,
+        )
+        raw = ollama.generate(wrapped)
+        cleaned = post_process_output(raw)
+        with open(target_path, "w") as f:
+            f.write(cleaned)
+        duration_ms = int((time.time() - started) * 1000)
+        emit(
+            "build:component:done",
+            {"component_id": component_id, "file_path": target_relpath, "duration_ms": duration_ms},
+        )
+        return {"component_id": component_id, "ok": True}
+    except (OllamaError, PostProcessError) as e:
+        emit("build:component:error", {"component_id": component_id, "error": str(e)})
+        return {"component_id": component_id, "ok": False, "error": str(e)}
+
+
+def run_build(
+    package_path: str,
+    workspace: str,
+    ollama: OllamaClient,
+    emit,
+    runtime: str = "Node 20",
+) -> dict:
+    package = parse_build_package(package_path)
+    started = time.time()
+    emit(
+        "build:start",
+        {
+            "total_components": sum(len(w) for w in package.waves),
+            "total_waves": len(package.waves),
+        },
+    )
+
+    max_par = max(1, package.metadata.get("max_parallelism", 1))
+    component_durations: list[int] = []
+
+    for wave_idx, components in enumerate(package.waves):
+        wave_started = time.time()
+        emit(
+            "build:wave:start",
+            {"wave_index": wave_idx, "components": [c["id"] for c in components]},
+        )
+        with ThreadPoolExecutor(max_workers=max_par) as ex:
+            futures = [
+                ex.submit(_build_component, c, package, workspace, ollama, runtime, emit)
+                for c in components
+            ]
+            for f in as_completed(futures):
+                f.result()
+        wave_dur_ms = int((time.time() - wave_started) * 1000)
+        component_durations.append(wave_dur_ms)
+        emit("build:wave:done", {"wave_index": wave_idx, "duration_ms": wave_dur_ms})
+
+    # Project assembly (best-effort — if any wave produced files, assemble)
+    src_dir = os.path.join(workspace, "src")
+    if os.path.isdir(src_dir) and any(os.scandir(src_dir)):
+        assemble_project(
+            workspace,
+            language=package.language,
+            port=_LANG_TO_PORT[package.language],
+            packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+        )
+
+    total_ms = int((time.time() - started) * 1000)
+    emit("build:complete", {"duration_ms": total_ms})
+    return {"workspace": workspace, "duration_ms": total_ms}
