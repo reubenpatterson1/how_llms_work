@@ -5,6 +5,7 @@ with type/language-specific shape examples, dispatches to local Ollama wave-by-w
 post-processes output, writes files into a workspace, and assembles the project skeleton.
 """
 
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -176,3 +177,49 @@ class OllamaClient:
             raise OllamaError(f"Ollama request failed: {e}") from e
         body = r.json()
         return body.get("response", "")
+
+
+_DOCKERFILE_JS = """FROM node:20-alpine
+WORKDIR /app
+COPY package.json ./
+RUN npm install --omit=dev
+COPY src ./src
+EXPOSE {port}
+CMD ["node", "src/app-server.js"]
+"""
+
+_DOCKERFILE_PY = """FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY src ./src
+ENV PYTHONUNBUFFERED=1
+EXPOSE {port}
+CMD ["python", "src/app.py"]
+"""
+
+
+def assemble_project(workspace: str, language: str, port: int, packages: list[str]) -> None:
+    if language == "javascript":
+        with open(os.path.join(workspace, "Dockerfile"), "w") as f:
+            f.write(_DOCKERFILE_JS.format(port=port))
+        deps = {pkg: "*" for pkg in packages}
+        pkg_json = {
+            "name": "architect-build",
+            "version": "0.1.0",
+            "type": "module",
+            "scripts": {"start": "node src/app-server.js"},
+            "dependencies": deps,
+        }
+        with open(os.path.join(workspace, "package.json"), "w") as f:
+            json.dump(pkg_json, f, indent=2)
+    elif language == "python":
+        with open(os.path.join(workspace, "Dockerfile"), "w") as f:
+            f.write(_DOCKERFILE_PY.format(port=port))
+        with open(os.path.join(workspace, "requirements.txt"), "w") as f:
+            f.write("\n".join(packages) + "\n")
+    else:
+        raise ValueError(f"Unsupported language for assembly: {language}")
+
+    with open(os.path.join(workspace, ".env.example"), "w") as f:
+        f.write("OPENWEATHER_API_KEY=\n")
