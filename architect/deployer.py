@@ -2,6 +2,7 @@
 
 import os
 import re
+import subprocess
 
 
 def render_yaml(
@@ -75,3 +76,55 @@ def derive_port(workspace: str) -> int | None:
         if m:
             return int(m.group(1))
     return None
+
+
+class DeployError(Exception):
+    """Generic deploy step failure."""
+
+
+class EcrAuthError(DeployError):
+    """ECR docker login is missing or expired."""
+
+
+_ECR_AUTH_MARKERS = ("no basic auth credentials", "denied: User", "401 Unauthorized")
+
+
+def docker_build(image_tag: str, workspace: str) -> str:
+    cp = subprocess.run(
+        ["docker", "build", "-t", image_tag, workspace],
+        capture_output=True,
+        text=True,
+    )
+    if cp.returncode != 0:
+        raise DeployError(f"docker build failed: {cp.stderr.strip() or cp.stdout.strip()}")
+    return cp.stdout
+
+
+def docker_push(image_tag: str, region: str, registry: str) -> str:
+    cp = subprocess.run(
+        ["docker", "push", image_tag],
+        capture_output=True,
+        text=True,
+    )
+    if cp.returncode != 0:
+        stderr = cp.stderr or ""
+        if any(marker in stderr for marker in _ECR_AUTH_MARKERS):
+            raise EcrAuthError(
+                f"ECR auth missing or expired. Run: "
+                f"aws ecr get-login-password --region {region} | "
+                f"docker login --username AWS --password-stdin {registry}\n\n"
+                f"Original error: {stderr.strip()}"
+            )
+        raise DeployError(f"docker push failed: {stderr.strip()}")
+    return cp.stdout
+
+
+def kubectl_apply(yaml_path: str) -> str:
+    cp = subprocess.run(
+        ["kubectl", "apply", "-f", yaml_path],
+        capture_output=True,
+        text=True,
+    )
+    if cp.returncode != 0:
+        raise DeployError(f"kubectl apply failed: {cp.stderr.strip() or cp.stdout.strip()}")
+    return cp.stdout
