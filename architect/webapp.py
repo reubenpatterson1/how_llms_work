@@ -210,6 +210,10 @@ def build_start():
     return jsonify({"run_id": run_id, "workspace": workspace})
 
 
+def _workspace_path(run_id: str) -> str:
+    return os.path.join(os.path.dirname(__file__), "workspaces", run_id)
+
+
 @app.get("/deploy")
 def deploy_page():
     run_id = request.args.get("run")
@@ -247,6 +251,60 @@ def deploy_page():
         healthcheck_path=healthcheck_path,
     )
     return render_template("deploy.html", run_id=run_id, rendered_yaml=rendered, host=host)
+
+
+@app.post("/deploy/image-build")
+def deploy_image_build():
+    body = request.get_json(silent=True) or {}
+    run_id = body.get("run_id")
+    image = body.get("image")
+    if not run_id or not image:
+        return jsonify({"error": "Missing run_id or image"}), 400
+    ws = _workspace_path(run_id)
+    try:
+        out = _deployer.docker_build(image, ws)
+        return jsonify({"output": out})
+    except _deployer.DeployError as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/deploy/image-push")
+def deploy_image_push():
+    body = request.get_json(silent=True) or {}
+    image = body.get("image")
+    if not image:
+        return jsonify({"error": "Missing image"}), 400
+    cfg = _bdcfg.load()
+    try:
+        out = _deployer.docker_push(image, region=cfg.aws_region, registry=cfg.ecr_registry)
+        return jsonify({"output": out})
+    except _deployer.EcrAuthError as e:
+        return jsonify({"error": str(e)}), 401
+    except _deployer.DeployError as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/deploy/apply")
+def deploy_apply():
+    body = request.get_json(silent=True) or {}
+    yaml_text = body.get("yaml")
+    host = body.get("host")
+    healthcheck_path = body.get("healthcheck_path", "/")
+    if not yaml_text or not host:
+        return jsonify({"error": "Missing yaml or host"}), 400
+
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
+        tf.write(yaml_text)
+        tf_path = tf.name
+    try:
+        apply_out = _deployer.kubectl_apply(tf_path)
+        elapsed = _deployer.poll_ingress(f"https://{host}{healthcheck_path}", timeout_s=120)
+        return jsonify({"applied": apply_out, "ingress_ready_after_s": elapsed, "url": f"https://{host}/"})
+    except _deployer.IngressTimeout as e:
+        return jsonify({"error": str(e)}), 504
+    except _deployer.DeployError as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/settings")

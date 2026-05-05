@@ -57,3 +57,32 @@ def test_get_deploy_renders_with_run_param(client, tmp_path, monkeypatch):
 def test_get_deploy_without_run_returns_400(client):
     r = client.get("/deploy")
     assert r.status_code == 400
+
+
+def test_post_deploy_image_build_returns_200(client, tmp_path, monkeypatch):
+    ws = tmp_path / "ws"
+    (ws / "src").mkdir(parents=True)
+    monkeypatch.setattr("architect.webapp._workspace_path", lambda run_id: str(ws))
+    monkeypatch.setattr("architect.deployer.docker_build", lambda img, ws_: "ok\n")
+    r = client.post("/deploy/image-build", json={"run_id": "abc", "image": "img:tag"})
+    assert r.status_code == 200
+
+
+def test_post_deploy_image_push_surfaces_ecr_auth_error(client, monkeypatch):
+    from architect.deployer import EcrAuthError
+    def boom(*a, **kw):
+        raise EcrAuthError("ECR auth missing or expired. Run: aws ecr get-login-password ...")
+    monkeypatch.setattr("architect.deployer.docker_push", boom)
+    r = client.post("/deploy/image-push", json={"image": "img:tag"})
+    assert r.status_code == 401
+    body = r.get_json()
+    assert "aws ecr get-login-password" in body["error"]
+
+
+def test_post_deploy_apply_returns_200_and_polls(client, tmp_path, monkeypatch):
+    yaml_path = tmp_path / "d.yaml"
+    yaml_path.write_text("apiVersion: v1\nkind: Pod\n")
+    monkeypatch.setattr("architect.deployer.kubectl_apply", lambda p: "applied")
+    monkeypatch.setattr("architect.deployer.poll_ingress", lambda url, **kw: 1.5)
+    r = client.post("/deploy/apply", json={"yaml": "apiVersion: v1\nkind: Pod\n", "host": "h.example.com", "healthcheck_path": "/healthz"})
+    assert r.status_code == 200
