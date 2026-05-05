@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 import yaml
+import requests
 
 
 @dataclass
@@ -146,3 +147,32 @@ def post_process_output(raw: str) -> str:
     raise PostProcessError(
         f"LLM output looks like prose, not code. First line: {first_nonblank[:80]!r}"
     )
+
+
+class OllamaError(Exception):
+    """Raised when Ollama returns an error or is unreachable."""
+
+
+class OllamaClient:
+    def __init__(self, base_url: str, model: str, timeout: int = 180):
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.timeout = timeout
+
+    def generate(self, prompt: str) -> str:
+        try:
+            r = requests.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.1},
+                },
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+        except requests.RequestException as e:
+            raise OllamaError(f"Ollama request failed: {e}") from e
+        body = r.json()
+        return body.get("response", "")
