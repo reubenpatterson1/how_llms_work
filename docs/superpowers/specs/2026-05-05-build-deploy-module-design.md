@@ -242,7 +242,7 @@ Edit the `MODULES` array (around `index.html:75-82`):
 - **O2: ECR registry URL + repo prefix.** Account confirmed `650127479436`, region `us-east-1` (from kubectl context). Exact ECR repo prefix to be confirmed during implementation; default stubbed in `.provider_config.json` until then.
 - **O3: Sample-doc fix needed.** `~/Documents/course_docs/deploy_template.yaml` healthcheck path needs updating from `/health` → `/healthz` to match podinfo (or swap example image to one that serves `/health`). Out of scope for the agent itself but needs fixing in the source-of-truth doc the agent will mirror.
 
-## 11. Implementation Rules
+
 
 - All four pipeline stages must be reachable from a single architect URL (employees install the architect once, get the whole flow)
 - Builder must respect the build-package YAML faithfully — wave order, parallelism cap — no silent reinterpretation. Component prompts ARE wrapped (see §5 step 3); the Decompose stage's bare per-component prompt is an input, not the dispatched payload.
@@ -252,3 +252,19 @@ Edit the `MODULES` array (around `index.html:75-82`):
 - Deployer must surface pod-restart / crashloop events from `kubectl get events` during the apply step — silent 503s while a pod crashloops are the worst-case UX
 - Workspaces are write-once per run — never mutate a prior run's workspace; new builds get new timestamps
 - "LLM of choice" is rhetorical: only Ollama is wired up (default model `mistral:7b`); provider-portability is a spoken claim, not a code path
+
+## 12. Phase 4 Smoke Test Findings (2026-05-06)
+
+End-to-end smoke test on the `vat-development-blue` cluster, namespace `training`, building HelloWorld with mistral:7b. Live URL achieved: `https://hello-world-39f1f9-training.tools.fubotv.net/healthz` → 200. Findings folded back into the agent or noted for future iteration:
+
+- **F1 (FIXED in commit 4e15778):** `docker_build` must pin `--platform=linux/amd64`. On Apple Silicon dev hosts, default builds produce arm64 images that hit `ImagePullBackOff` ("no match for platform in manifest") on the cluster's amd64 nodes. `docker_build(image, ws, platform="linux/amd64")` is now the default; second positional/keyword arg lets future multi-arch users override.
+- **F2 (NOT FIXED, for future task):** AWS SSO session expiry causes both `docker push` (403) and `kubectl apply` (exit 255 "SSO session expired") to fail mid-pipeline with cryptic errors. Mitigation worth adding: a precheck in the deploy step (`aws sts get-caller-identity`) before docker_push that surfaces a clean "run `aws sso login`" message rather than letting the failure cascade through several seconds of work.
+- **F3 (DOCUMENTED, no agent change):** ECR + K8s `imagePullPolicy: IfNotPresent` (the default) means re-pushing the same tag does NOT cause a pod restart to pull the new image — the node uses its cached copy. The agent's natural flow (`run_short` is uuid4-derived, unique per build) sidesteps this: every build run produces a new tag, every deploy pulls fresh. Manual re-pushes during smoke testing required `kubectl patch deployment ... imagePullPolicy: Always` to force a repull. Worth flagging in user-facing docs but no code change since the natural flow is correct.
+- **F4 (R1 EVIDENCE):** Validated empirically — mistral:7b produces clean code for components 1-3 (model, simple handler, simple service) but garbled code for the wave-1 entry point (`app-server`). Two distinct failure modes observed: (a) re-implements other components' logic inline instead of importing them, with hardcoded placeholder strings (e.g. `'YOUR_API_KEY'` literal); (b) generates invalid JS — nested template literals not properly escaped, causing `SyntaxError: missing ) after argument list` at module load. **Concrete recommendation for the spec's R1 mitigation:** Module 4 walkthroughs should either (i) use a stronger model for the entry-point component (Claude Sonnet, GPT-4-class, or qwen2.5-coder:32b), (ii) explicitly hand-author the entry point in the build-package prompt with a much fuller shape example showing exactly which routers to import and mount, or (iii) make the build agent ship a known-good `app-server.<ext>` template instead of asking the LLM to generate it.
+- **F5 (DOCUMENTED, agent already correct):** Resource naming `<spec_slug>-<run_short>` works in practice — observed `hello-world-39f1f9` for K8s Application, ECR tag, and ingress host without collision. No changes needed.
+- **F6 (TIMING):** Real wall-clock numbers from the smoke test for future planning:
+  - Build (4 components, mistral:7b, wave-parallel, max_par=3): **41s** (wave 0 = 17s, wave 1 = 24s)
+  - Docker build with platform pin: **17-28s**
+  - Docker push to ECR: **2-9s** (depending on layer cache)
+  - kubectl apply + ingress ready: **~90s** observed when pod boots cleanly
+  - Total walkthrough end-to-end (clean run, no fix loops): **~3-4 minutes**
