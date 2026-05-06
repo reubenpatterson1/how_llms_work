@@ -2,6 +2,7 @@ import { useState } from 'react';
 import WaveGridReplay from './components/WaveGridReplay';
 import Assessment from './components/Assessment';
 import './index.css';
+import './App.css';
 
 const SLIDES = [
   { id: 's1', type: 'text', title: 'How to Build/Deploy with LLMs',
