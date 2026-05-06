@@ -11,3 +11,9 @@ architect/.provider_config.json
 .worktrees/
 deploy-landing/test-results/
 deploy-landing/playwright-report/
+
+# Architect Stage 3 build output (per-run, never committed)
+architect/workspaces/
+# Architect runtime analytics + test results
+architect/analytics.db
+architect/test_results.json
