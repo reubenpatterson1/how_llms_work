@@ -11,13 +11,21 @@ def _completed(returncode=0, stdout="", stderr=""):
     return cp
 
 
-def test_docker_build_invokes_correct_command(tmp_path):
+def test_docker_build_invokes_correct_command_with_amd64_platform(tmp_path):
     with patch("architect.deployer.subprocess.run", return_value=_completed(0, "ok", "")) as run:
         docker_build("img:tag", str(tmp_path))
     args = run.call_args.args[0]
-    assert args[0:3] == ["docker", "build", "-t"]
-    assert args[3] == "img:tag"
-    assert args[4] == str(tmp_path)
+    assert args[0:5] == ["docker", "build", "--platform", "linux/amd64", "-t"]
+    assert args[5] == "img:tag"
+    assert args[6] == str(tmp_path)
+
+
+def test_docker_build_platform_override(tmp_path):
+    with patch("architect.deployer.subprocess.run", return_value=_completed(0, "ok", "")) as run:
+        docker_build("img:tag", str(tmp_path), platform="linux/arm64")
+    args = run.call_args.args[0]
+    assert "--platform" in args
+    assert args[args.index("--platform") + 1] == "linux/arm64"
 
 
 def test_docker_build_raises_on_failure(tmp_path):

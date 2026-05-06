@@ -92,9 +92,12 @@ class EcrAuthError(DeployError):
 _ECR_AUTH_MARKERS = ("no basic auth credentials", "denied: User", "401 Unauthorized")
 
 
-def docker_build(image_tag: str, workspace: str) -> str:
+def docker_build(image_tag: str, workspace: str, platform: str = "linux/amd64") -> str:
+    # Pin platform so Mac (arm64) hosts produce amd64 images for the fubo cluster.
+    # Caught in Phase 4 smoke test 2026-05-05: pod entered ImagePullBackOff with
+    # "no match for platform in manifest" because docker on Apple Silicon defaulted to arm64.
     cp = subprocess.run(
-        ["docker", "build", "-t", image_tag, workspace],
+        ["docker", "build", "--platform", platform, "-t", image_tag, workspace],
         capture_output=True,
         text=True,
     )
