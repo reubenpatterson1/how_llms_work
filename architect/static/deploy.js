@@ -4,6 +4,37 @@ const pushBtn = document.getElementById("image-push");
 const applyBtn = document.getElementById("apply");
 const liveLink = document.getElementById("live-link");
 
+// Prominent URL card (top of page) — wire copy button + provide setUrlState helper
+const urlLabel = document.getElementById("target-url-label");
+const urlLink = document.getElementById("target-url-link");
+const urlCopy = document.getElementById("target-url-copy");
+if (urlCopy && urlLink) {
+  urlCopy.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(urlLink.href);
+    urlCopy.textContent = "Copied ✓";
+    setTimeout(() => { urlCopy.textContent = "Copy"; }, 1500);
+  });
+}
+function setUrlState(state) {
+  if (!urlLabel || !urlLink) return;
+  switch (state) {
+    case "deploying":
+      urlLabel.textContent = "Deploying to";
+      urlLabel.style.color = "#fbbf24";
+      urlLink.style.color = "#fbbf24";
+      break;
+    case "live":
+      urlLabel.textContent = "✓ Live at";
+      urlLabel.style.color = "#22c55e";
+      urlLink.style.color = "#22c55e";
+      break;
+    default:
+      urlLabel.textContent = "Will deploy to";
+      urlLabel.style.color = "";
+      urlLink.style.color = "";
+  }
+}
+
 function append(line) {
   log.textContent += line + "\n";
   log.scrollTop = log.scrollHeight;
@@ -110,6 +141,13 @@ applyBtn.addEventListener("click", async () => {
   const pathMatch = yamlText.match(/healthcheck:\s*\n\s*path:\s*(\S+)/);
   const host = hostMatch ? hostMatch[1] : window.HOST;
   const healthcheck_path = pathMatch ? pathMatch[1] : "/";
+  // Update prominent URL card to reflect the host the user is actually deploying to
+  // (may differ from the page-load default if they edited metadata.name)
+  if (urlLink) {
+    urlLink.href = `https://${host}/`;
+    urlLink.textContent = `https://${host}/`;
+  }
+  setUrlState("deploying");
   append(`> kubectl apply -f <rendered.yaml>`);
   const r = await fetch(`${window.PFX || ""}/deploy/apply`, {
     method: "POST", headers: {"Content-Type": "application/json"},
@@ -119,6 +157,7 @@ applyBtn.addEventListener("click", async () => {
   if (!r.ok) {
     append(`ERROR: ${body.error}`);
     setBtnState(applyBtn, "error", "3. Apply (retry)");
+    setUrlState("idle");
     return;
   }
   if (body.kubectl_missing) {
@@ -130,6 +169,7 @@ applyBtn.addEventListener("click", async () => {
   append((body.applied || "").trim() || "(applied)");
   append(`Ingress ready after ${body.ingress_ready_after_s.toFixed(1)}s`);
   liveLink.innerHTML = `Live at <a href="${body.url}" target="_blank">${body.url}</a>`;
+  setUrlState("live");
   setBtnState(applyBtn, "done", "✓ 3. Live");
 });
 
@@ -171,6 +211,11 @@ function showApplyHandoff(body) {
         // no-cors gives an opaque response; if fetch resolves, the host responded
         st.textContent = `responsive after ${((Date.now() - start) / 1000).toFixed(1)}s`;
         liveLink.innerHTML = `Live at <a href="${body.url}" target="_blank">${body.url}</a>`;
+        if (urlLink) {
+          urlLink.href = body.url;
+          urlLink.textContent = body.url;
+        }
+        setUrlState("live");
         setBtnState(applyBtn, "done", "✓ 3. Live");
         return;
       } catch (_) {

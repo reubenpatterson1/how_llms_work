@@ -8,14 +8,29 @@
 
 {% block content %}
 <div style="padding: 32px; max-width: 1400px; margin: 0 auto;">
-  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px;">
-    <div>
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 24px;">
+    <div style="flex: 1; min-width: 0;">
       <h1 style="font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px;">
         Deploy Agent
       </h1>
       <p style="color: var(--text-dim); font-size: 14px;">
         Renders a customizable deploy YAML, builds and pushes the image to ECR, and applies the manifest to the cluster. Run: <code>{{ run_id }}</code>
       </p>
+    </div>
+    <div id="target-url-card" style="flex-shrink: 0; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; min-width: 280px;">
+      <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+        <span id="target-url-label">Will deploy to</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <a id="target-url-link" href="https://{{ host }}/" target="_blank" rel="noopener"
+           style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--accent); font-weight: 600; text-decoration: none; word-break: break-all;">
+          https://{{ host }}/
+        </a>
+        <button id="target-url-copy" type="button"
+                style="background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">
+          Copy
+        </button>
+      </div>
     </div>
   </div>
 
