@@ -1,8 +1,39 @@
 import { useState } from 'react';
 import WaveGridReplay from './components/WaveGridReplay';
 import Assessment from './components/Assessment';
+import architectDashboardImg from './assets/screenshots/architect-dashboard.png';
+import decomposeEmptyImg from './assets/screenshots/decompose-empty.png';
+import decomposeSpecLoadedImg from './assets/screenshots/decompose-spec-loaded.png';
+import decomposeWavePlanImg from './assets/screenshots/decompose-wave-plan.png';
 import './index.css';
 import './App.css';
+
+const SAMPLE_SPEC_HIGHLIGHT = `# Dense Architecture Specification — Team Task Tracker (MVP)
+# Density Score: 0.540
+
+## Purpose
+- Objective: Ship a team task tracker for engineering teams
+- Success Criteria: P95 page load under 800ms
+
+## Data Model
+- Entities: User, Team, Task, Comment (with full attribute lists)
+- Relationships: User belongs to Team; Task belongs to Team + assignee
+- Constraints: User.email unique; Task.status in {todo,doing,done,blocked}
+
+## API
+- GET /api/teams/:teamId/tasks
+- POST /api/teams/:teamId/tasks
+- PATCH /api/tasks/:id
+- POST /api/tasks/:id/comments
+
+## Tech Stack
+- TypeScript 5.4, Hono on Bun, PostgreSQL 15 + Drizzle, Redis 7
+
+## Auth
+- JWT RS256, RBAC owner/admin/member, 15m access + 30d refresh
+
+## Deployment
+- fly.io 2 regions, GitHub Actions, preview-per-PR + staging + prod`;
 
 const SLIDES = [
   { id: 's1', type: 'text', title: 'How to Build/Deploy with LLMs',
@@ -13,6 +44,22 @@ const SLIDES = [
 
   { id: 's3', type: 'text', title: 'The Pipeline End to End',
     body: 'Spec → Decompose → Build → Deploy. Four stages, four artifacts: dense spec, build-package YAML, container image + manifest, live URL.' },
+
+  { id: 's4a', type: 'image', title: 'The Architect Agent',
+    image: architectDashboardImg,
+    caption: 'The Architecture Agent runs structured Q&A across 10 channels. Output: a dense spec with constraints traceable to every decision. (Modules 1-2 cover this in depth.)' },
+
+  { id: 's4b', type: 'codeblock', title: 'The Dense Spec That Comes Out',
+    intro: 'Worked example: a team task tracker for engineering sprints. 4 entities, 4 endpoints, JWT auth, fly.io deploy. This is the input the Decompose agent will turn into a wave plan.',
+    code: SAMPLE_SPEC_HIGHLIGHT },
+
+  { id: 's4c', type: 'image', title: 'Decompose: Load the Spec',
+    image: decomposeSpecLoadedImg,
+    caption: 'Paste the dense spec into the Decompose page (skip re-running intake). Status flips to "using upload" — Run Decompose now uses your pasted content.' },
+
+  { id: 's4d', type: 'image', title: 'Decompose Output: 15 Components, 3 Waves, 73% Time Saved',
+    image: decomposeWavePlanImg,
+    caption: 'Wave 0: 6 interface definitions (4 entity models + 2 configs) — fully parallel. Wave 1: services that depend on configs. Wave 2: handlers + middleware. Right side: machine-readable interface contracts and the dependency graph.' },
 
   { id: 's4', type: 'text', title: 'Recap: What Comes Out of Decompose',
     body: 'A YAML DAG. Each node is a component with: id, type, wave, complexity, constraints, prompt. Wave assignment encodes parallelism — Wave 0 components have no inter-dependencies, Wave 1 depends on Wave 0 outputs.' },
@@ -73,6 +120,22 @@ export default function App() {
     if (slide.type === 'assessment') {
       const Comp = COMPONENTS['Assessment'];
       return <Comp />;
+    }
+    if (slide.type === 'image') {
+      return (
+        <div className="image-slide">
+          <img src={slide.image} alt={slide.title} />
+          {slide.caption && <p className="caption">{slide.caption}</p>}
+        </div>
+      );
+    }
+    if (slide.type === 'codeblock') {
+      return (
+        <div className="codeblock-slide">
+          {slide.intro && <p className="intro">{slide.intro}</p>}
+          <pre className="code">{slide.code}</pre>
+        </div>
+      );
     }
     return <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'inherit'}}>{slide.body}</pre>;
   };
