@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import WaveGridReplay from './components/WaveGridReplay';
 import PipelineFlow from './components/PipelineFlow';
+import BuildFlow from './components/BuildFlow';
+import DeployFlow from './components/DeployFlow';
 import Assessment from './components/Assessment';
 import architectDashboardImg from './assets/screenshots/architect-dashboard.png';
 import decomposeEmptyImg from './assets/screenshots/decompose-empty.png';
 import decomposeSpecLoadedImg from './assets/screenshots/decompose-spec-loaded.png';
 import decomposeWavePlanImg from './assets/screenshots/decompose-wave-plan.png';
+import buildUiImg from './assets/screenshots/build-ui.png';
+import deployUiImg from './assets/screenshots/deploy-ui.png';
 import './index.css';
 import './App.css';
 
@@ -126,16 +130,19 @@ Constraints: (same auth constraints as above)
 
 … one prompt per component, all 15 in this build package.` },
 
-  { id: 's5', type: 'text', title: "The Build Agent's Job",
-    body: 'For each wave (sequentially): dispatch all components in parallel to the LLM, write each output to disk, advance to next wave. Then assemble the project skeleton: manifest, Dockerfile, .env.example.' },
+  { id: 's5', type: 'component', title: "The Build Agent's Pipeline",
+    component: 'BuildFlow' },
 
-  { id: 's6', type: 'text', title: 'Why Wave-Parallel Matters',
-    body: 'Sequential build of N components ≈ N × per-component time. Wave-parallel: max(wave_0_time) + max(wave_1_time) + ... For a 4-component build with 2 waves of 2, parallelism roughly halves wall-clock time.' },
+  { id: 's6', type: 'image', title: 'The Build UI in Action',
+    image: buildUiImg,
+    caption: 'Live screenshot: 4 components built across 2 waves in 32.9s on local Ollama gemma3:12b. Wave 0 (weather-service, health-handler) ran in parallel; Wave 1 (weather-handler, app-server) followed. "Continue to Deploy →" appears when complete.' },
 
-  { id: 's7', type: 'component', title: 'Wave-Grid Animation', component: 'WaveGridReplay' },
+  { id: 's7', type: 'component', title: 'The Deploy Agent\'s Pipeline',
+    component: 'DeployFlow' },
 
-  { id: 's8', type: 'text', title: 'LLM of Choice',
-    body: 'The build-package YAML is provider-agnostic — any model that can follow the wrapped prompt format works. Default in this build: local Ollama with mistral:7b. Bigger models give better single-shot quality; the wrapping layer normalizes a lot of the gap.' },
+  { id: 's8', type: 'image', title: 'The Deploy UI in Action',
+    image: deployUiImg,
+    caption: 'Live screenshot: rendered fubo Application manifest in Monaco editor, "Will deploy to" card showing the target URL with copy button, three sequential action buttons, and a custom-template upload card on the right.' },
 
   { id: 's9', type: 'text', title: 'What Gets Generated',
     body: 'Per component: one source file (.js or .py). Per project: package.json or requirements.txt, Dockerfile, .env.example, index.html shell if frontend. The build agent writes everything to a versioned workspace folder.' },
@@ -168,7 +175,7 @@ Constraints: (same auth constraints as above)
     body: '8-10 MCQ on pipeline mechanics. Skeleton MCQ component lives in src/components/Assessment.jsx (will be expanded in a follow-up).' },
 ];
 
-const COMPONENTS = { WaveGridReplay, PipelineFlow, Assessment };
+const COMPONENTS = { WaveGridReplay, PipelineFlow, BuildFlow, DeployFlow, Assessment };
 
 export default function App() {
   const [idx, setIdx] = useState(0);
