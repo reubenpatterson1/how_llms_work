@@ -379,12 +379,30 @@ def deploy_image_push():
 
 @app.post("/deploy/apply")
 def deploy_apply():
+    import shutil as _sh
     body = request.get_json(silent=True) or {}
     yaml_text = body.get("yaml")
     host = body.get("host")
     healthcheck_path = body.get("healthcheck_path", "/")
     if not yaml_text or not host:
         return jsonify({"error": "Missing yaml or host"}), 400
+
+    # If kubectl isn't on this host (e.g. agent runs on EC2 without cluster auth),
+    # return the YAML + a copy-pasteable command so the user can apply from their laptop.
+    if not _sh.which("kubectl"):
+        return jsonify({
+            "kubectl_missing": True,
+            "yaml": yaml_text,
+            "url": f"https://{host}/",
+            "host": host,
+            "healthcheck_path": healthcheck_path,
+            "instructions": (
+                "kubectl is not installed on this server (or you don't have cluster auth here).\n"
+                "Run this on a machine that does:\n\n"
+                f"cat <<'EOF' | kubectl apply -f -\n{yaml_text}EOF\n\n"
+                f"Then poll:  curl https://{host}{healthcheck_path}"
+            ),
+        })
 
     import tempfile
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
