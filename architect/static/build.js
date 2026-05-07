@@ -117,12 +117,39 @@ if (clearBtn) {
   });
 }
 
+function showStatus(text, color) {
+  let banner = document.getElementById("build-status-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "build-status-banner";
+    banner.style.cssText = "padding: .6rem 1rem; margin-bottom: 1rem; border-radius: 6px; font-family: 'IBM Plex Mono', monospace; font-size: .85rem;";
+    grid.parentNode.insertBefore(banner, grid);
+  }
+  banner.textContent = text;
+  banner.style.background = color === "red" ? "#2b1616" : color === "green" ? "#162b1f" : "#1e293b";
+  banner.style.color = color === "red" ? "#fca5a5" : color === "green" ? "#86efac" : "#94a3b8";
+  banner.style.border = `1px solid ${color === "red" ? "#7f1d1d" : color === "green" ? "#166534" : "#334155"}`;
+}
+
+socket.on("build:start", (p) => {
+  showStatus(`Build started — ${p.total_components} components in ${p.total_waves} waves`, "blue");
+});
+
+socket.on("build:complete", (p) => {
+  showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
+});
+
+socket.on("build:fatal", (p) => {
+  showStatus(`Build failed: ${p.error}`, "red");
+});
+
 startBtn.addEventListener("click", async () => {
   if (!uploadedPackage && !window.PACKAGE_PATH) {
     alert("Upload a build-package YAML or pass ?package=<path> in the URL before starting.");
     return;
   }
   startBtn.disabled = true;
+  showStatus("Requesting run_id…", "blue");
   const payload = uploadedPackage
     ? { package_text: uploadedPackage }
     : { package: window.PACKAGE_PATH };
@@ -133,10 +160,12 @@ startBtn.addEventListener("click", async () => {
   });
   const body = await r.json();
   if (!r.ok) {
-    alert(`Build start failed: ${body.error}`);
+    showStatus(`Build start failed: ${body.error}`, "red");
     startBtn.disabled = false;
     return;
   }
   runId = body.run_id;
+  // Join the room BEFORE the server's 1s grace period elapses
   socket.emit("join", {room: `build:${runId}`});
+  showStatus(`Joined build:${runId} — waiting for first wave…`, "blue");
 });

@@ -204,6 +204,10 @@ def build_start():
         socketio.emit(event, payload, to=f"build:{run_id}")
 
     def task():
+        # Give the client ~1s to receive the run_id and join the build:<run_id> room
+        # before we start emitting events. Otherwise build:start fires into an empty
+        # room and the wave-grid UI shows nothing.
+        socketio.sleep(1.0)
         try:
             _builder.run_build(
                 package_path=package_path,
