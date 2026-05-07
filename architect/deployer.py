@@ -126,7 +126,55 @@ def docker_build(image_tag: str, workspace: str, platform: str = "linux/amd64") 
     return cp.stdout
 
 
+def _extract_repo_name(image_tag: str, registry: str) -> str | None:
+    """Extract the ECR repo path from a full image tag.
+    e.g. '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/foo:abc'
+         → 'architect-builds/foo'
+    """
+    if not image_tag.startswith(registry + "/"):
+        return None
+    rest = image_tag[len(registry) + 1:]
+    return rest.split(":", 1)[0]
+
+
+def ensure_ecr_repository(image_tag: str, region: str, registry: str) -> str:
+    """Create the ECR repository for image_tag if it doesn't exist.
+
+    Returns the repo name. Raises DeployError if AWS CLI fails for non-NotFound reasons.
+    """
+    repo = _extract_repo_name(image_tag, registry)
+    if not repo:
+        return ""  # not an ECR image; skip
+    describe = subprocess.run(
+        ["aws", "ecr", "describe-repositories", "--region", region, "--repository-names", repo],
+        capture_output=True, text=True,
+    )
+    if describe.returncode == 0:
+        return repo  # already exists
+    if "RepositoryNotFoundException" not in (describe.stderr or "") + (describe.stdout or ""):
+        raise DeployError(
+            f"aws ecr describe-repositories failed (non-NotFound): {describe.stderr.strip() or describe.stdout.strip()}"
+        )
+    create = subprocess.run(
+        ["aws", "ecr", "create-repository", "--region", region, "--repository-name", repo],
+        capture_output=True, text=True,
+    )
+    if create.returncode != 0:
+        raise DeployError(
+            f"aws ecr create-repository {repo} failed: {create.stderr.strip() or create.stdout.strip()}"
+        )
+    return repo
+
+
 def docker_push(image_tag: str, region: str, registry: str) -> str:
+    # Auto-create the ECR repo if it doesn't exist yet.
+    # First deploy of any new spec lands here — failing on missing repo is unfriendly.
+    try:
+        ensure_ecr_repository(image_tag, region, registry)
+    except DeployError:
+        # If we can't create (e.g. IAM policy), let docker push surface the real error
+        pass
+
     cp = subprocess.run(
         ["docker", "push", image_tag],
         capture_output=True,
