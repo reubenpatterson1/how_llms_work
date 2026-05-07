@@ -51,36 +51,61 @@ if (resetTemplateBtn) {
   });
 }
 
-let imageTag = `architect-${window.RUN_ID}:${Date.now()}`;
+// Use the server-rendered ECR image tag (full registry/repo:tag format)
+// e.g. 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/<spec_slug>:<run_short>
+const imageTag = window.IMAGE_TAG;
+if (!imageTag) {
+  append("ERROR: window.IMAGE_TAG not set — server rendered the deploy page without an image. Reload?");
+}
+
+function setBtnState(btn, state, label) {
+  // state: 'idle' | 'running' | 'done' | 'error'
+  btn.disabled = state === "running" || state === "done";
+  btn.textContent = label;
+  btn.dataset.state = state;
+  // visual hint
+  btn.style.opacity = state === "done" ? "0.7" : "";
+}
 
 buildBtn.addEventListener("click", async () => {
-  buildBtn.disabled = true;
-  append(`> docker build -t ${imageTag} <workspace>`);
+  setBtnState(buildBtn, "running", "1. Building image…");
+  append(`> docker build --platform linux/amd64 -t ${imageTag} <workspace>`);
   const r = await fetch(`${window.PFX || ""}/deploy/image-build`, {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({run_id: window.RUN_ID, image: imageTag}),
   });
   const body = await r.json();
-  if (r.ok) { append(body.output || "ok"); pushBtn.disabled = false; }
-  else { append(`ERROR: ${body.error}`); buildBtn.disabled = false; }
+  if (r.ok) {
+    append((body.output || "").trim() || "(image built)");
+    setBtnState(buildBtn, "done", "✓ 1. Image built");
+    setBtnState(pushBtn, "idle", "2. Push to ECR");
+  } else {
+    append(`ERROR: ${body.error}`);
+    setBtnState(buildBtn, "error", "1. Build Image (retry)");
+  }
 });
 
 pushBtn.addEventListener("click", async () => {
-  pushBtn.disabled = true;
+  setBtnState(pushBtn, "running", "2. Pushing to ECR…");
   append(`> docker push ${imageTag}`);
   const r = await fetch(`${window.PFX || ""}/deploy/image-push`, {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({image: imageTag}),
   });
   const body = await r.json();
-  if (r.ok) { append(body.output || "ok"); applyBtn.disabled = false; }
-  else { append(`ERROR: ${body.error}`); pushBtn.disabled = false; }
+  if (r.ok) {
+    append((body.output || "").trim() || "(pushed)");
+    setBtnState(pushBtn, "done", "✓ 2. Pushed to ECR");
+    setBtnState(applyBtn, "idle", "3. Apply");
+  } else {
+    append(`ERROR: ${body.error}`);
+    setBtnState(pushBtn, "error", "2. Push to ECR (retry)");
+  }
 });
 
 applyBtn.addEventListener("click", async () => {
-  applyBtn.disabled = true;
+  setBtnState(applyBtn, "running", "3. Applying + polling ingress…");
   const yamlText = window.EDITOR.getValue();
-  // Parse the YAML client-side just enough to extract host + healthcheck path for the poll
   const hostMatch = yamlText.match(/host:\s*(\S+)/);
   const pathMatch = yamlText.match(/healthcheck:\s*\n\s*path:\s*(\S+)/);
   const host = hostMatch ? hostMatch[1] : window.HOST;
@@ -92,11 +117,12 @@ applyBtn.addEventListener("click", async () => {
   });
   const body = await r.json();
   if (r.ok) {
-    append(body.applied || "applied");
+    append((body.applied || "").trim() || "(applied)");
     append(`Ingress ready after ${body.ingress_ready_after_s.toFixed(1)}s`);
     liveLink.innerHTML = `Live at <a href="${body.url}" target="_blank">${body.url}</a>`;
+    setBtnState(applyBtn, "done", "✓ 3. Live");
   } else {
     append(`ERROR: ${body.error}`);
-    applyBtn.disabled = false;
+    setBtnState(applyBtn, "error", "3. Apply (retry)");
   }
 });

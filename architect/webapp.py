@@ -303,7 +303,7 @@ def deploy_page():
         host=host,
         healthcheck_path=healthcheck_path,
     )
-    return render_template("deploy.html", run_id=run_id, rendered_yaml=rendered, host=host)
+    return render_template("deploy.html", run_id=run_id, rendered_yaml=rendered, host=host, image=image)
 
 
 def _resolve_deploy_fields(run_id: str):
