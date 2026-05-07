@@ -200,11 +200,33 @@ def build_start():
     cfg = _bdcfg.load()
     ollama = _builder.OllamaClient(base_url=cfg.ollama_base_url, model=cfg.ollama_model)
 
+    # Persist build events to _status.json so a polling client can replay them.
+    # Socket.IO emits from background tasks proved unreliable behind nginx; polling
+    # the status file is robust through any HTTP proxy / async-mode combination.
+    status_file = os.path.join(workspace, "_status.json")
+    status_state = {"events": [], "complete": False, "fatal": None, "run_id": run_id}
+    with open(status_file, "w") as f:
+        import json as _json
+        _json.dump(status_state, f)
+
     def emit_event(event, payload):
-        # Broadcast (no `to=`) — rooms + background-task threading proved unreliable on EC2
-        # behind nginx. Tag every payload with run_id so the client can filter for its own run.
-        payload = {**payload, "run_id": run_id}
-        socketio.emit(event, payload)
+        merged = {**payload, "run_id": run_id}
+        status_state["events"].append({"event": event, "payload": merged})
+        if event == "build:complete":
+            status_state["complete"] = True
+        elif event == "build:fatal":
+            status_state["fatal"] = payload.get("error")
+        try:
+            with open(status_file, "w") as sf:
+                import json as _json
+                _json.dump(status_state, sf)
+        except OSError:
+            pass
+        # Best-effort socket.io broadcast for clients that have it working
+        try:
+            socketio.emit(event, merged)
+        except Exception:
+            pass
 
     def task():
         try:
@@ -219,6 +241,26 @@ def build_start():
 
     socketio.start_background_task(task)
     return jsonify({"run_id": run_id, "workspace": workspace})
+
+
+@app.get("/build/status")
+def build_status():
+    """Polling endpoint: returns the current event log + complete/fatal state for a run."""
+    run_id = request.args.get("run")
+    if not run_id:
+        return jsonify({"error": "Missing 'run' query param"}), 400
+    workspace = os.path.join(os.path.dirname(__file__), "workspaces", run_id)
+    status_file = os.path.join(workspace, "_status.json")
+    if not os.path.exists(status_file):
+        # Build hasn't started writing yet, or workspace doesn't exist
+        return jsonify({"events": [], "complete": False, "fatal": None, "run_id": run_id})
+    try:
+        import json as _json
+        with open(status_file) as f:
+            return jsonify(_json.load(f))
+    except (OSError, _json.JSONDecodeError):
+        # Race: status file mid-write; client should retry
+        return jsonify({"events": [], "complete": False, "fatal": None, "run_id": run_id, "_retry": True})
 
 
 def _workspace_path(run_id: str) -> str:

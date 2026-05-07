@@ -162,6 +162,80 @@ socket.on("build:fatal", (p) => {
   showStatus(`Build failed: ${p.error}`, "red");
 });
 
+// Apply an event to the UI (idempotent — calling twice is safe)
+function applyEvent(ev) {
+  const p = ev.payload || {};
+  switch (ev.event) {
+    case "build:start":
+      showStatus(`Build started — ${p.total_components} components in ${p.total_waves} waves`, "blue");
+      break;
+    case "build:wave:start":
+      (p.components || []).forEach(id => ensureCard(id, p.wave_index));
+      break;
+    case "build:component:start": {
+      const card = cards[p.component_id];
+      if (card) {
+        card.className = "card running";
+        card.querySelector(".status").textContent = "running…";
+      }
+      break;
+    }
+    case "build:component:done": {
+      const card = cards[p.component_id];
+      if (card) {
+        card.className = "card done";
+        card.querySelector(".status").textContent = "done";
+        card.querySelector(".duration").textContent = `${p.duration_ms}ms → ${p.file_path}`;
+      }
+      break;
+    }
+    case "build:component:error": {
+      const card = cards[p.component_id];
+      if (card) {
+        card.className = "card error";
+        card.querySelector(".status").textContent = "error";
+        card.querySelector(".duration").textContent = p.error;
+      }
+      break;
+    }
+    case "build:complete": {
+      showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
+      const link = document.createElement("a");
+      link.href = `${window.PFX || ""}/deploy?run=${runId}`;
+      link.textContent = "Continue to Deploy →";
+      link.style.cssText = "display:inline-block;margin-top:1rem;color:#60a5fa;font-weight:600;";
+      grid.appendChild(link);
+      break;
+    }
+    case "build:fatal":
+      showStatus(`Build failed: ${p.error}`, "red");
+      break;
+  }
+}
+
+let lastEventCount = 0;
+let pollHandle = null;
+
+async function pollStatus() {
+  if (!runId) return;
+  try {
+    const r = await fetch(`${window.PFX || ""}/build/status?run=${runId}`);
+    if (!r.ok) return;
+    const state = await r.json();
+    const events = state.events || [];
+    // Apply any events we haven't seen yet
+    for (let i = lastEventCount; i < events.length; i++) {
+      applyEvent(events[i]);
+    }
+    lastEventCount = events.length;
+    if (state.complete || state.fatal) {
+      if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+    }
+  } catch (e) {
+    // Ignore transient errors and try again next tick
+  }
+}
+
 startBtn.addEventListener("click", async () => {
   if (!uploadedPackage && !window.PACKAGE_PATH) {
     alert("Upload a build-package YAML or pass ?package=<path> in the URL before starting.");
@@ -184,7 +258,10 @@ startBtn.addEventListener("click", async () => {
     return;
   }
   runId = body.run_id;
-  // Join the room BEFORE the server's 1s grace period elapses
-  socket.emit("join", {room: `build:${runId}`});
-  showStatus(`Joined build:${runId} — waiting for first wave…`, "blue");
+  showStatus(`Started build ${runId} — polling for progress…`, "blue");
+  // Poll the status endpoint every 1s. Polling is the primary signal;
+  // socket.io is a best-effort fallback that may or may not work behind nginx.
+  lastEventCount = 0;
+  pollStatus();
+  pollHandle = setInterval(pollStatus, 1000);
 });
