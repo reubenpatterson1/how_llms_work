@@ -200,23 +200,22 @@ def build_start():
     cfg = _bdcfg.load()
     ollama = _builder.OllamaClient(base_url=cfg.ollama_base_url, model=cfg.ollama_model)
 
-    def emit_to_room(event, payload):
-        socketio.emit(event, payload, to=f"build:{run_id}")
+    def emit_event(event, payload):
+        # Broadcast (no `to=`) — rooms + background-task threading proved unreliable on EC2
+        # behind nginx. Tag every payload with run_id so the client can filter for its own run.
+        payload = {**payload, "run_id": run_id}
+        socketio.emit(event, payload)
 
     def task():
-        # Give the client ~1s to receive the run_id and join the build:<run_id> room
-        # before we start emitting events. Otherwise build:start fires into an empty
-        # room and the wave-grid UI shows nothing.
-        socketio.sleep(1.0)
         try:
             _builder.run_build(
                 package_path=package_path,
                 workspace=workspace,
                 ollama=ollama,
-                emit=emit_to_room,
+                emit=emit_event,
             )
         except Exception as e:
-            emit_to_room("build:fatal", {"error": str(e)})
+            emit_event("build:fatal", {"error": str(e)})
 
     socketio.start_background_task(task)
     return jsonify({"run_id": run_id, "workspace": workspace})

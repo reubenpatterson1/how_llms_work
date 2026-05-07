@@ -30,11 +30,18 @@ function ensureCard(componentId, waveIdx) {
   return el;
 }
 
+// Filter: only handle events for THIS run (server broadcasts; we ignore other runs)
+function isOurRun(p) {
+  return p && p.run_id && runId && p.run_id === runId;
+}
+
 socket.on("build:wave:start", (p) => {
+  if (!isOurRun(p)) return;
   p.components.forEach(id => ensureCard(id, p.wave_index));
 });
 
 socket.on("build:component:start", (p) => {
+  if (!isOurRun(p)) return;
   const card = cards[p.component_id];
   if (card) {
     card.className = "card running";
@@ -43,6 +50,7 @@ socket.on("build:component:start", (p) => {
 });
 
 socket.on("build:component:done", (p) => {
+  if (!isOurRun(p)) return;
   const card = cards[p.component_id];
   if (card) {
     card.className = "card done";
@@ -52,6 +60,7 @@ socket.on("build:component:done", (p) => {
 });
 
 socket.on("build:component:error", (p) => {
+  if (!isOurRun(p)) return;
   const card = cards[p.component_id];
   if (card) {
     card.className = "card error";
@@ -60,7 +69,13 @@ socket.on("build:component:error", (p) => {
   }
 });
 
+socket.on("build:wave:done", (p) => {
+  if (!isOurRun(p)) return;
+  // optional: show wave-completion progress
+});
+
 socket.on("build:complete", (p) => {
+  if (!isOurRun(p)) return;
   const link = document.createElement("a");
   link.href = `${window.PFX || ""}/deploy?run=${runId}`;
   link.textContent = "Continue to Deploy →";
@@ -69,6 +84,7 @@ socket.on("build:complete", (p) => {
 });
 
 socket.on("build:fatal", (p) => {
+  if (!isOurRun(p)) return;
   const err = document.createElement("p");
   err.textContent = `Build failed: ${p.error}`;
   err.style.color = "#ef4444";
@@ -132,14 +148,17 @@ function showStatus(text, color) {
 }
 
 socket.on("build:start", (p) => {
+  if (!isOurRun(p)) return;
   showStatus(`Build started — ${p.total_components} components in ${p.total_waves} waves`, "blue");
 });
 
 socket.on("build:complete", (p) => {
+  if (!isOurRun(p)) return;
   showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
 });
 
 socket.on("build:fatal", (p) => {
+  if (!isOurRun(p)) return;
   showStatus(`Build failed: ${p.error}`, "red");
 });
 
