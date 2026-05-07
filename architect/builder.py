@@ -50,17 +50,35 @@ def _slugify(name: str) -> str:
     return s[:40]  # K8s name limit is 63; leave headroom for run-suffix
 
 
+_OBJECTIVE_RE = re.compile(r"Objective:\s*(.+)", re.IGNORECASE)
+
+
+def _derive_name_from_purpose(purpose_lines: list[str]) -> str | None:
+    """Best-effort name derivation when metadata.name is absent.
+
+    Looks for an 'Objective:' line in the spec's purpose and extracts the first
+    few significant words. e.g. 'Objective: Ship a team task tracker for ...'
+    -> 'team-task-tracker'.
+    """
+    skip_words = {"a", "an", "the", "build", "ship", "create", "make", "for", "of", "to", "and", "or"}
+    for line in purpose_lines:
+        m = _OBJECTIVE_RE.search(str(line))
+        if not m:
+            continue
+        words = re.findall(r"[A-Za-z][A-Za-z0-9]*", m.group(1).lower())
+        kept = [w for w in words if w not in skip_words][:4]
+        if kept:
+            return "-".join(kept)
+    return None
+
+
 def parse_build_package(path: str) -> BuildPackage:
     with open(path, "r") as f:
         data = yaml.safe_load(f)
 
     metadata = data.get("metadata", {})
-    name = metadata.get("name")
-    if not name:
-        raise ValueError(
-            "build-package YAML is missing required field metadata.name "
-            "(spec slug used to name K8s resources, ECR tag, ingress host)"
-        )
+    spec = data.get("spec", {})
+    name = metadata.get("name") or _derive_name_from_purpose(spec.get("purpose", [])) or "app"
 
     dag = data.get("dag", {})
     waves_dict: dict[int, list[dict]] = {}
@@ -69,11 +87,11 @@ def parse_build_package(path: str) -> BuildPackage:
         waves_dict.setdefault(comp["wave"], []).append(comp_with_id)
 
     waves = [waves_dict[w] for w in sorted(waves_dict.keys())]
-    language = _detect_language(data.get("spec", {}).get("tech_stack", []))
+    language = _detect_language(spec.get("tech_stack", []))
 
     return BuildPackage(
         metadata=metadata,
-        spec=data.get("spec", {}),
+        spec=spec,
         waves=waves,
         language=language,
         spec_slug=_slugify(name),

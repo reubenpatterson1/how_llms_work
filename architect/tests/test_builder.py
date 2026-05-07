@@ -82,10 +82,44 @@ def test_parse_reads_spec_slug_from_metadata(tmp_path):
     assert result.spec_slug == "hello-world"
 
 
-def test_parse_raises_when_metadata_name_missing(tmp_path):
-    import pytest
-    bad = HELLO_WORLD_PACKAGE.replace("name: hello-world\n  ", "")
-    path = tmp_path / "bad.yaml"
-    path.write_text(bad)
-    with pytest.raises(ValueError, match="metadata.name"):
-        parse_build_package(str(path))
+def test_parse_derives_name_from_objective_when_metadata_name_missing(tmp_path):
+    """No metadata.name -> derive from spec.purpose 'Objective:' line."""
+    import textwrap
+    pkg = textwrap.dedent('''
+metadata:
+  total_components: 1
+  total_waves: 1
+  max_parallelism: 1
+spec:
+  tech_stack:
+    - "Language: JavaScript"
+  purpose:
+    - "Objective: Ship a team task tracker for engineering teams"
+dag:
+  c1: {name: c1, type: handler, wave: 0, complexity: low, constraints: [], prompt: "p"}
+''')
+    path = tmp_path / "no-name.yaml"
+    path.write_text(pkg)
+    result = parse_build_package(str(path))
+    # "Ship" is a stop word, so the first 4 kept words are: team, task, tracker, engineering
+    assert result.spec_slug == "team-task-tracker-engineering"
+
+
+def test_parse_defaults_to_app_slug_when_no_name_or_objective(tmp_path):
+    """No metadata.name and no Objective in purpose -> default 'app'."""
+    import textwrap
+    pkg = textwrap.dedent('''
+metadata:
+  total_components: 1
+  total_waves: 1
+  max_parallelism: 1
+spec:
+  tech_stack:
+    - "Language: Python"
+dag:
+  c1: {name: c1, type: handler, wave: 0, complexity: low, constraints: [], prompt: "p"}
+''')
+    path = tmp_path / "barebones.yaml"
+    path.write_text(pkg)
+    result = parse_build_package(str(path))
+    assert result.spec_slug == "app"
