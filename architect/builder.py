@@ -219,6 +219,50 @@ CMD ["python", "src/app.py"]
 """
 
 
+_APP_SERVER_SHIM_JS = '''// Auto-generated entry point. Built by architect.builder.assemble_project
+// because the build-package's components didn't include an `app-server`.
+// Mounts any default-exported Express routers from sibling files.
+import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
+const PORT = process.env.PORT || __PORT__;
+
+// Always-on healthcheck — guarantees the K8s liveness probe passes
+// even if no generated handler provided one.
+app.get('/healthz', (req, res) => res.status(200).json({status: 'ok'}));
+
+// Auto-mount any default-exported routers from sibling files.
+// Routers are functions; models/configs/services that aren't routers get skipped.
+const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && f !== 'app-server.js');
+for (const f of files) {
+  try {
+    const mod = await import('./' + f);
+    if (mod.default && typeof mod.default === 'function') {
+      app.use('/', mod.default);
+      console.log('mounted /', f);
+    }
+  } catch (e) {
+    console.warn('skip', f, e.message);
+  }
+}
+
+// Fallback root response if no handler claimed it
+app.get('/', (req, res) => res.type('html').send(
+  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Hello World</title></head>' +
+  '<body style="font-family:sans-serif;text-align:center;margin-top:4rem;background:#0f172a;color:#e2e8f0;">' +
+  '<h1>Hello, World!</h1><div id="clock"></div>' +
+  '<script>function tick(){document.getElementById("clock").textContent=new Date().toLocaleTimeString()};tick();setInterval(tick,1000)</script>' +
+  '</body></html>'
+));
+
+app.listen(PORT, () => console.log(`app-server listening on :${PORT}`));
+'''
+
+
 def assemble_project(workspace: str, language: str, port: int, packages: list[str]) -> None:
     if language == "javascript":
         with open(os.path.join(workspace, "Dockerfile"), "w") as f:
@@ -233,6 +277,14 @@ def assemble_project(workspace: str, language: str, port: int, packages: list[st
         }
         with open(os.path.join(workspace, "package.json"), "w") as f:
             json.dump(pkg_json, f, indent=2)
+        # Write app-server.js shim ONLY if the build agent didn't already generate one.
+        # Decompose-output build-packages typically don't include an `app-server` component,
+        # so the Dockerfile's `node src/app-server.js` CMD has nothing to run without this.
+        os.makedirs(os.path.join(workspace, "src"), exist_ok=True)
+        shim_path = os.path.join(workspace, "src", "app-server.js")
+        if not os.path.exists(shim_path):
+            with open(shim_path, "w") as f:
+                f.write(_APP_SERVER_SHIM_JS.replace("__PORT__", str(port)))
     elif language == "python":
         with open(os.path.join(workspace, "Dockerfile"), "w") as f:
             f.write(_DOCKERFILE_PY.format(port=port))
@@ -254,6 +306,14 @@ _DEFAULT_PACKAGES_BY_LANG = {
 }
 
 
+def _safe_filename(component_id: str) -> str:
+    """Slugify a component_id for use as a filename. Decompose may emit names like
+    'city entity with name-model' that don't work as ESM import paths.
+    """
+    s = re.sub(r"[^a-zA-Z0-9_-]+", "-", component_id).strip("-").lower()
+    return s or "component"
+
+
 def _build_component(
     component: dict,
     package: BuildPackage,
@@ -264,7 +324,7 @@ def _build_component(
 ) -> dict:
     component_id = component["id"]
     ext = _LANG_TO_EXT[package.language]
-    target_relpath = f"src/{component_id}.{ext}"
+    target_relpath = f"src/{_safe_filename(component_id)}.{ext}"
     target_path = os.path.join(workspace, target_relpath)
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
