@@ -166,9 +166,8 @@ def decompose_page():
 
 @app.get("/build")
 def build_page():
-    package = request.args.get("package")
-    if not package:
-        return ("Missing required query param: package", 400)
+    # package query param is optional now — user can also upload via the page UI
+    package = request.args.get("package", "")
     return render_template("build.html", package=package)
 
 
@@ -176,8 +175,10 @@ def build_page():
 def build_start():
     body = request.get_json(silent=True) or {}
     package = body.get("package")
-    if not package:
-        return jsonify({"error": "Missing 'package'"}), 400
+    package_text = body.get("package_text")
+    if not package and not package_text:
+        return jsonify({"error": "Missing 'package' (path) or 'package_text' (content)"}), 400
+
     run_id = uuid.uuid4().hex[:12]
     workspace = os.path.join(
         os.path.dirname(__file__), "workspaces", f"{run_id}"
@@ -186,8 +187,15 @@ def build_start():
 
     # Persist the package YAML into the workspace so /deploy can re-read spec_slug
     # for resource naming without needing the user to pass the package path again.
-    import shutil as _shutil
-    _shutil.copyfile(package, os.path.join(workspace, "_package.yaml"))
+    workspace_pkg = os.path.join(workspace, "_package.yaml")
+    if package_text:
+        with open(workspace_pkg, "w") as f:
+            f.write(package_text)
+        package_path = workspace_pkg
+    else:
+        import shutil as _shutil
+        _shutil.copyfile(package, workspace_pkg)
+        package_path = package
 
     cfg = _bdcfg.load()
     ollama = _builder.OllamaClient(base_url=cfg.ollama_base_url, model=cfg.ollama_model)
@@ -198,7 +206,7 @@ def build_start():
     def task():
         try:
             _builder.run_build(
-                package_path=package,
+                package_path=package_path,
                 workspace=workspace,
                 ollama=ollama,
                 emit=emit_to_room,
@@ -251,6 +259,46 @@ def deploy_page():
         healthcheck_path=healthcheck_path,
     )
     return render_template("deploy.html", run_id=run_id, rendered_yaml=rendered, host=host)
+
+
+def _resolve_deploy_fields(run_id: str):
+    """Shared derivation of resource_name, image, host, port, healthcheck_path
+    used by both GET /deploy and POST /deploy/render."""
+    workspace = os.path.join(os.path.dirname(__file__), "workspaces", run_id)
+    if not os.path.isdir(workspace):
+        return None, f"Workspace not found: {run_id}"
+    pkg_path = os.path.join(workspace, "_package.yaml")
+    if not os.path.exists(pkg_path):
+        return None, f"Workspace {run_id} missing _package.yaml — re-run build"
+    package = _builder.parse_build_package(pkg_path)
+    run_short = run_id[:6]
+    resource_name = f"{package.spec_slug}-{run_short}"
+    cfg = _bdcfg.load()
+    return {
+        "name": resource_name,
+        "namespace": cfg.default_namespace,
+        "image": f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{package.spec_slug}:{run_short}",
+        "port": _deployer.derive_port(workspace) or 3000,
+        "host": f"{resource_name}-{cfg.default_namespace}.tools.fubotv.net",
+        "healthcheck_path": _deployer.derive_healthcheck_path(workspace) or "/",
+    }, None
+
+
+@app.post("/deploy/render")
+def deploy_render():
+    body = request.get_json(silent=True) or {}
+    run_id = body.get("run_id")
+    template_text = body.get("template_text")
+    if not run_id or not template_text:
+        return jsonify({"error": "Missing 'run_id' or 'template_text'"}), 400
+    fields, err = _resolve_deploy_fields(run_id)
+    if err:
+        return jsonify({"error": err}), 404
+    try:
+        rendered = _deployer.render_yaml_text(template=template_text, **fields)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"yaml": rendered, "host": fields["host"]})
 
 
 @app.post("/deploy/image-build")
@@ -525,6 +573,10 @@ def api_set_phase():
     state["engine"].set_critical_channels(state["judge"].critical_channels)
     state["engine"].set_quality_weight(PHASE_QUALITY_WEIGHT.get(phase, 0.0))
 
+    # Auto-resolve sub-dimensions that are overkill for PoC
+    if phase == ProjectPhase.POC:
+        state["engine"].auto_resolve_poc_defaults()
+
     phase_weights = PHASE_CHANNEL_WEIGHTS.get(phase, {})
 
     return jsonify({
@@ -679,7 +731,7 @@ def api_settings():
                 "label": "Ollama (Local)",
                 "description": "Run models locally via Ollama. Free, private, no API key needed.",
                 "requires_key": False,
-                "models": ollama_models or ["llama3.2", "mistral", "codellama"],
+                "models": ollama_models or ["gemma3:12b", "llama3.2", "mistral", "codellama"],
             },
             {
                 "type": "openai",

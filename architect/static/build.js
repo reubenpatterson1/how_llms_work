@@ -75,14 +75,68 @@ socket.on("build:fatal", (p) => {
   grid.appendChild(err);
 });
 
+// Upload UI: file picker + paste textarea (mirrors decompose page)
+let uploadedPackage = "";
+const fileInput = document.getElementById("package-file");
+const textarea = document.getElementById("package-textarea");
+const clearBtn = document.getElementById("clear-upload");
+const uploadStatus = document.getElementById("upload-status");
+const uploadMeta = document.getElementById("upload-meta");
+
+function setUploaded(text, source) {
+  uploadedPackage = (text || "").trim();
+  if (uploadStatus) {
+    uploadStatus.textContent = uploadedPackage ? "using upload" : (window.PACKAGE_PATH ? "from query" : "no source");
+    uploadStatus.style.color = uploadedPackage ? "#fbbf24" : "";
+  }
+  if (uploadMeta) {
+    uploadMeta.textContent = uploadedPackage
+      ? `Loaded ${(uploadedPackage.length / 1024).toFixed(1)}k chars${source ? " from " + source : ""} — Start Build will use the upload.`
+      : (window.PACKAGE_PATH ? `Default: ${window.PACKAGE_PATH}` : "");
+  }
+  if (clearBtn) clearBtn.disabled = !uploadedPackage;
+}
+
+if (fileInput) {
+  fileInput.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    if (textarea) textarea.value = text;
+    setUploaded(text, f.name);
+  });
+}
+if (textarea) {
+  textarea.addEventListener("input", () => setUploaded(textarea.value, "paste"));
+}
+if (clearBtn) {
+  clearBtn.addEventListener("click", () => {
+    if (textarea) textarea.value = "";
+    if (fileInput) fileInput.value = "";
+    setUploaded("", null);
+  });
+}
+
 startBtn.addEventListener("click", async () => {
+  if (!uploadedPackage && !window.PACKAGE_PATH) {
+    alert("Upload a build-package YAML or pass ?package=<path> in the URL before starting.");
+    return;
+  }
   startBtn.disabled = true;
+  const payload = uploadedPackage
+    ? { package_text: uploadedPackage }
+    : { package: window.PACKAGE_PATH };
   const r = await fetch(`${window.PFX || ""}/build/start`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({package: window.PACKAGE_PATH}),
+    body: JSON.stringify(payload),
   });
   const body = await r.json();
+  if (!r.ok) {
+    alert(`Build start failed: ${body.error}`);
+    startBtn.disabled = false;
+    return;
+  }
   runId = body.run_id;
   socket.emit("join", {room: `build:${runId}`});
 });

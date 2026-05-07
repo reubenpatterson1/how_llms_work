@@ -8,8 +8,8 @@ import time
 import requests
 
 
-def render_yaml(
-    template_path: str,
+def render_yaml_text(
+    template: str,
     name: str,
     namespace: str,
     image: str,
@@ -22,8 +22,6 @@ def render_yaml(
             "healthcheck_path is required — must be derived from the generated app, "
             "not defaulted (see spec §6 step 1)"
         )
-    with open(template_path, "r") as f:
-        template = f.read()
     return (
         template
         .replace("{{name}}", name)
@@ -32,6 +30,28 @@ def render_yaml(
         .replace("{{port}}", str(port))
         .replace("{{host}}", host)
         .replace("{{healthcheck_path}}", healthcheck_path)
+    )
+
+
+def render_yaml(
+    template_path: str,
+    name: str,
+    namespace: str,
+    image: str,
+    port: int,
+    host: str,
+    healthcheck_path: str,
+) -> str:
+    with open(template_path, "r") as f:
+        template = f.read()
+    return render_yaml_text(
+        template=template,
+        name=name,
+        namespace=namespace,
+        image=image,
+        port=port,
+        host=host,
+        healthcheck_path=healthcheck_path,
     )
 
 

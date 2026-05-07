@@ -9,6 +9,48 @@ function append(line) {
   log.scrollTop = log.scrollHeight;
 }
 
+// Custom-template upload: re-render auto-fields onto the user's template, then load into Monaco
+const templateFile = document.getElementById("template-file");
+const templateStatus = document.getElementById("template-status");
+const templateMeta = document.getElementById("template-meta");
+const resetTemplateBtn = document.getElementById("reset-template");
+
+if (templateFile) {
+  templateFile.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    append(`> render custom template: ${f.name} (${(text.length/1024).toFixed(1)}k chars)`);
+    const r = await fetch(`${window.PFX || ""}/deploy/render`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({run_id: window.RUN_ID, template_text: text}),
+    });
+    const body = await r.json();
+    if (!r.ok) {
+      append(`ERROR: ${body.error}`);
+      return;
+    }
+    if (window.EDITOR) window.EDITOR.setValue(body.yaml);
+    if (templateStatus) {
+      templateStatus.textContent = "custom";
+      templateStatus.style.color = "#fbbf24";
+    }
+    if (templateMeta) templateMeta.textContent = `Loaded ${f.name} — auto-fields rendered for this run.`;
+  });
+}
+if (resetTemplateBtn) {
+  resetTemplateBtn.addEventListener("click", () => {
+    if (templateFile) templateFile.value = "";
+    if (window.EDITOR && window.DEFAULT_RENDERED_YAML) window.EDITOR.setValue(window.DEFAULT_RENDERED_YAML);
+    if (templateStatus) {
+      templateStatus.textContent = "default";
+      templateStatus.style.color = "";
+    }
+    if (templateMeta) templateMeta.textContent = "Using built-in fubo Application template";
+  });
+}
+
 let imageTag = `architect-${window.RUN_ID}:${Date.now()}`;
 
 buildBtn.addEventListener("click", async () => {

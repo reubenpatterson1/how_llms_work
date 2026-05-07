@@ -15,8 +15,52 @@ def test_get_build_renders_with_package_param(client):
     assert b"build" in r.data.lower()
 
 
-def test_get_build_without_package_returns_400(client):
+def test_get_build_without_package_renders(client):
+    # Build page now supports upload UI — no default package is OK
     r = client.get("/build")
+    assert r.status_code == 200
+    assert b"build" in r.data.lower()
+
+
+def test_post_build_start_accepts_package_text(client, tmp_path, monkeypatch):
+    pkg_text = "metadata: {name: hi, total_components: 0, total_waves: 0, max_parallelism: 1}\nspec: {tech_stack: [\"Language: JavaScript\"]}\ndag: {}\n"
+    with patch("architect.webapp.socketio.start_background_task") as bt:
+        r = client.post("/build/start", json={"package_text": pkg_text})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "run_id" in body
+    bt.assert_called_once()
+
+
+def test_post_build_start_rejects_empty_payload(client):
+    r = client.post("/build/start", json={})
+    assert r.status_code == 400
+
+
+def test_post_deploy_render_returns_yaml(client, tmp_path, monkeypatch):
+    """User-uploaded template gets auto-fields filled and returned."""
+    fake_fields = {
+        "name": "hello-world-abc123",
+        "namespace": "training",
+        "image": "650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/hello-world:abc123",
+        "port": 3000,
+        "host": "hello-world-abc123-training.tools.fubotv.net",
+        "healthcheck_path": "/healthz",
+    }
+    monkeypatch.setattr("architect.webapp._resolve_deploy_fields", lambda rid: (fake_fields, None))
+    custom_template = "name: {{name}}\nimage: {{image}}\nport: {{port}}\nhost: {{host}}\nhc: {{healthcheck_path}}\n"
+    r = client.post("/deploy/render", json={"run_id": "abc123def", "template_text": custom_template})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert "name: hello-world-abc123" in body["yaml"]
+    assert "port: 3000" in body["yaml"]
+    assert body["host"] == fake_fields["host"]
+
+
+def test_post_deploy_render_rejects_missing_fields(client):
+    r = client.post("/deploy/render", json={})
+    assert r.status_code == 400
+    r = client.post("/deploy/render", json={"run_id": "abc"})
     assert r.status_code == 400
 
 

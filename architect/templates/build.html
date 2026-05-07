@@ -1,20 +1,59 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Build — Architect</title>
-  <link rel="stylesheet" href="{{ pfx }}/static/architect.css">
-</head>
-<body>
-  <h1>Build</h1>
-  <p>Package: {{ package }}</p>
-  <div id="wave-grid"></div>
-  <button id="start-build">Start Build</button>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script>
-    window.PACKAGE_PATH = {{ package | tojson }};
-    window.PFX = {{ pfx | tojson }};
-  </script>
-  <script src="{{ pfx }}/static/build.js"></script>
-</body>
-</html>
+{% extends "base.html" %}
+{% set active_page = "build" %}
+{% block title %}Build — Architecture Agent{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 1200px; margin: 0 auto;">
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px;">
+    <div>
+      <h1 style="font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px;">
+        Build Agent
+      </h1>
+      <p style="color: var(--text-dim); font-size: 14px;">
+        Reads the build-package YAML, runs each component prompt through your local LLM wave-by-wave, and assembles a deployable project.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <button class="btn btn-primary" id="start-build">Start Build</button>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 360px; gap: 24px;">
+    <!-- Left: wave-grid -->
+    <div>
+      <div id="wave-grid"></div>
+    </div>
+
+    <!-- Right: Upload card -->
+    <div>
+      <div class="card" id="upload-card" style="padding: 16px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="font-size:14px; font-weight:600;">⬆ Upload Build Package</span>
+          <span id="upload-status" style="margin-left:auto; font-size:10px; font-family:'IBM Plex Mono',monospace; color: var(--text-dim); padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border);">{{ "from query" if package else "no source" }}</span>
+        </div>
+        <p style="font-size:11px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.5;">
+          Have a <code>build-package.yaml</code> from a prior decompose run? Upload or paste it here.
+        </p>
+        <input type="file" id="package-file" accept=".yaml,.yml,.txt" style="display:none;">
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <button class="btn btn-ghost" type="button" onclick="document.getElementById('package-file').click()"
+            style="flex:1; font-size: 12px; padding: 6px 10px;">Choose .yaml file</button>
+          <button class="btn btn-ghost" type="button" id="clear-upload" disabled
+            style="font-size: 12px; padding: 6px 10px;">Clear</button>
+        </div>
+        <textarea id="package-textarea"
+          placeholder="…or paste your build-package YAML here"
+          style="width:100%; height:140px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: var(--surface-deep); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; resize: vertical;"></textarea>
+        <div id="upload-meta" style="font-size: 10px; color: var(--text-dim); margin-top: 6px; min-height: 14px;">{% if package %}Default: {{ package }}{% endif %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  window.PACKAGE_PATH = {{ (package or "") | tojson }};
+  window.PFX = {{ pfx | tojson }};
+</script>
+<script src="{{ pfx }}/static/build.js"></script>
+{% endblock %}

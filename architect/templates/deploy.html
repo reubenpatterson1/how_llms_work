@@ -1,36 +1,77 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Deploy — Architect</title>
-  <link rel="stylesheet" href="{{ pfx }}/static/architect.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/editor/editor.main.css">
-</head>
-<body>
-  <h1>Deploy</h1>
-  <p>Run: {{ run_id }}</p>
-  <div id="editor" style="height:60vh;border:1px solid #334155;"></div>
-  <div style="margin-top:1rem;display:flex;gap:.5rem;">
-    <button id="image-build">1. Build Image</button>
-    <button id="image-push" disabled>2. Push to ECR</button>
-    <button id="apply" disabled>3. Apply</button>
-  </div>
-  <pre id="log" style="background:#020617;padding:1rem;margin-top:1rem;max-height:30vh;overflow:auto;"></pre>
-  <p id="live-link" style="margin-top:1rem;font-weight:600;"></p>
+{% extends "base.html" %}
+{% set active_page = "deploy" %}
+{% block title %}Deploy — Architecture Agent{% endblock %}
 
-  <script>window.RUN_ID = {{ run_id | tojson }}; window.HOST = {{ host | tojson }}; window.PFX = {{ pfx | tojson }};</script>
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>
-  <script>
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs' }});
-    require(['vs/editor/editor.main'], function() {
-      window.EDITOR = monaco.editor.create(document.getElementById('editor'), {
-        value: {{ rendered_yaml | tojson }},
-        language: 'yaml',
-        theme: 'vs-dark',
-        minimap: { enabled: false },
-      });
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/editor/editor.main.css">
+{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 1400px; margin: 0 auto;">
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px;">
+    <div>
+      <h1 style="font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px;">
+        Deploy Agent
+      </h1>
+      <p style="color: var(--text-dim); font-size: 14px;">
+        Renders a customizable deploy YAML, builds and pushes the image to ECR, and applies the manifest to the cluster. Run: <code>{{ run_id }}</code>
+      </p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 360px; gap: 24px;">
+    <!-- Left: Monaco YAML editor + action bar -->
+    <div>
+      <div id="editor" style="height: 60vh; border: 1px solid var(--border); border-radius: 8px;"></div>
+      <div style="margin-top: 1rem; display: flex; gap: .5rem;">
+        <button class="btn btn-primary" id="image-build">1. Build Image</button>
+        <button class="btn btn-ghost" id="image-push" disabled>2. Push to ECR</button>
+        <button class="btn btn-ghost" id="apply" disabled>3. Apply</button>
+      </div>
+      <pre id="log" style="background: var(--surface-deep); padding: 1rem; margin-top: 1rem; max-height: 30vh; overflow: auto; border: 1px solid var(--border); border-radius: 6px; font-size: 11px;"></pre>
+      <p id="live-link" style="margin-top: 1rem; font-weight: 600;"></p>
+    </div>
+
+    <!-- Right: Custom template upload card -->
+    <div>
+      <div class="card" style="padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <span style="font-size: 14px; font-weight: 600;">⬆ Custom Deploy Template</span>
+          <span id="template-status" style="margin-left: auto; font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--text-dim); padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border);">default</span>
+        </div>
+        <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.5;">
+          Upload your own template (with <code>{{ '{{name}}' }}</code>, <code>{{ '{{image}}' }}</code>, etc. placeholders). Auto-derived fields will be filled in for this run, then loaded into the editor.
+        </p>
+        <input type="file" id="template-file" accept=".yaml,.yml" style="display:none;">
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <button class="btn btn-ghost" type="button" onclick="document.getElementById('template-file').click()"
+            style="flex: 1; font-size: 12px; padding: 6px 10px;">Choose .yaml file</button>
+          <button class="btn btn-ghost" type="button" id="reset-template"
+            style="font-size: 12px; padding: 6px 10px;">Reset</button>
+        </div>
+        <div id="template-meta" style="font-size: 10px; color: var(--text-dim); margin-top: 6px; min-height: 14px;">Using built-in fubo Application template</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.RUN_ID = {{ run_id | tojson }};
+  window.HOST = {{ host | tojson }};
+  window.PFX = {{ pfx | tojson }};
+  window.DEFAULT_RENDERED_YAML = {{ rendered_yaml | tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>
+<script>
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs' }});
+  require(['vs/editor/editor.main'], function() {
+    window.EDITOR = monaco.editor.create(document.getElementById('editor'), {
+      value: window.DEFAULT_RENDERED_YAML,
+      language: 'yaml',
+      theme: 'vs-dark',
+      minimap: { enabled: false },
     });
-  </script>
-  <script src="{{ pfx }}/static/deploy.js"></script>
-</body>
-</html>
+  });
+</script>
+<script src="{{ pfx }}/static/deploy.js"></script>
+{% endblock %}
