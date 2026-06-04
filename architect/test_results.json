@@ -1,5 +1,6 @@
 {
   "iterations": 5,
+  "using_real_llm": false,
   "vague": {
     "metrics": {
       "hallucination_surface": 0.3749,
@@ -4088,7 +4089,9 @@
   },
   "channel_resolution_over_time": [
     {
-      "density_score": 0.069,
+      "density_score": 0.062,
+      "constraint_quality": 0.52,
+      "coverage": "5/43",
       "channels": {
         "purpose": {
           "id": "purpose",
@@ -4096,7 +4099,7 @@
           "description": "Application objectives, user stories, success criteria",
           "resolution": 0.525,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
             "Success: measurable metrics (KPI)",
             "Scope: real-time features"
@@ -4107,7 +4110,7 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
@@ -4140,14 +4143,18 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.0,
-          "constraints": [],
+          "resolution": 0.1,
+          "constraints": [
+            "Entity: users/accounts"
+          ],
           "sub_dimensions": {
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.5,
+              "constraints": [
+                "Entity: users/accounts"
+              ]
             },
             "relationships": {
               "name": "relationships",
@@ -4179,10 +4186,8 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.16,
-          "constraints": [
-            "Realtime: WebSocket (ws)"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "endpoints": {
               "name": "endpoints",
@@ -4211,10 +4216,8 @@
             "realtime": {
               "name": "realtime",
               "description": "WebSocket, SSE, or polling requirements",
-              "resolution": 0.8,
-              "constraints": [
-                "Realtime: WebSocket (ws)"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             }
           }
         },
@@ -4458,17 +4461,19 @@
       }
     },
     {
-      "density_score": 0.122,
+      "density_score": 0.119,
+      "constraint_quality": 0.6,
+      "coverage": "9/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -4479,16 +4484,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -4514,9 +4519,12 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -4524,13 +4532,16 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -4538,8 +4549,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -4563,10 +4576,8 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.16,
-          "constraints": [
-            "Realtime: WebSocket (ws)"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "endpoints": {
               "name": "endpoints",
@@ -4595,10 +4606,8 @@
             "realtime": {
               "name": "realtime",
               "description": "WebSocket, SSE, or polling requirements",
-              "resolution": 0.8,
-              "constraints": [
-                "Realtime: WebSocket (ws)"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             }
           }
         },
@@ -4645,10 +4654,8 @@
           "id": "auth",
           "name": "Auth",
           "description": "Authentication method, authorization model, session management",
-          "resolution": 0.15,
-          "constraints": [
-            "Authorization: role-based"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "method": {
               "name": "method",
@@ -4659,10 +4666,8 @@
             "authorization": {
               "name": "authorization",
               "description": "Authorization model (RBAC, ABAC, ACL)",
-              "resolution": 0.6,
-              "constraints": [
-                "Authorization: role-based"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             },
             "session": {
               "name": "session",
@@ -4846,17 +4851,19 @@
       }
     },
     {
-      "density_score": 0.194,
+      "density_score": 0.209,
+      "constraint_quality": 0.707,
+      "coverage": "14/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -4867,16 +4874,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -4902,9 +4909,12 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -4912,13 +4922,16 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -4926,8 +4939,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -4951,10 +4966,8 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.16,
-          "constraints": [
-            "Realtime: WebSocket (ws)"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "endpoints": {
               "name": "endpoints",
@@ -4983,10 +4996,8 @@
             "realtime": {
               "name": "realtime",
               "description": "WebSocket, SSE, or polling requirements",
-              "resolution": 0.8,
-              "constraints": [
-                "Realtime: WebSocket (ws)"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             }
           }
         },
@@ -4994,12 +5005,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -5037,8 +5049,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -5046,10 +5060,8 @@
           "id": "auth",
           "name": "Auth",
           "description": "Authentication method, authorization model, session management",
-          "resolution": 0.15,
-          "constraints": [
-            "Authorization: role-based"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "method": {
               "name": "method",
@@ -5060,10 +5072,8 @@
             "authorization": {
               "name": "authorization",
               "description": "Authorization model (RBAC, ABAC, ACL)",
-              "resolution": 0.6,
-              "constraints": [
-                "Authorization: role-based"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             },
             "session": {
               "name": "session",
@@ -5247,17 +5257,19 @@
       }
     },
     {
-      "density_score": 0.233,
+      "density_score": 0.278,
+      "constraint_quality": 0.695,
+      "coverage": "19/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -5268,16 +5280,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -5303,9 +5315,12 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -5313,13 +5328,16 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -5327,8 +5345,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -5352,11 +5372,11 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
             "Realtime: WebSocket"
           ],
           "sub_dimensions": {
@@ -5377,8 +5397,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -5393,7 +5415,6 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
                 "Realtime: WebSocket"
               ]
             }
@@ -5403,12 +5424,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -5446,8 +5468,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -5455,10 +5479,8 @@
           "id": "auth",
           "name": "Auth",
           "description": "Authentication method, authorization model, session management",
-          "resolution": 0.15,
-          "constraints": [
-            "Authorization: role-based"
-          ],
+          "resolution": 0.0,
+          "constraints": [],
           "sub_dimensions": {
             "method": {
               "name": "method",
@@ -5469,10 +5491,8 @@
             "authorization": {
               "name": "authorization",
               "description": "Authorization model (RBAC, ABAC, ACL)",
-              "resolution": 0.6,
-              "constraints": [
-                "Authorization: role-based"
-              ]
+              "resolution": 0.0,
+              "constraints": []
             },
             "session": {
               "name": "session",
@@ -5660,17 +5680,19 @@
       }
     },
     {
-      "density_score": 0.297,
+      "density_score": 0.358,
+      "constraint_quality": 0.713,
+      "coverage": "23/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -5681,16 +5703,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -5716,9 +5738,13 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -5726,13 +5752,17 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -5740,8 +5770,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -5765,11 +5797,11 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
             "Realtime: WebSocket"
           ],
           "sub_dimensions": {
@@ -5790,8 +5822,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -5806,7 +5840,6 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
                 "Realtime: WebSocket"
               ]
             }
@@ -5816,12 +5849,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -5859,8 +5893,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -5871,7 +5907,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -5890,7 +5925,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -6084,17 +6118,19 @@
       }
     },
     {
-      "density_score": 0.355,
+      "density_score": 0.436,
+      "constraint_quality": 0.722,
+      "coverage": "27/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -6105,16 +6141,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -6140,9 +6176,13 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -6150,13 +6190,17 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -6164,8 +6208,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -6189,13 +6235,12 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
-            "Realtime: WebSocket",
-            "Realtime: WebSocket (WS)"
+            "Realtime: WebSocket"
           ],
           "sub_dimensions": {
             "endpoints": {
@@ -6215,8 +6260,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -6231,9 +6278,7 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
-                "Realtime: WebSocket",
-                "Realtime: WebSocket (WS)"
+                "Realtime: WebSocket"
               ]
             }
           }
@@ -6242,12 +6287,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -6285,8 +6331,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -6297,7 +6345,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -6316,7 +6363,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -6342,10 +6388,11 @@
           "id": "deployment",
           "name": "Deployment",
           "description": "Infrastructure, CI/CD, environments, scaling",
-          "resolution": 0.575,
+          "resolution": 0.775,
           "constraints": [
             "Infrastructure: Kubernetes",
             "CI/CD: GitHub Actions",
+            "Environments: multiple tiers defined (dev, staging, prod)",
             "Scaling: auto-scaling"
           ],
           "sub_dimensions": {
@@ -6368,8 +6415,10 @@
             "environments": {
               "name": "environments",
               "description": "Environment tiers (dev, staging, prod)",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.8,
+              "constraints": [
+                "Environments: multiple tiers defined (dev, staging, prod)"
+              ]
             },
             "scaling": {
               "name": "scaling",
@@ -6520,17 +6569,19 @@
       }
     },
     {
-      "density_score": 0.445,
+      "density_score": 0.525,
+      "constraint_quality": 0.722,
+      "coverage": "32/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -6541,16 +6592,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -6576,9 +6627,13 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -6586,13 +6641,17 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -6600,8 +6659,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -6625,13 +6686,12 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
-            "Realtime: WebSocket",
-            "Realtime: WebSocket (WS)"
+            "Realtime: WebSocket"
           ],
           "sub_dimensions": {
             "endpoints": {
@@ -6651,8 +6711,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -6667,9 +6729,7 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
-                "Realtime: WebSocket",
-                "Realtime: WebSocket (WS)"
+                "Realtime: WebSocket"
               ]
             }
           }
@@ -6678,12 +6738,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -6721,8 +6782,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -6733,7 +6796,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -6752,7 +6814,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -6778,10 +6839,11 @@
           "id": "deployment",
           "name": "Deployment",
           "description": "Infrastructure, CI/CD, environments, scaling",
-          "resolution": 0.575,
+          "resolution": 0.775,
           "constraints": [
             "Infrastructure: Kubernetes",
             "CI/CD: GitHub Actions",
+            "Environments: multiple tiers defined (dev, staging, prod)",
             "Scaling: auto-scaling"
           ],
           "sub_dimensions": {
@@ -6804,8 +6866,10 @@
             "environments": {
               "name": "environments",
               "description": "Environment tiers (dev, staging, prod)",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.8,
+              "constraints": [
+                "Environments: multiple tiers defined (dev, staging, prod)"
+              ]
             },
             "scaling": {
               "name": "scaling",
@@ -6973,17 +7037,19 @@
       }
     },
     {
-      "density_score": 0.497,
+      "density_score": 0.578,
+      "constraint_quality": 0.72,
+      "coverage": "35/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -6994,16 +7060,16 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -7029,9 +7095,13 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -7039,13 +7109,17 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -7053,8 +7127,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -7078,14 +7154,13 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
             "API style: REST",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
-            "Realtime: WebSocket",
-            "Realtime: WebSocket (WS)"
+            "Realtime: WebSocket"
           ],
           "sub_dimensions": {
             "endpoints": {
@@ -7106,8 +7181,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -7122,9 +7199,7 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
-                "Realtime: WebSocket",
-                "Realtime: WebSocket (WS)"
+                "Realtime: WebSocket"
               ]
             }
           }
@@ -7133,12 +7208,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -7176,8 +7252,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -7188,7 +7266,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -7207,7 +7284,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -7233,10 +7309,11 @@
           "id": "deployment",
           "name": "Deployment",
           "description": "Infrastructure, CI/CD, environments, scaling",
-          "resolution": 0.575,
+          "resolution": 0.775,
           "constraints": [
             "Infrastructure: Kubernetes",
             "CI/CD: GitHub Actions",
+            "Environments: multiple tiers defined (dev, staging, prod)",
             "Scaling: auto-scaling"
           ],
           "sub_dimensions": {
@@ -7259,8 +7336,10 @@
             "environments": {
               "name": "environments",
               "description": "Environment tiers (dev, staging, prod)",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.8,
+              "constraints": [
+                "Environments: multiple tiers defined (dev, staging, prod)"
+              ]
             },
             "scaling": {
               "name": "scaling",
@@ -7437,17 +7516,20 @@
       }
     },
     {
-      "density_score": 0.542,
+      "density_score": 0.63,
+      "constraint_quality": 0.718,
+      "coverage": "38/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
+            "Objective: application type identified",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
             "Scope: real-time features"
@@ -7458,16 +7540,17 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)",
+                "Objective: application type identified"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -7493,9 +7576,14 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
+            "Entities defined (models on)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -7503,13 +7591,18 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)",
+                "Entities defined (models on)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -7517,8 +7610,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -7542,15 +7637,14 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
             "API style: REST",
             "API style: REST (rest)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
-            "Realtime: WebSocket",
-            "Realtime: WebSocket (WS)"
+            "Realtime: WebSocket"
           ],
           "sub_dimensions": {
             "endpoints": {
@@ -7572,8 +7666,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -7588,9 +7684,7 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
-                "Realtime: WebSocket",
-                "Realtime: WebSocket (WS)"
+                "Realtime: WebSocket"
               ]
             }
           }
@@ -7599,12 +7693,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -7642,8 +7737,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -7654,7 +7751,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -7673,7 +7769,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -7699,18 +7794,19 @@
           "id": "deployment",
           "name": "Deployment",
           "description": "Infrastructure, CI/CD, environments, scaling",
-          "resolution": 0.5,
+          "resolution": 0.775,
           "constraints": [
             "Infrastructure: Kubernetes",
             "Cloud: AWS",
             "CI/CD: GitHub Actions",
+            "Environments: multiple tiers defined (dev, staging, prod)",
             "Scaling: auto-scaling"
           ],
           "sub_dimensions": {
             "infrastructure": {
               "name": "infrastructure",
               "description": "Cloud provider and compute (K8s, serverless, VMs)",
-              "resolution": 0.5,
+              "resolution": 0.8,
               "constraints": [
                 "Infrastructure: Kubernetes",
                 "Cloud: AWS"
@@ -7727,8 +7823,10 @@
             "environments": {
               "name": "environments",
               "description": "Environment tiers (dev, staging, prod)",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.8,
+              "constraints": [
+                "Environments: multiple tiers defined (dev, staging, prod)"
+              ]
             },
             "scaling": {
               "name": "scaling",
@@ -7916,20 +8014,24 @@
       }
     },
     {
-      "density_score": 0.57,
+      "density_score": 0.658,
+      "constraint_quality": 0.71,
+      "coverage": "40/43",
       "channels": {
         "purpose": {
           "id": "purpose",
           "name": "Purpose",
           "description": "Application objectives, user stories, success criteria",
-          "resolution": 0.525,
+          "resolution": 0.55,
           "constraints": [
-            "Objective: task management",
+            "Objective: application described (Build a collaborative task management API for)",
+            "Objective: application type identified",
             "Users: team-based",
-            "Users: team-based (Team)",
+            "Users: target audience identified (for user)",
             "Success: measurable metrics (KPI)",
             "Success: measurable metrics (dashboard)",
-            "Scope: real-time features"
+            "Scope: real-time features",
+            "Scope: feature identified (create task)"
           ],
           "sub_dimensions": {
             "objective": {
@@ -7937,16 +8039,17 @@
               "description": "Primary application objective",
               "resolution": 0.6,
               "constraints": [
-                "Objective: task management"
+                "Objective: application described (Build a collaborative task management API for)",
+                "Objective: application type identified"
               ]
             },
             "users": {
               "name": "users",
               "description": "Target user personas",
-              "resolution": 0.5,
+              "resolution": 0.6,
               "constraints": [
                 "Users: team-based",
-                "Users: team-based (Team)"
+                "Users: target audience identified (for user)"
               ]
             },
             "success_criteria": {
@@ -7963,7 +8066,8 @@
               "description": "Feature scope and boundaries",
               "resolution": 0.5,
               "constraints": [
-                "Scope: real-time features"
+                "Scope: real-time features",
+                "Scope: feature identified (create task)"
               ]
             }
           }
@@ -7972,9 +8076,14 @@
           "id": "data_model",
           "name": "Data Model",
           "description": "Entities, relationships, cardinality, constraints, indexes",
-          "resolution": 0.38,
+          "resolution": 0.64,
           "constraints": [
+            "Entity: users/accounts",
+            "Entities defined (entities: User)",
+            "Entity: users/accounts (member)",
+            "Entities defined (models on)",
             "Relationship: one-to-many",
+            "Cardinality: assignment relationship (assignee)",
             "Constraint: not null (NOT NULL)",
             "Index strategy specified (index on)"
           ],
@@ -7982,13 +8091,18 @@
             "entities": {
               "name": "entities",
               "description": "Core domain entities and attributes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Entity: users/accounts",
+                "Entities defined (entities: User)",
+                "Entity: users/accounts (member)",
+                "Entities defined (models on)"
+              ]
             },
             "relationships": {
               "name": "relationships",
               "description": "Entity relationships and cardinality",
-              "resolution": 0.6,
+              "resolution": 0.7,
               "constraints": [
                 "Relationship: one-to-many"
               ]
@@ -7996,8 +8110,10 @@
             "cardinality": {
               "name": "cardinality",
               "description": "One-to-one, one-to-many, many-to-many specifics",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.6,
+              "constraints": [
+                "Cardinality: assignment relationship (assignee)"
+              ]
             },
             "constraints": {
               "name": "constraints",
@@ -8021,15 +8137,14 @@
           "id": "api",
           "name": "API",
           "description": "Endpoints, methods, request/response shapes, versioning",
-          "resolution": 0.4,
+          "resolution": 0.54,
           "constraints": [
             "API style: REST (RESTful)",
             "API style: REST",
             "API style: REST (rest)",
+            "Response shape defined (Response:)",
             "API versioning: URL path (v1). Endpoint)",
-            "Realtime: WebSocket (ws)",
-            "Realtime: WebSocket",
-            "Realtime: WebSocket (WS)"
+            "Realtime: WebSocket"
           ],
           "sub_dimensions": {
             "endpoints": {
@@ -8051,8 +8166,10 @@
             "response_shapes": {
               "name": "response_shapes",
               "description": "Response body schemas and status codes",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.7,
+              "constraints": [
+                "Response shape defined (Response:)"
+              ]
             },
             "versioning": {
               "name": "versioning",
@@ -8067,9 +8184,7 @@
               "description": "WebSocket, SSE, or polling requirements",
               "resolution": 0.8,
               "constraints": [
-                "Realtime: WebSocket (ws)",
-                "Realtime: WebSocket",
-                "Realtime: WebSocket (WS)"
+                "Realtime: WebSocket"
               ]
             }
           }
@@ -8078,12 +8193,13 @@
           "id": "tech_stack",
           "name": "Tech Stack",
           "description": "Languages, frameworks, databases, infrastructure",
-          "resolution": 0.72,
+          "resolution": 0.9,
           "constraints": [
             "Language: Python (Python 3.12)",
             "Framework: FastAPI",
             "Database: PostgreSQL",
-            "Cache: Redis"
+            "Cache: Redis",
+            "Message queue: none required (No message queue)"
           ],
           "sub_dimensions": {
             "language": {
@@ -8121,8 +8237,10 @@
             "message_queue": {
               "name": "message_queue",
               "description": "Message broker or event bus",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.9,
+              "constraints": [
+                "Message queue: none required (No message queue)"
+              ]
             }
           }
         },
@@ -8133,7 +8251,6 @@
           "resolution": 0.8,
           "constraints": [
             "Auth: JWT tokens",
-            "Authorization: role-based",
             "Authorization: RBAC",
             "Session: refresh token rotation",
             "MFA required"
@@ -8152,7 +8269,6 @@
               "description": "Authorization model (RBAC, ABAC, ACL)",
               "resolution": 0.8,
               "constraints": [
-                "Authorization: role-based",
                 "Authorization: RBAC"
               ]
             },
@@ -8178,18 +8294,19 @@
           "id": "deployment",
           "name": "Deployment",
           "description": "Infrastructure, CI/CD, environments, scaling",
-          "resolution": 0.5,
+          "resolution": 0.775,
           "constraints": [
             "Infrastructure: Kubernetes",
             "Cloud: AWS",
             "CI/CD: GitHub Actions",
+            "Environments: multiple tiers defined (dev, staging, prod)",
             "Scaling: auto-scaling"
           ],
           "sub_dimensions": {
             "infrastructure": {
               "name": "infrastructure",
               "description": "Cloud provider and compute (K8s, serverless, VMs)",
-              "resolution": 0.5,
+              "resolution": 0.8,
               "constraints": [
                 "Infrastructure: Kubernetes",
                 "Cloud: AWS"
@@ -8206,8 +8323,10 @@
             "environments": {
               "name": "environments",
               "description": "Environment tiers (dev, staging, prod)",
-              "resolution": 0.0,
-              "constraints": []
+              "resolution": 0.8,
+              "constraints": [
+                "Environments: multiple tiers defined (dev, staging, prod)"
+              ]
             },
             "scaling": {
               "name": "scaling",
@@ -8402,6 +8521,6 @@
       }
     }
   ],
-  "spec": "# Dense Architecture Specification\n# Density Score: 0.570\n\n## Purpose\n# Resolution: 52.5%\n\n- Objective: task management\n- Users: team-based\n- Users: team-based (Team)\n- Success: measurable metrics (KPI)\n- Success: measurable metrics (dashboard)\n- Scope: real-time features\n\n## Data Model\n# Resolution: 38.0%\n\n- Relationship: one-to-many\n- Constraint: not null (NOT NULL)\n- Index strategy specified (index on)\n\n## API\n# Resolution: 40.0%\n\n- API style: REST (RESTful)\n- API style: REST\n- API style: REST (rest)\n- API versioning: URL path (v1). Endpoint)\n- Realtime: WebSocket (ws)\n- Realtime: WebSocket\n- Realtime: WebSocket (WS)\n\n## Tech Stack\n# Resolution: 72.0%\n\n- Language: Python (Python 3.12)\n- Framework: FastAPI\n- Database: PostgreSQL\n- Cache: Redis\n\n## Auth\n# Resolution: 80.0%\n\n- Auth: JWT tokens\n- Authorization: role-based\n- Authorization: RBAC\n- Session: refresh token rotation\n- MFA required\n\n## Deployment\n# Resolution: 50.0%\n\n- Infrastructure: Kubernetes\n- Cloud: AWS\n- CI/CD: GitHub Actions\n- Scaling: auto-scaling\n\n## Error Handling\n# Resolution: 72.5%\n\n- Error: HTTP status codes specified (400 validation, 401 auth, 403 forbidden, 404 not found, 409 conflict, 429 rate limit, 500 internal. Retry with exponential backoff for upstream calls (max 3 retries, 1s base). Circuit breaker on Redis with 5-failure threshold, 30s recovery. Structured JSON logging with correlation IDs. Log levels: DEBUG, INFO, WARN, ERROR)\n- Retry: exponential backoff (Retry with exponential backoff)\n- Circuit breaker pattern\n- Logging: JSON format (JSON logging)\n\n## Performance\n# Resolution: 67.5%\n\n- Latency targets specified (P50)\n- Throughput target specified (1000 rps)\n- Optimization: connection pooling (Connection pooling)\n- Pagination required (pagination)\n\n## Security\n# Resolution: 70.0%\n\n- Input validation required\n- Encryption: TLS in transit\n- CORS policy required\n- Rate limiting required (rate limit)\n- Rate limiting required\n\n## Testing\n# Resolution: 27.5%\n\n- Testing: unit tests (Unit test)\n- Test data: fixtures\n\n## All Constraints (Flat)\n\n- Objective: task management\n- Users: team-based\n- Users: team-based (Team)\n- Success: measurable metrics (KPI)\n- Success: measurable metrics (dashboard)\n- Scope: real-time features\n- Relationship: one-to-many\n- Constraint: not null (NOT NULL)\n- Index strategy specified (index on)\n- API style: REST (RESTful)\n- API style: REST\n- API style: REST (rest)\n- API versioning: URL path (v1). Endpoint)\n- Realtime: WebSocket (ws)\n- Realtime: WebSocket\n- Realtime: WebSocket (WS)\n- Language: Python (Python 3.12)\n- Framework: FastAPI\n- Database: PostgreSQL\n- Cache: Redis\n- Auth: JWT tokens\n- Authorization: role-based\n- Authorization: RBAC\n- Session: refresh token rotation\n- MFA required\n- Infrastructure: Kubernetes\n- Cloud: AWS\n- CI/CD: GitHub Actions\n- Scaling: auto-scaling\n- Error: HTTP status codes specified (400 validation, 401 auth, 403 forbidden, 404 not found, 409 conflict, 429 rate limit, 500 internal. Retry with exponential backoff for upstream calls (max 3 retries, 1s base). Circuit breaker on Redis with 5-failure threshold, 30s recovery. Structured JSON logging with correlation IDs. Log levels: DEBUG, INFO, WARN, ERROR)\n- Retry: exponential backoff (Retry with exponential backoff)\n- Circuit breaker pattern\n- Logging: JSON format (JSON logging)\n- Latency targets specified (P50)\n- Throughput target specified (1000 rps)\n- Optimization: connection pooling (Connection pooling)\n- Pagination required (pagination)\n- Input validation required\n- Encryption: TLS in transit\n- CORS policy required\n- Rate limiting required (rate limit)\n- Rate limiting required\n- Testing: unit tests (Unit test)\n- Test data: fixtures\n\n## Implementation Rules\n\n- Every architectural decision MUST trace to a constraint above\n- If a dimension has no constraint, ASK \u2014 do not invent\n- Prefer explicit over implicit in all generated code\n- No defaults: every value must come from this spec\n",
-  "density_score": 0.5700000000000001
+  "spec": "# Dense Architecture Specification\n# Density Score: 0.658\n\n## Purpose\n# Resolution: 55.0%\n\n- Objective: application described (Build a collaborative task management API for)\n- Objective: application type identified\n- Users: team-based\n- Users: target audience identified (for user)\n- Success: measurable metrics (KPI)\n- Success: measurable metrics (dashboard)\n- Scope: real-time features\n- Scope: feature identified (create task)\n\n## Data Model\n# Resolution: 64.0%\n\n- Entity: users/accounts\n- Entities defined (entities: User)\n- Entity: users/accounts (member)\n- Entities defined (models on)\n- Relationship: one-to-many\n- Cardinality: assignment relationship (assignee)\n- Constraint: not null (NOT NULL)\n- Index strategy specified (index on)\n\n## API\n# Resolution: 54.0%\n\n- API style: REST (RESTful)\n- API style: REST\n- API style: REST (rest)\n- Response shape defined (Response:)\n- API versioning: URL path (v1). Endpoint)\n- Realtime: WebSocket\n\n## Tech Stack\n# Resolution: 90.0%\n\n- Language: Python (Python 3.12)\n- Framework: FastAPI\n- Database: PostgreSQL\n- Cache: Redis\n- Message queue: none required (No message queue)\n\n## Auth\n# Resolution: 80.0%\n\n- Auth: JWT tokens\n- Authorization: RBAC\n- Session: refresh token rotation\n- MFA required\n\n## Deployment\n# Resolution: 77.5%\n\n- Infrastructure: Kubernetes\n- Cloud: AWS\n- CI/CD: GitHub Actions\n- Environments: multiple tiers defined (dev, staging, prod)\n- Scaling: auto-scaling\n\n## Error Handling\n# Resolution: 72.5%\n\n- Error: HTTP status codes specified (400 validation, 401 auth, 403 forbidden, 404 not found, 409 conflict, 429 rate limit, 500 internal. Retry with exponential backoff for upstream calls (max 3 retries, 1s base). Circuit breaker on Redis with 5-failure threshold, 30s recovery. Structured JSON logging with correlation IDs. Log levels: DEBUG, INFO, WARN, ERROR)\n- Retry: exponential backoff (Retry with exponential backoff)\n- Circuit breaker pattern\n- Logging: JSON format (JSON logging)\n\n## Performance\n# Resolution: 67.5%\n\n- Latency targets specified (P50)\n- Throughput target specified (1000 rps)\n- Optimization: connection pooling (Connection pooling)\n- Pagination required (pagination)\n\n## Security\n# Resolution: 70.0%\n\n- Input validation required\n- Encryption: TLS in transit\n- CORS policy required\n- Rate limiting required (rate limit)\n- Rate limiting required\n\n## Testing\n# Resolution: 27.5%\n\n- Testing: unit tests (Unit test)\n- Test data: fixtures\n\n## All Constraints (Flat)\n\n- Objective: application described (Build a collaborative task management API for)\n- Objective: application type identified\n- Users: team-based\n- Users: target audience identified (for user)\n- Success: measurable metrics (KPI)\n- Success: measurable metrics (dashboard)\n- Scope: real-time features\n- Scope: feature identified (create task)\n- Entity: users/accounts\n- Entities defined (entities: User)\n- Entity: users/accounts (member)\n- Entities defined (models on)\n- Relationship: one-to-many\n- Cardinality: assignment relationship (assignee)\n- Constraint: not null (NOT NULL)\n- Index strategy specified (index on)\n- API style: REST (RESTful)\n- API style: REST\n- API style: REST (rest)\n- Response shape defined (Response:)\n- API versioning: URL path (v1). Endpoint)\n- Realtime: WebSocket\n- Language: Python (Python 3.12)\n- Framework: FastAPI\n- Database: PostgreSQL\n- Cache: Redis\n- Message queue: none required (No message queue)\n- Auth: JWT tokens\n- Authorization: RBAC\n- Session: refresh token rotation\n- MFA required\n- Infrastructure: Kubernetes\n- Cloud: AWS\n- CI/CD: GitHub Actions\n- Environments: multiple tiers defined (dev, staging, prod)\n- Scaling: auto-scaling\n- Error: HTTP status codes specified (400 validation, 401 auth, 403 forbidden, 404 not found, 409 conflict, 429 rate limit, 500 internal. Retry with exponential backoff for upstream calls (max 3 retries, 1s base). Circuit breaker on Redis with 5-failure threshold, 30s recovery. Structured JSON logging with correlation IDs. Log levels: DEBUG, INFO, WARN, ERROR)\n- Retry: exponential backoff (Retry with exponential backoff)\n- Circuit breaker pattern\n- Logging: JSON format (JSON logging)\n- Latency targets specified (P50)\n- Throughput target specified (1000 rps)\n- Optimization: connection pooling (Connection pooling)\n- Pagination required (pagination)\n- Input validation required\n- Encryption: TLS in transit\n- CORS policy required\n- Rate limiting required (rate limit)\n- Rate limiting required\n- Testing: unit tests (Unit test)\n- Test data: fixtures\n\n## Implementation Rules\n\n- Every architectural decision MUST trace to a constraint above\n- If a dimension has no constraint, ASK \u2014 do not invent\n- Prefer explicit over implicit in all generated code\n- No defaults: every value must come from this spec\n",
+  "density_score": 0.658
 }

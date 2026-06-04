@@ -81,17 +81,28 @@ async function loadSpec() {
 }
 
 function downloadSpec() {
-  window.open('/api/spec/download?sid=' + SID, '_blank');
+  window.open(PFX + '/api/spec/download?sid=' + SID, '_blank');
 }
 
 async function copySpec() {
   try {
     const r = await fetch('/api/spec?sid=' + SID);
     const data = await r.json();
-    await navigator.clipboard.writeText(data.spec);
+    // navigator.clipboard requires HTTPS; use fallback for HTTP
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(data.spec);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = data.spec;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
     alert('Specification copied to clipboard');
   } catch(e) {
-    alert('Failed to copy');
+    alert('Failed to copy: ' + e.message);
   }
 }
 

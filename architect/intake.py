@@ -118,6 +118,7 @@ class IntakeEngine:
         self._critical_channels: set[str] = set()  # Phase-aware: only these must hit threshold
         self._asked_questions: list[str] = []  # Track questions to avoid repeats
         self._quality_weight: float = 0.0  # 0=completeness, 1=quality-only
+        self._last_targeted_channel_id: str | None = None  # Track for dismissal detection
 
     def set_llm_config(self, config):
         """Set the LLM config for contextual question generation."""
@@ -135,6 +136,43 @@ class IntakeEngine:
         PoC ≈ 0.7, MVP ≈ 0.3, Pre-Prod = 0.0."""
         self._quality_weight = max(0.0, min(1.0, weight))
 
+    def auto_resolve_poc_defaults(self):
+        """Auto-resolve sub-dimensions that are overkill for a PoC.
+
+        For a proof of concept, cardinality details, index strategy,
+        measurable success criteria, API versioning, and realtime specs
+        are unnecessary friction. Set them to a sensible default so the
+        intake engine doesn't keep drilling into them.
+        """
+        poc_defaults = [
+            ("data_model", "cardinality", 0.8, "PoC scope — cardinality deferred to MVP"),
+            ("data_model", "relationships", 0.7, "PoC scope — basic relationships, normalize at MVP"),
+            ("data_model", "indexes", 0.8, "PoC scope — default indexes only, optimize at MVP"),
+            ("purpose", "success_criteria", 0.8, "PoC scope — success = working demo, formal metrics at MVP"),
+            ("api", "versioning", 0.9, "PoC scope — no versioning needed"),
+            ("api", "realtime", 0.7, "PoC scope — defer real-time to MVP unless core to concept"),
+            ("auth", "mfa", 0.9, "PoC scope — MFA not required, deferred to MVP"),
+            ("auth", "session", 0.7, "PoC scope — basic session handling, full lifecycle at MVP"),
+        ]
+        for ch_id, sub_id, resolution, constraint in poc_defaults:
+            ch = self.registry.channels.get(ch_id)
+            if ch:
+                sub = ch.sub_dimensions.get(sub_id)
+                if sub and sub.resolution < 0.5:
+                    # Only auto-fill if the user hasn't already provided info
+                    self.registry.update_resolution(ch_id, sub_id, resolution, constraint)
+
+    _DISMISSAL_RE = re.compile(
+        r'\b(none|no\b|not\s+needed|not\s+required|not\s+applicable|n/?a|'
+        r'skip|defer|close\s+this|not\s+planned|out\s+of\s+scope|don\'t\s+need|'
+        r'not\s+applicable|doesn\'t\s+apply|doesn\'t\s+matter)\b',
+        re.IGNORECASE,
+    )
+
+    def _is_dismissal(self, response: str) -> bool:
+        """Short response that explicitly says 'none/no/not needed' for a topic."""
+        return len(response.strip()) <= 200 and bool(self._DISMISSAL_RE.search(response))
+
     def process_response(self, response: str) -> IntakeResult:
         updates = self.analyzer.analyze(response)
         ambiguities = self.analyzer.identify_ambiguities(response)
@@ -144,6 +182,17 @@ class IntakeEngine:
                 update.channel_id, update.sub_dimension,
                 update.resolution, update.constraint,
             )
+
+        # If the user dismissed the previously-targeted channel, force-close unresolved subs
+        if self._last_targeted_channel_id and self._is_dismissal(response):
+            ch = self.registry.channels.get(self._last_targeted_channel_id)
+            if ch:
+                for sub_id, sub in ch.sub_dimensions.items():
+                    if sub.resolution < 0.6:
+                        self.registry.update_resolution(
+                            self._last_targeted_channel_id, sub_id, 0.8,
+                            "Not required / out of scope (user marked N/A)",
+                        )
 
         # Accumulate app context from responses
         self._app_description += " " + response
@@ -205,6 +254,7 @@ class IntakeEngine:
         # Sort by resolution ascending — target the least resolved channel
         unresolved.sort(key=lambda ch: ch.resolution)
         target = unresolved[0]
+        self._last_targeted_channel_id = target.id
 
         # Try LLM-generated contextual question first
         if self._app_description.strip() and self._llm_config:

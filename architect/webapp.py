@@ -27,6 +27,7 @@ from .llm_judge import (
 from .comparator import Comparator
 from .mock_llm import MockLLM
 from .decomposer import run_decompose_programmatic
+from .spec_parser import parse_markdown_to_registry, parse_markdown_summary, parse_density_score
 from .analytics import record_event, get_dashboard_data, get_module_locks, set_module_lock
 from . import builder as _builder
 from . import deployer as _deployer
@@ -705,15 +706,83 @@ def api_spec_download():
     )
 
 
+@app.route("/api/load-spec", methods=["POST"])
+def api_load_spec():
+    """Replace session registry with one re-hydrated from a spec.md string.
+
+    Body: { sid?, spec_text, phase? }
+    """
+    body = request.get_json(silent=True) or {}
+    spec_text = (body.get("spec_text") or "").strip()
+    if not spec_text or len(spec_text) < 50:
+        return jsonify({"ok": False, "error": "spec_text is required (min 50 chars)."}), 400
+
+    sid = body.get("sid") or request.args.get("sid") or session.get("sid", "default")
+    phase_str = body.get("phase")
+
+    try:
+        phase = ProjectPhase(phase_str) if phase_str else _sessions.get(sid, {}).get("phase", ProjectPhase.MVP)
+    except ValueError:
+        return jsonify({"ok": False, "error": f"Unknown phase: {phase_str}"}), 400
+
+    try:
+        registry = parse_markdown_to_registry(spec_text)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Could not parse spec: {e}"}), 400
+
+    engine = IntakeEngine(registry)
+    engine.set_llm_config(_global_config)
+    judge = LLMJudge(registry, config=_global_config, phase=phase)
+    engine.threshold = judge.completion_threshold
+    engine.set_critical_channels(judge.critical_channels)
+    engine.set_quality_weight(PHASE_QUALITY_WEIGHT.get(phase, 0.0))
+
+    _sessions[sid] = {
+        "registry": registry,
+        "engine": engine,
+        "judge": judge,
+        "phase": phase,
+        "history": [],
+        "created": time.time(),
+    }
+
+    summary = parse_markdown_summary(spec_text)
+    declared_density = parse_density_score(spec_text)
+
+    return jsonify({
+        "ok": True,
+        "sid": sid,
+        "phase": phase.value,
+        "phase_label": PROJECT_PHASE_LABELS.get(phase, phase.value),
+        "density_score": registry.overall_density_score(),
+        "declared_density_score": declared_density,
+        "constraints_loaded": summary["total_constraints"],
+        "channels_with_content": summary["channels_with_content"],
+        "constraints_per_channel": summary["constraints_per_channel"],
+    })
+
+
 @app.route("/api/decompose", methods=["POST"])
 def api_decompose():
-    """Run decomposition agent on current session spec."""
-    sid = request.args.get("sid", session.get("sid", "default"))
+    """Run decomposition agent on current session spec or an uploaded spec.
+
+    Body: { phase?, sid?, spec_text? }
+    If spec_text is provided, it bypasses the session registry.
+    """
+    body = request.get_json(silent=True) or {}
+    sid = body.get("sid") or request.args.get("sid") or session.get("sid", "default")
+    phase = body.get("phase", "mvp")
+    uploaded_spec = (body.get("spec_text") or "").strip()
+
     state = _get_state(sid)
-    registry = state["registry"]
-    gen = SpecGenerator(registry)
-    spec_text = gen.generate()
-    phase = request.json.get("phase", "mvp") if request.is_json else "mvp"
+    if uploaded_spec and len(uploaded_spec) >= 50:
+        spec_text = uploaded_spec
+        registry = parse_markdown_to_registry(spec_text)
+    else:
+        registry = state["registry"]
+        gen = SpecGenerator(registry)
+        spec_text = gen.generate()
+
     try:
         plan = run_decompose_programmatic(spec_text, registry, phase=phase)
         return jsonify({
