@@ -525,6 +525,8 @@ def api_send():
 
     # Feed response into engine's context for contextual question generation
     engine._app_description += " " + user_response
+    engine._response_count += 1
+    engine.apply_dismissal_if_needed(user_response)
 
     # Get next question (uses LLM for context-aware questions when available)
     is_complete = engine.is_complete()
@@ -778,6 +780,8 @@ def api_decompose():
     if uploaded_spec and len(uploaded_spec) >= 50:
         spec_text = uploaded_spec
         registry = parse_markdown_to_registry(spec_text)
+        # Keep session registry in sync so /api/spec returns the same spec
+        state["registry"] = registry
     else:
         registry = state["registry"]
         gen = SpecGenerator(registry)
