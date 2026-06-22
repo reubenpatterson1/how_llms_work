@@ -4,6 +4,7 @@ import PipelineFlow from './components/PipelineFlow';
 import BuildFlow from './components/BuildFlow';
 import DeployFlow from './components/DeployFlow';
 import Assessment from './components/Assessment';
+import DeploymentStack from './components/DeploymentStack';
 import architectDashboardImg from './assets/screenshots/architect-dashboard.png';
 import decomposeEmptyImg from './assets/screenshots/decompose-empty.png';
 import decomposeSpecLoadedImg from './assets/screenshots/decompose-spec-loaded.png';
@@ -41,6 +42,12 @@ const SAMPLE_SPEC_HIGHLIGHT = `# Dense Architecture Specification — Team Task 
 - fly.io 2 regions, GitHub Actions, preview-per-PR + staging + prod`;
 
 const SLIDES = [
+  { id: 's0a', type: 'text', title: 'The Deployment Stack: What You Are Actually Doing',
+    body: 'Before any LLM tooling: every Kubernetes deployment is built from the same set of components in a fixed dependency order.\n\n1. Local Codebase — your app code, a Dockerfile, and a Helm chart / K8s manifest live together in the repo.\n2. Docker Image — the Dockerfile compiles your code into an immutable runtime artifact and pushes it to a registry (ECR).\n3. Helm Chart / K8s Manifest — references the image tag and tells K8s how to run it: replicas, resources, ingress host.\n4. GitHub Branch — the branch is the unit of review; nothing deploys until it merges.\n5. PR & Merge — the merge event fires the deploy pipeline.\n6. GH Actions Workflow — builds the Docker image, pushes it, then applies the Helm chart automatically.\n   ↳ No CI/CD yet? Run those same three steps yourself from the command line (the "direct path").\n7. Live URL — Ingress + ALB + Route 53 route traffic to your running pod.\n\nNext slide: step through each component interactively.' },
+
+  { id: 's0b', type: 'component', title: 'Deployment Stack: Dependencies & Order of Operations',
+    component: 'DeploymentStack' },
+
   { id: 's1', type: 'text', title: 'How to Build/Deploy with LLMs',
     body: '1. Recap of Decompose output\n2. The Build Agent\n3. Wave-parallelism payoff\n4. The Deploy Agent\n5. Live URL\n6. What this doesn\'t cover (→ Module 5)' },
 
@@ -175,7 +182,7 @@ Constraints: (same auth constraints as above)
     body: '8-10 MCQ on pipeline mechanics. Skeleton MCQ component lives in src/components/Assessment.jsx (will be expanded in a follow-up).' },
 ];
 
-const COMPONENTS = { WaveGridReplay, PipelineFlow, BuildFlow, DeployFlow, Assessment };
+const COMPONENTS = { WaveGridReplay, PipelineFlow, BuildFlow, DeployFlow, Assessment, DeploymentStack };
 
 export default function App() {
   const [idx, setIdx] = useState(0);
