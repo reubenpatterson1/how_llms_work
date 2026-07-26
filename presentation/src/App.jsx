@@ -449,7 +449,12 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    window.__LLM_AT_LAST_SLIDE__ = currentSlide === SLIDES.length - 1
+    const isLastSlide = currentSlide === SLIDES.length - 1;
+    window.__LLM_AT_LAST_SLIDE__ = isLastSlide;
+    if (isLastSlide) {
+      window.__LLM_MODULE_LAST_SLIDE__ = true;
+      markPartComplete();
+    }
   }, [currentSlide]);
 
   return (

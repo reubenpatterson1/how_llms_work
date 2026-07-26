@@ -119,7 +119,12 @@ export default function App() {
   }, [go])
 
   useEffect(() => {
-    window.__LLM_AT_LAST_SLIDE__ = idx === SLIDES.length - 1
+    const isLastSlide = idx === SLIDES.length - 1;
+    window.__LLM_AT_LAST_SLIDE__ = isLastSlide;
+    if (isLastSlide) {
+      window.__LLM_MODULE_LAST_SLIDE__ = true;
+      markPartComplete();
+    }
   }, [idx])
 
   return (
