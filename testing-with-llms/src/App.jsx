@@ -347,12 +347,31 @@ function ComponentSlide({ slide }) {
   );
 }
 
+function markPartComplete() {
+  try {
+    const raw = localStorage.getItem('llm_course_progress')
+    const progress = raw ? JSON.parse(raw) : {}
+    progress.__v = 2
+    progress.part5 = true
+    localStorage.setItem('llm_course_progress', JSON.stringify(progress))
+  } catch {
+    // ignore storage errors (private mode, etc.)
+  }
+}
+
 export default function App() {
   const [idx, setIdx] = useState(0);
   const slide = SLIDES[idx];
 
   const go = useCallback((dir) => {
-    setIdx((i) => Math.max(0, Math.min(SLIDES.length - 1, i + dir)));
+    setIdx((i) => {
+      const next = Math.max(0, Math.min(SLIDES.length - 1, i + dir))
+      if (next === SLIDES.length - 1 && i !== next) {
+        markPartComplete()
+        window.__LLM_AT_LAST_SLIDE__ = true
+      }
+      return next
+    });
   }, []);
 
   useEffect(() => {
@@ -363,6 +382,10 @@ export default function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [go]);
+
+  useEffect(() => {
+    window.__LLM_AT_LAST_SLIDE__ = idx === SLIDES.length - 1
+  }, [idx]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex",

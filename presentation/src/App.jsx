@@ -402,12 +402,31 @@ function SlideIndicator({ total, current, onNavigate }) {
   );
 }
 
+function markPartComplete() {
+  try {
+    const raw = localStorage.getItem('llm_course_progress')
+    const progress = raw ? JSON.parse(raw) : {}
+    progress.__v = 2
+    progress.part1 = true
+    localStorage.setItem('llm_course_progress', JSON.stringify(progress))
+  } catch {
+    // ignore storage errors (private mode, etc.)
+  }
+}
+
 export default function App() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const slide = SLIDES[currentSlide];
 
   const goNext = useCallback(() => {
-    setCurrentSlide(s => Math.min(s + 1, SLIDES.length - 1));
+    setCurrentSlide(s => {
+      const next = Math.min(s + 1, SLIDES.length - 1)
+      if (next === SLIDES.length - 1 && s !== next) {
+        markPartComplete()
+        window.__LLM_AT_LAST_SLIDE__ = true
+      }
+      return next
+    });
   }, []);
 
   const goPrev = useCallback(() => {
@@ -430,6 +449,7 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
+    window.__LLM_AT_LAST_SLIDE__ = currentSlide === SLIDES.length - 1
   }, [currentSlide]);
 
   return (

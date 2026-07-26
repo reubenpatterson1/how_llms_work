@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import WaveGridReplay from './components/WaveGridReplay';
 import PipelineFlow from './components/PipelineFlow';
 import BuildFlow from './components/BuildFlow';
@@ -184,9 +184,25 @@ Constraints: (same auth constraints as above)
 
 const COMPONENTS = { WaveGridReplay, PipelineFlow, BuildFlow, DeployFlow, Assessment, DeploymentStack };
 
+function markPartComplete() {
+  try {
+    const raw = localStorage.getItem('llm_course_progress')
+    const progress = raw ? JSON.parse(raw) : {}
+    progress.__v = 2
+    progress.part4 = true
+    localStorage.setItem('llm_course_progress', JSON.stringify(progress))
+  } catch {
+    // ignore storage errors (private mode, etc.)
+  }
+}
+
 export default function App() {
   const [idx, setIdx] = useState(0);
   const slide = SLIDES[idx];
+
+  useEffect(() => {
+    window.__LLM_AT_LAST_SLIDE__ = idx === SLIDES.length - 1
+  }, [idx]);
 
   const renderBody = () => {
     if (slide.type === 'component') {
@@ -223,7 +239,14 @@ export default function App() {
       <footer>
         <button disabled={idx === 0} onClick={() => setIdx(idx - 1)}>Prev</button>
         <span>{idx + 1} / {SLIDES.length}</span>
-        <button disabled={idx === SLIDES.length - 1} onClick={() => setIdx(idx + 1)}>Next</button>
+        <button disabled={idx === SLIDES.length - 1} onClick={() => {
+          const next = idx + 1
+          setIdx(next)
+          if (next === SLIDES.length - 1) {
+            markPartComplete()
+            window.__LLM_AT_LAST_SLIDE__ = true
+          }
+        }}>Next</button>
       </footer>
     </div>
   );

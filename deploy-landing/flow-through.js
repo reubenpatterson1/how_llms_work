@@ -44,8 +44,8 @@
   // Expose name capture for quiz components
   window.__llmTrackQuizName=function(name){localStorage.setItem('llm_quiz_name_'+current,name);};
 
-  // Gate: check prerequisite (except Part 1)
-  if(idx>0){
+  // Gate: check prerequisite (except Part 1), allow bypass via ?nogate or localStorage key
+  if(idx>0 && location.search.indexOf('nogate')<0 && !localStorage.getItem('llm_bypass_gate')){
     var prev=MODULES[idx-1];
     var prog=getProgress();
     if(!prog[prev]){
@@ -66,8 +66,14 @@
 
   var btn=document.getElementById('llm-complete-btn');
 
-  // Show complete button when user reaches the quiz slide (last 2 slides)
+  // Show complete button when user reaches the last slide
   function checkSlidePosition(){
+    // Prefer explicit flag from the module app
+    if(window.__LLM_AT_LAST_SLIDE__===true){
+      btn.style.display='inline-block';
+      return;
+    }
+    // Fallback to DOM scraping (for older modules)
     var texts=document.body.innerText;
     var match=texts.match(/(\d+)\s*\/\s*(\d+)/);
     if(match){
