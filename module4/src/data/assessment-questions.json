@@ -10,22 +10,22 @@
       "id": "A1", "section": "A", "slideRef": "s4d",
       "q": "Decompose turns the task-tracker spec into 15 components across 3 waves: Wave 0 holds the 4 entity models and 2 configs, Wave 1 holds CacheService and AuthService, Wave 2 holds AuthMiddleware and the 6 handlers. What determines which wave a given component lands in?",
       "options": [
-        "Its estimated complexity — cheap, low-complexity components are scheduled into earlier waves so each wave finishes fast.",
-        "Its channel source — data-model components always precede API components regardless of what actually depends on what.",
+        "Its estimated complexity band: low-complexity components are scheduled into the earliest waves so every wave finishes close to its 10-minute floor.",
+        "Its channel source: the decomposer groups by channel first, so every data-model component precedes every API component regardless of the real edges.",
         "The depth of its dependency chain: a component lands in the first wave by which every component it depends on has already been built.",
-        "The alphabetical order of its component id, so a given spec always decomposes identically."
+        "The alphabetical order of its component id, which keeps decompose deterministic across repeated runs of the same dense spec."
       ],
       "answer": 2,
-      "explanation": "Waves come out of a topological sort over the dependency graph: each wave is the set of components whose dependencies were all satisfied by an earlier wave. Complexity feeds the time *estimate*, never the placement. Channel source drives the wave's human-readable label — the handlers sit in Wave 2 not because they are 'API work' but because they depend on AuthService, which depends on Wave 0's configs. And ordering *within* a wave is meaningless by construction, since everything in a wave runs at the same time, so an alphabetical rule would have nothing to sort."
+      "explanation": "Waves come out of a topological sort over the dependency graph: each wave is the set of components whose dependencies were all satisfied by an earlier wave. Complexity feeds the time *estimate*, never the placement. Channel source drives the wave's human-readable label — the handlers sit in Wave 2 not because they are 'API work' but because they depend on AuthService, which depends on Wave 0's configs. And ordering *within* a wave is meaningless by construction, since everything in a wave runs at the same time, so an alphabetical rule would have nothing to sort — and the determinism it appeals to already comes from the dependency graph itself."
     },
     {
       "id": "A2", "section": "A", "slideRef": "s4",
       "q": "The build package header reads `15 components · 3 waves · 7× parallelism`. Wave 0 has 6 components, Wave 1 has 2, Wave 2 has 7. Where does the `7×` come from, and what consumes it?",
       "options": [
-        "15 ÷ 3 — components divided by waves — and the Build Agent uses it to decide how many waves to run at once.",
+        "15 ÷ 3 — components divided by waves — and the Build Agent uses it to decide how many waves it may keep in flight at once.",
         "The size of the largest wave; the Build Agent reads it from the package metadata and uses it as the thread-pool worker cap for every wave.",
-        "The number of distinct component types in the plan; it is a reporting metric the Build Agent ignores.",
-        "15 − (3 × 2): the count of components that have no dependencies at all."
+        "The number of distinct component types across the plan; it is a reporting metric only, and the Build Agent ignores it at run time.",
+        "15 − (3 × 2): the count of components with no dependencies at all, which is what sizes the Build Agent's thread pool."
       ],
       "answer": 1,
       "explanation": "Max parallelism is the width of the widest wave — here Wave 2's 7 components. It is demonstrably not an average: 15 ÷ 3 = 5, which is not the number printed. The Build Agent lifts `max_parallelism` straight out of the build package's metadata and hands it to its thread pool as the worker count, so the pool is sized once for the worst case and reused; narrower waves just leave workers idle. Waves are never run concurrently with each other — Wave N+1's inputs literally do not exist until Wave N has finished — so there is nothing for a 'how many waves at once' knob to control."
@@ -34,9 +34,9 @@
       "id": "A3", "section": "A", "slideRef": "s4d",
       "q": "Decompose reports `73% time savings` for the 15-component, 3-wave plan. A learner computes (15 − 3) ÷ 15 = 80% and asks why the tool disagrees with them. What is the tool actually computing?",
       "options": [
-        "It caps the reported figure at 73% to stay deliberately conservative.",
-        "It subtracts measured LLM latency and network overhead from the ideal figure.",
-        "It divides the number of dependency edges by the number of components.",
+        "It caps the reported figure at 73%, a deliberately conservative ceiling the tool applies so that a wave plan never advertises time savings it cannot reproduce.",
+        "It starts from the ideal figure and subtracts the measured LLM latency and network overhead recorded on the previous run of the same spec.",
+        "It divides the number of dependency edges by the number of components, so a graph with fewer edges reports a higher savings percentage.",
         "It compares complexity-weighted minutes: sequential time sums every component's own estimate, parallel time sums only the slowest component in each wave."
       ],
       "answer": 3,
@@ -47,21 +47,21 @@
       "q": "Part 3 of the build package lists interface contracts such as `IAuthService`, each with an explicit `Owner: AuthService` line and a `Types: AuthCredentials, AuthToken, TokenPayload` line. Why is ownership pinned before any code is generated?",
       "options": [
         "Exactly one component implements the interface; every other component is told to import it and NOT implement it, so two components generated in the same wave cannot emit competing definitions of the same contract.",
-        "So the Deploy Agent knows which container should receive traffic for that interface.",
-        "So the ~500-line build package can be sorted by owner and is easier for a human to read.",
-        "Because the generating model refuses to emit a component whose interface has no named owner."
+        "So the Deploy Agent knows which container should receive inbound traffic for that interface: the Owner line becomes the Service selector in the rendered Kubernetes manifest, and an unowned interface gets no route at all.",
+        "So the ~500-line build package can be sorted and paginated by owner, which is what lets a human reviewer read all of one component's obligations in a single place before signing the package off and handing it to the Build Agent.",
+        "Because the generating model refuses to emit a component whose interface has no named owner, so decompose fills the field in ahead of time purely to keep the fifteen per-component calls from erroring out on a missing-owner validation."
       ],
       "answer": 0,
-      "explanation": "Parallel generation is only safe if the shared boundary is settled first. AuthMiddleware's build prompt says `Depends on (import, do not implement): IAuthService` — the Owner field is what makes that instruction unambiguous about who does implement it. Without a single named owner, two components generated concurrently by independent LLM calls would each invent their own `AuthToken` shape and the assembled project would not compile. Ownership is a build-time consistency guarantee; it has no runtime meaning, so routing is irrelevant, and readability is a side effect rather than the reason."
+      "explanation": "Parallel generation is only safe if the shared boundary is settled first. AuthMiddleware's build prompt says `Depends on (import, do not implement): IAuthService` — the Owner field is what makes that instruction unambiguous about who does implement it. Without a single named owner, two components generated concurrently by independent LLM calls would each invent their own `AuthToken` shape and the assembled project would not compile. Ownership is a build-time consistency guarantee; it has no runtime meaning, so routing is irrelevant, and readability is a side effect rather than the reason. Nothing in the model's behaviour requires the field either — an unowned interface would generate perfectly happily, and incoherently."
     },
     {
       "id": "A5", "section": "A", "slideRef": "s4",
       "q": "Part 4 of the build package is `Component Build Prompts` — one prompt per component, 15 of them for this MVP. What does a single component's prompt contain?",
       "options": [
-        "The entire dense spec, so the model generating that component has the full architectural picture.",
-        "Just the component name — the Build Agent looks up everything else at build time.",
+        "The entire dense spec, so the model generating that component has the full architectural picture and can resolve any constraint that its own description happens to leave implicit.",
+        "Just the component name and its target language — the Build Agent looks the role, constraints and interface contracts up from the build package at generation time.",
         "The component's role, only the spec constraints that apply to it, the interface it must implement with method signatures, and the interfaces it must import but not implement.",
-        "The component's prompt plus the expected file contents, so the model can diff its output against the target."
+        "The component's prompt plus the expected file contents, so the model can diff its own output against the reference target and correct itself before it returns."
       ],
       "answer": 2,
       "explanation": "Each prompt is a deliberately narrow slice. AuthService's prompt carries its purpose, the three auth constraints that actually bear on it (RS256 signing, RBAC roles owner/admin/member, 15m access + 30d refresh), its `Must implement: IAuthService` method signatures, and its import-only dependencies. The full dense spec is Part 1 of the package for human and orchestrator reference — it is *not* what each per-component call receives, because handing every component the whole spec recreates the exact failure decomposition exists to prevent. The Build Agent does add mechanical detail later (target path, runtime, allowed packages), but the component's purpose and constraints travel in the prompt, and there is no reference implementation to diff against — the file does not exist yet."
@@ -71,9 +71,9 @@
       "q": "The Build Agent's Wrap Prompt stage wraps the decompose-supplied component prompt before it reaches the LLM. What does the wrapper add?",
       "options": [
         "The target file path, the runtime version, the list of packages already installed in the image, and a file-shape template for that component type and language.",
-        "The full dense spec, the wave plan, the dependency graph, and every interface contract.",
-        "A system prompt, a temperature, a token budget, and a stop sequence.",
-        "The Dockerfile, package.json and .env.example, so the model can see the project layout."
+        "The full dense spec, the wave plan, the dependency graph and every interface contract, so each component is generated with exactly the context the orchestrator holds.",
+        "A system prompt, a sampling temperature, a token budget and a stop sequence, all tuned per component type and language so a two-line config file is not sampled like a service.",
+        "The Dockerfile, the package.json and the .env.example already written for this run, so the model can see the project layout it is emitting a file into."
       ],
       "answer": 0,
       "explanation": "The wrapper exists to make the output *mechanically usable*, not to add architectural context. It names the exact target file (`src/auth-service.js`), pins the runtime (Node 20), enumerates the packages actually installed in the image so the model cannot import something that will not resolve, and pastes a shape template for that component type and language so the emitted file matches project conventions. It also opens with `Output the file CONTENTS ONLY — no markdown fences, no prose` — a formatting instruction inside the prompt text, not a sampling parameter. Re-injecting the whole spec would undo decomposition; the Dockerfile and dependency manifest do not exist yet at this stage, since Assemble writes them after the components are generated."
@@ -82,9 +82,9 @@
       "id": "B2", "section": "B", "slideRef": "s6",
       "q": "A build has two waves: Wave 0 (weather-service, health-handler) and Wave 1 (weather-handler, app-server). How many LLM calls does the Build Agent make, and in what pattern?",
       "options": [
-        "One call for the whole build — the model emits all four files in a single response.",
-        "Two calls, one per wave, each returning that wave's files together.",
-        "Four calls, all four dispatched concurrently, with a reconciliation pass afterwards to fix ordering problems.",
+        "One call for the whole build — the model emits all four files in a single response, which is what keeps their imports consistent.",
+        "Two calls, one per wave, each returning that wave's files together so the components in a wave can reference each other.",
+        "Four calls, all four dispatched concurrently, then a reconciliation pass afterwards that repairs any ordering problems it finds.",
         "Four calls, one per component: Wave 0's two dispatched concurrently, then — only once both have returned — Wave 1's two dispatched concurrently."
       ],
       "answer": 3,
@@ -94,22 +94,22 @@
       "id": "B3", "section": "B", "slideRef": "s5",
       "q": "The Python Dockerfile the Build Agent writes ends with `CMD [\"python\", \"src/app.py\"]`, but a decompose-derived build package usually contains no `app` component. What does the Assemble stage do about that?",
       "options": [
-        "It rewrites the Dockerfile's CMD to point at whichever generated file looks most like an entrypoint.",
+        "It rewrites the Dockerfile's CMD to point at whichever generated file looks most like an entrypoint, preferring one that calls `app.run()` and falling back to the first `src/*.py` that registers a Blueprint route at module level.",
         "It writes an `src/app.py` shim — only if the build did not already generate one — that creates the Flask app, auto-registers every module-level Blueprint found in sibling `src/*.py` files, and always serves `/healthz`.",
-        "It fails the build and tells the user to add an `app` component to the build package.",
-        "It concatenates every generated Python file into one `src/app.py` so the CMD resolves."
+        "It fails the build with an explicit error telling the user to add an `app` component to the build package, on the grounds that silently inventing an entrypoint would hide a real gap in the decompose output from whoever has to run the build.",
+        "It concatenates every generated Python file into a single `src/app.py`, in dependency order and with duplicate imports hoisted to the top, so the fixed CMD resolves without the Assemble stage having to write a line of code of its own."
       ],
       "answer": 1,
-      "explanation": "The generated components are Flask *fragments* — a `Blueprint(...)` plus `@bp.get(...)` handlers — with no `Flask(__name__)` and no `app.run()`. With a fixed CMD and no `src/app.py`, the container dies on start with `can't open file '/app/src/app.py'`. The shim supplies the missing assembly layer without editing a single generated file, and the existence check means a build that genuinely produced its own entrypoint keeps it rather than being overwritten. The always-on `/healthz` is not decoration: it guarantees the Kubernetes probe has something to hit even when no generated handler exposed a health route. Concatenating files would collide on imports and duplicate route registrations; rewriting the CMD per build would make the image's start command unpredictable."
+      "explanation": "The generated components are Flask *fragments* — a `Blueprint(...)` plus `@bp.get(...)` handlers — with no `Flask(__name__)` and no `app.run()`. With a fixed CMD and no `src/app.py`, the container dies on start with `can't open file '/app/src/app.py'`. The shim supplies the missing assembly layer without editing a single generated file, and the existence check means a build that genuinely produced its own entrypoint keeps it rather than being overwritten. The always-on `/healthz` is not decoration: it guarantees the Kubernetes probe has something to hit even when no generated handler exposed a health route. Concatenating files would still duplicate route registrations and collide on module-level names however carefully the imports were tidied up; rewriting the CMD per build would make the image's start command unpredictable."
     },
     {
       "id": "B4", "section": "B", "slideRef": "s5",
       "q": "For one component, the LLM returns the text \"I cannot generate this file without more information about your database schema.\" What does the Build Agent do?",
       "options": [
-        "Writes the text to the target source file anyway; the Docker build will catch it later.",
-        "Retries the same prompt until code comes back.",
+        "Writes the returned text to the target source file anyway; the Docker build will catch it later.",
+        "Retries the same prompt at a higher sampling temperature until code comes back, capped at three attempts.",
         "Raises a post-process error, writes no file for that component, and lets the rest of the wave finish.",
-        "Substitutes a stub that satisfies the component's interface so the build stays green."
+        "Substitutes a stub satisfying the component's declared interface so the wave still ends green."
       ],
       "answer": 2,
       "explanation": "Post-processing is a validity gate, not a formatter. If the response is fenced, the first fenced block is extracted; if it is unfenced, the first non-blank line must begin with a code-like token (`import`, `from`, `def`, `class`, `const`, `export`, and so on). Prose fails both tests, so the agent raises a post-process error and no file is written — deferring the failure to the Docker build would turn a clear per-component error into a confusing syntax error. The failure is scoped to that one component: it is emitted as an error event while the other components in the wave still complete, which is the concrete payoff of one call per component. Note what does *not* happen — no automatic retry and no stub substitution. Recovering a failed component is a human decision in this pipeline."
@@ -118,10 +118,10 @@
       "id": "B5", "section": "B", "slideRef": "s9",
       "q": "A JavaScript build of 4 components finishes. Which files exist in that run's workspace folder?",
       "options": [
-        "Only the 4 generated `src/*.js` files — packaging is the Deploy Agent's job.",
+        "Only the 4 generated `src/*.js` files — packaging is the Deploy Agent's job, and it reads the workspace directly when it renders the deploy YAML.",
         "The 4 generated `src/*.js` files plus a `Dockerfile`, a `package.json`, a `.env.example`, and an `src/app-server.js` entrypoint if none was generated.",
-        "The 4 generated files plus a Helm chart and a Kubernetes Deployment manifest.",
-        "The 4 generated files plus a test suite and a CI workflow."
+        "The 4 generated files plus a Helm chart and a rendered Kubernetes Deployment manifest, written at assemble time so the Deploy Agent only has to apply them.",
+        "The 4 generated files plus a per-component test suite and a GitHub Actions CI workflow, both emitted by Assemble so the build is verified before the image is pushed."
       ],
       "answer": 1,
       "explanation": "Assemble writes the project-level files the generated sources cannot produce for themselves: a language-appropriate Dockerfile (`node:20-alpine`, `EXPOSE 3000`, `CMD [\"node\",\"src/app-server.js\"]`), a dependency manifest listing exactly the packages the prompt told the model it was allowed to use (`package.json` for JavaScript, `requirements.txt` for Python), a `.env.example` naming the secrets a developer still has to supply, and the entrypoint shim when the build did not generate one. Kubernetes YAML is rendered later by the Deploy Agent from a template, against the workspace — it is not a build artefact. Tests and CI workflows are never emitted anywhere in this pipeline; that is Module 5's subject."
@@ -130,22 +130,22 @@
       "id": "C1", "section": "C", "slideRef": "s7",
       "q": "The Deploy Agent auto-derives `healthcheck_path` from the built workspace rather than accepting a default. How does it choose, and what happens if it finds nothing?",
       "options": [
-        "It defaults to `/`, so rendering always succeeds.",
-        "It reads the path out of the dense spec's Deployment section.",
-        "It starts the container locally and records whichever path returns 200.",
+        "It defaults to `/`, so rendering always succeeds rather than failing; any container that answers at its root will pass the readiness probe, and even a 404 at `/` is taken as proof that the app is up and serving requests.",
+        "It reads the path out of the dense spec's Deployment section, which is where the intake stage records hosting details, and falls back to `/health` whenever the spec author left that particular field blank in the intake form.",
+        "It starts the container locally on a scratch port, probes each candidate path in turn, and records whichever one returns 200, so the rendered manifest always names a path the running image has already answered on at least once.",
         "It scans the generated sources for GET route literals and takes the first hit from a fixed priority list (`/healthz`, `/health`, `/readyz`, `/ready`, `/ping`, `/`); if no routes are found at all it refuses to render rather than defaulting."
       ],
       "answer": 3,
-      "explanation": "Rendering YAML with a *guessed* health path is worse than failing loudly, because Kubernetes will then mark a perfectly healthy pod unready and the mistake resurfaces minutes later as a rollout that never completes. So an empty `healthcheck_path` is treated as a hard error at render time. The derivation is a static scan of the generated sources for GET route registrations, resolved against a fixed preference order and falling back to the shortest discovered route only when none of the preferred paths exist. It cannot probe a container — nothing is running yet when the YAML is rendered — and the spec's Deployment section describes hosting, not routes. This is also why the entrypoint shim registers `/healthz`: it makes the scan succeed by construction."
+      "explanation": "Rendering YAML with a *guessed* health path is worse than failing loudly, because Kubernetes will then mark a perfectly healthy pod unready and the mistake resurfaces minutes later as a rollout that never completes — and note that a 404 at `/` fails a readiness probe, it does not pass one. So an empty `healthcheck_path` is treated as a hard error at render time. The derivation is a static scan of the generated sources for GET route registrations, resolved against a fixed preference order and falling back to the shortest discovered route only when none of the preferred paths exist. It cannot probe a container — nothing is running yet when the YAML is rendered — and the spec's Deployment section describes hosting, not routes. This is also why the entrypoint shim registers `/healthz`: it makes the scan succeed by construction."
     },
     {
       "id": "C2", "section": "C", "slideRef": "s7",
       "q": "Two different apps are built and deployed through the pipeline. What do they share in ECR, and what keeps them from colliding?",
       "options": [
         "Both push to the same `architect-builds/app` repository; only the image tag is per-run unique, and nothing collides because the Kubernetes Application name and ingress host are still derived from the spec slug plus run id.",
-        "Nothing is shared — each app gets its own ECR repository named after its spec slug.",
-        "They share a repository and a tag; the newer push simply overwrites the older image.",
-        "They share a repository and a tag, and the Kubernetes Application name is randomly generated to keep them apart."
+        "Nothing is shared — each app gets its own ECR repository named after its spec slug, so the repo-creation pre-flight runs once per app and two apps can never write into the same registry path at all, not even during a concurrent build.",
+        "They share both the repository and the tag, so the newer push simply overwrites the older image; that is safe here because the Kubernetes Application object is deleted and recreated on every deploy and never references an overwritten image.",
+        "They share both the repository and the tag, and the Kubernetes Application name is randomly generated on each run, which is the mechanism that keeps the two running deployments and their ingress hosts from overwriting one another on the cluster."
       ],
       "answer": 0,
       "explanation": "The registry path is deliberately decoupled from the spec slug. One shared repository means the ECR repo-creation pre-flight happens once ever instead of once per new app, and is a no-op on every subsequent build. Uniqueness lives in two other places: the image tag carries the short run id (`...:d9331c`, so images never overwrite each other), and the Kubernetes object name plus ingress host carry the app identity (`quote-of-the-day-d9331c`, `quote-of-the-day-d9331c-training.tools.fubotv.net`). Random names would give you uniqueness without identity — you could no longer tell which running Application corresponds to which app."
@@ -154,34 +154,34 @@
       "id": "C3", "section": "C", "slideRef": "s7",
       "q": "The Deploy Agent always builds with `docker build --platform linux/amd64`. If that flag were dropped and the build ran on an Apple Silicon laptop, what would fail, and when?",
       "options": [
-        "`docker build` would fail immediately with an unsupported-architecture error.",
-        "`docker push` would be rejected by ECR for an architecture mismatch.",
+        "`docker build` would fail immediately with an unsupported-architecture error, before any layer reached the ECR registry.",
+        "`docker push` would be rejected by ECR, which validates the image manifest's architecture against the repository's declared platform setting.",
         "Build and push would both succeed; the pod would then sit in ImagePullBackOff on the cluster with `no match for platform in manifest`.",
-        "Nothing would fail — the kubelet emulates the mismatched architecture transparently."
+        "Nothing would fail — the kubelet emulates the mismatched architecture transparently, at a modest CPU and memory cost."
       ],
       "answer": 2,
-      "explanation": "This is a late-binding failure, which is exactly why the flag is pinned instead of left to the host default. Docker on an arm64 machine happily builds an arm64 image, and ECR is a content-agnostic registry that happily stores it — neither step has any reason to object. The mismatch is only discovered when an amd64 node's kubelet tries to pull the image and finds no matching platform in the manifest, at which point you are debugging a crash-looping pod two green steps and several minutes downstream of the actual cause. Pinning `--platform` moves the decision to the only place that knows the deployment target: the build."
+      "explanation": "This is a late-binding failure, which is exactly why the flag is pinned instead of left to the host default. Docker on an arm64 machine happily builds an arm64 image, and ECR is a content-agnostic registry with no per-repository platform to validate against, so it happily stores it — neither step has any reason to object. The mismatch is only discovered when an amd64 node's kubelet tries to pull the image and finds no matching platform in the manifest, at which point you are debugging a crash-looping pod two green steps and several minutes downstream of the actual cause. Pinning `--platform` moves the decision to the only place that knows the deployment target: the build."
     },
     {
       "id": "C4", "section": "C", "slideRef": "s0b",
       "q": "You apply a manifest in which only the image tag changed (`abc123` → `def456`); replicas stay at 2. What does the cluster actually do?",
       "options": [
-        "The API server patches the two running containers in place with the new image.",
+        "The API server patches the two running containers in place with the new image, which is why a tag-only change is the cheapest update there is: the kubelet pulls `def456`, swaps the image field, and the pods keep their own names, IP addresses and start times.",
         "The Deployment controller diffs desired against actual state, creates a NEW ReplicaSet for `def456`, and the default rolling update (maxSurge 1, maxUnavailable 0) brings up a replacement and waits for its readiness probe before terminating an old pod.",
-        "Both running pods are deleted, then two fresh pods are created from the new image.",
-        "`kubectl apply` blocks until every pod is Ready and then returns; nothing happens asynchronously."
+        "Both running pods are deleted first, then two fresh pods are created from the new image, because a ReplicaSet's pod template is immutable once created and the Deployment controller has no way to overlap old and new pods inside one ReplicaSet, whatever maxSurge says.",
+        "`kubectl apply` blocks until every pod is Ready and then returns, so nothing at all happens asynchronously; if a readiness probe never passes, the apply call itself is what eventually times out and reports the rollout failure back to the caller."
       ],
       "answer": 1,
-      "explanation": "A pod's image cannot be edited in place, so a tag change can only be realised by creating new pods — which is why a second ReplicaSet appears and the old one is scaled to zero rather than mutated. The rolling-update defaults are what make the swap zero-downtime: maxUnavailable 0 forbids killing an old pod before its replacement reports Ready, maxSurge 1 allows exactly one extra pod during the overlap, and the Service selector routes only to Ready pods so traffic never lands on a starting container. Deleting both pods first would be a hard outage. And `apply` is asynchronous — it returns as soon as the API server has stored the desired state; observing the rollout is a separate `kubectl rollout status` call."
+      "explanation": "A pod's image cannot be edited in place, so a tag change can only be realised by creating new pods — which is why a second ReplicaSet appears and the old one is scaled to zero rather than mutated. The rolling-update defaults are what make the swap zero-downtime: maxUnavailable 0 forbids killing an old pod before its replacement reports Ready, maxSurge 1 allows exactly one extra pod during the overlap, and the Service selector routes only to Ready pods so traffic never lands on a starting container. Deleting both pods first would be a hard outage. And `apply` is asynchronous — it returns as soon as the API server has stored the desired state; observing the rollout is a separate `kubectl rollout status` call — not because a ReplicaSet's template cannot be edited, but because the Deployment controller tracks each template revision as its own ReplicaSet, which is exactly what lets old and new pods coexist during the roll."
     },
     {
       "id": "C5", "section": "C", "slideRef": "s16",
       "q": "A pipeline run ends with a live URL returning HTTP 200. What has the pipeline verified?",
       "options": [
         "Only that the ingress served a successful response at the derived health path — nothing about behavioural correctness, and no tests ran at any point in the pipeline.",
-        "That the generated code passes its tests and that the deploy config validated cleanly.",
-        "That the app is correct, since a 200 from the health path exercises the generated handlers.",
-        "That the rollout is being monitored and will roll back automatically if it degrades."
+        "That the generated code passes the test suite Assemble emitted for it, and that the rendered deploy config validated cleanly before it was applied.",
+        "That the app is behaviourally correct, since a 200 from the health path can only be produced by the generated handlers actually running and returning data.",
+        "That the rollout is now being monitored and will automatically roll back if the readiness probe starts failing once the poll window has closed."
       ],
       "answer": 0,
       "explanation": "The only assertion the pipeline makes is transport-level: it polls the ingress every 5 seconds for up to 120 seconds and stops at the first 200 or 302. No automated tests run as part of the build, there is no deploy-config validation, no health-monitoring dashboard, and no rollback or blue-green strategy — every one of those is Module 5. Module 4's own live run makes the gap concrete: the deployed app returned a genuine 200 while its `/quote` handler was a functional stub returning `{\"result\":\"value\"}`. A green pipeline means 'running and reachable', not 'working'."
