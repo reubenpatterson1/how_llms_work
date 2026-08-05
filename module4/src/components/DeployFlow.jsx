@@ -15,7 +15,7 @@ fields = {
   'name':              'quote-of-the-day-d9331c',       # spec_slug-run_short
   'namespace':         'training',
   'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c',
-  'port':              3000,                             # fell back to default (port auto-detect is Node-only)
+  'port':              3000,                             # default (port auto-detect is Node-only)
   'host':              'quote-of-the-day-d9331c-training.tools.fubotv.net',
   'healthcheck_path':  '/healthz',                        # scanned from generated handler
 }
@@ -55,7 +55,8 @@ rendered = render_yaml_text(template, **fields)
 #9 CACHED
 #10 exporting to image
 #10 writing image sha256:2fc055f523cdd3c75abbc79cfe49f6d4e9b0342ee6fe7eb8388a01d77d37185c done
-#10 naming to 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c done`
+#10 naming to 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c done
+# (identical rebuild — every layer cached, hence no build time shown)`
   },
   {
     id: 'push',

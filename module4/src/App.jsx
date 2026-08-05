@@ -153,10 +153,13 @@ Constraints: (same auth constraints as above)
     image: deployUiImg,
     caption: 'Live screenshot: rendered fubo Application manifest for the "Quote of the Day" app (run d9331c480953) in Monaco editor, "Will deploy to" card showing the target URL with copy button, three sequential action buttons, and a custom-template upload card on the right.' },
 
-  { id: 's8b', type: 'image', title: 'The Real Handoff — and the Real Result',
-    images: [deployManualApplyImg, quoteAppLiveImg],
-    imageAlts: ['Manual apply handoff panel with rendered YAML and copy-pasteable kubectl command', 'Live deployed app response in the browser at the real ingress URL'],
-    caption: 'Left: this agent host has no kubectl, so instead of applying directly it hands back the exact YAML and a copy-pasteable command — this is the correct, by-design outcome, not a failure. Right: after running that command from a machine with cluster auth, the app really is live — the actual HTTP response from the deployed pod.' },
+  { id: 's8b', type: 'image', title: 'The Real Handoff',
+    image: deployManualApplyImg,
+    caption: 'This agent host has no kubectl, so instead of applying directly, it hands back the exact rendered YAML and a copy-pasteable apply command. For this split-host setup — agent and cluster access on different machines — that\'s the correct, by-design outcome, not a failure.' },
+
+  { id: 's8c', type: 'image', title: 'The Real Result',
+    image: quoteAppLiveImg,
+    caption: 'The pod really is live and responding — a real HTTP 200 from the deployed container. The response itself is a generic placeholder (`{"result":"value"}`), not an actual quote: the LLM-generated /quote handler for this run was a functional stub rather than a fully realized feature. That\'s an honest, unedited limitation of this specific build, not a deployment failure.' },
 
   { id: 's9', type: 'text', title: 'What Gets Generated',
     body: 'Per component: one source file (.js or .py). Per project: package.json or requirements.txt, Dockerfile, .env.example, index.html shell if frontend. The build agent writes everything to a versioned workspace folder.' },
@@ -226,18 +229,6 @@ export default function App() {
       return <Comp />;
     }
     if (slide.type === 'image') {
-      if (slide.images) {
-        return (
-          <div className="image-slide image-slide-multi">
-            <div className="image-slide-grid">
-              {slide.images.map((src, i) => (
-                <img key={i} src={src} alt={slide.imageAlts?.[i] ?? `${slide.title} (${i + 1})`} />
-              ))}
-            </div>
-            {slide.caption && <p className="caption">{slide.caption}</p>}
-          </div>
-        );
-      }
       return (
         <div className="image-slide">
           <img src={slide.image} alt={slide.title} />
