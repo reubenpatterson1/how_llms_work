@@ -219,6 +219,18 @@ export default function App() {
       return <Comp />;
     }
     if (slide.type === 'image') {
+      if (slide.images) {
+        return (
+          <div className="image-slide image-slide-multi">
+            <div className="image-slide-grid">
+              {slide.images.map((src, i) => (
+                <img key={i} src={src} alt={`${slide.title} (${i + 1})`} />
+              ))}
+            </div>
+            {slide.caption && <p className="caption">{slide.caption}</p>}
+          </div>
+        );
+      }
       return (
         <div className="image-slide">
           <img src={slide.image} alt={slide.title} />
