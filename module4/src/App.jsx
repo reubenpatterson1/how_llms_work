@@ -6,7 +6,6 @@ import DeployFlow from './components/DeployFlow';
 import Assessment from './components/Assessment';
 import DeploymentStack from './components/DeploymentStack';
 import architectDashboardImg from './assets/screenshots/architect-dashboard.png';
-import decomposeEmptyImg from './assets/screenshots/decompose-empty.png';
 import decomposeSpecLoadedImg from './assets/screenshots/decompose-spec-loaded.png';
 import decomposeWavePlanImg from './assets/screenshots/decompose-wave-plan.png';
 import buildUiImg from './assets/screenshots/build-ui.png';
