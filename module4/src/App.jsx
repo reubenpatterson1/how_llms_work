@@ -11,6 +11,8 @@ import decomposeSpecLoadedImg from './assets/screenshots/decompose-spec-loaded.p
 import decomposeWavePlanImg from './assets/screenshots/decompose-wave-plan.png';
 import buildUiImg from './assets/screenshots/build-ui.png';
 import deployUiImg from './assets/screenshots/deploy-ui.png';
+import deployManualApplyImg from './assets/screenshots/deploy-manual-apply.png';
+import quoteAppLiveImg from './assets/screenshots/quote-app-live.png';
 import './index.css';
 import './App.css';
 
@@ -149,7 +151,11 @@ Constraints: (same auth constraints as above)
 
   { id: 's8', type: 'image', title: 'The Deploy UI in Action',
     image: deployUiImg,
-    caption: 'Live screenshot: rendered fubo Application manifest in Monaco editor, "Will deploy to" card showing the target URL with copy button, three sequential action buttons, and a custom-template upload card on the right.' },
+    caption: 'Live screenshot: rendered fubo Application manifest for the "Quote of the Day" app (run d9331c480953) in Monaco editor, "Will deploy to" card showing the target URL with copy button, three sequential action buttons, and a custom-template upload card on the right.' },
+
+  { id: 's8b', type: 'image', title: 'The Real Handoff — and the Real Result',
+    images: [deployManualApplyImg, quoteAppLiveImg],
+    caption: 'Left: this agent host has no kubectl, so instead of applying directly it hands back the exact YAML and a copy-pasteable command — this is the correct, by-design outcome, not a failure. Right: after running that command from a machine with cluster auth, the app really is live — the actual HTTP response from the deployed pod.' },
 
   { id: 's9', type: 'text', title: 'What Gets Generated',
     body: 'Per component: one source file (.js or .py). Per project: package.json or requirements.txt, Dockerfile, .env.example, index.html shell if frontend. The build agent writes everything to a versioned workspace folder.' },
