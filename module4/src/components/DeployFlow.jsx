@@ -7,21 +7,26 @@ const STAGES = [
     symbol: '◇',
     color: '#fbbf24',
     sub: 'Fill auto-derived fields',
-    sample: `# Read template (default or user-uploaded)
+    sample: `# Read template (built-in fubo Application template)
 template = open('deploy_template.yaml').read()
 
-# Auto-derive from workspace + config:
+# Auto-derived from workspace + config:
 fields = {
-  'name':              'hello-world-735bac',         # spec_slug-run_short
+  'name':              'quote-of-the-day-d9331c',       # spec_slug-run_short
   'namespace':         'training',
-  'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/hello-world:735bac',
-  'port':              3000,                          # from generated app.listen()
-  'host':              'hello-world-735bac-training.tools.fubotv.net',
-  'healthcheck_path':  '/healthz',                    # scanned from generated handler
+  'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c',
+  'port':              3000,                             # from generated app.listen()
+  'host':              'quote-of-the-day-d9331c-training.tools.fubotv.net',
+  'healthcheck_path':  '/healthz',                        # scanned from generated handler
 }
 
 rendered = render_yaml_text(template, **fields)
-# → loaded into Monaco editor, user can edit before apply`
+# → loaded into Monaco editor, user can edit before apply
+
+# Note: the ECR repo ("architect-builds/app") is SHARED across every
+# build regardless of spec_slug — only the image tag is per-run-unique.
+# The K8s Application name/host still comes from spec_slug, so two
+# different apps never collide on the same Application or ingress host.`
   },
   {
     id: 'docker_build',
@@ -30,34 +35,50 @@ rendered = render_yaml_text(template, **fields)
     color: '#60a5fa',
     sub: '--platform=linux/amd64',
     sample: `> docker build --platform linux/amd64 -t \\
-  650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/hello-world:735bac \\
-  /var/www/llm-course/architect/workspaces/735bacc940ad/
+  650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c \\
+  /var/www/llm-course/architect/workspaces/d9331c480953/
 
-[+] Building 17.4s (10/10) FINISHED
- => [internal] load build definition from Dockerfile
- => [1/5] FROM docker.io/library/node:20-alpine
- => [2/5] WORKDIR /app
- => [3/5] COPY package.json ./
- => [4/5] RUN npm install --omit=dev
- => [5/5] COPY src ./src
- => exporting to image  sha256:01c51f43...`
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 292B done
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 [internal] load .dockerignore
+#4 [internal] load build context
+#4 transferring context: 382B done
+#5 [1/5] FROM docker.io/library/python:3.12-slim@sha256:646fb0bc...
+#6 [3/5] COPY requirements.txt ./
+#6 CACHED
+#7 [4/5] RUN pip install --no-cache-dir -r requirements.txt
+#7 CACHED
+#8 [2/5] WORKDIR /app
+#8 CACHED
+#9 [5/5] COPY src ./src
+#9 CACHED
+#10 exporting to image
+#10 writing image sha256:2fc055f523cdd3c75abbc79cfe49f6d4e9b0342ee6fe7eb8388a01d77d37185c done
+#10 naming to 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c done`
   },
   {
     id: 'push',
     label: 'Push to ECR',
     symbol: '◈',
     color: '#a78bfa',
-    sub: 'Auto-create repo if missing',
-    sample: `# Pre-flight: create repo if it doesn't exist
+    sub: 'One shared repo, per-run tag',
+    sample: `# Pre-flight: create the shared repo if it doesn't exist yet
+# (one-time; every future build reuses it, regardless of app name)
 ensure_ecr_repository(image_tag, region, registry)
 
-> docker push 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/hello-world:735bac
+> docker push 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c
 
-The push refers to repository [.../architect-builds/hello-world]
-257f790ce9bf: Pushed
-e10358715ead: Layer already exists
-4983b93ee796: Layer already exists
-735bac: digest: sha256:cbaf8a4c... size: 1990
+The push refers to repository [650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app]
+1933659c1ae8: Layer already exists
+362546fc9bff: Layer already exists
+7cd89e51eab8: Layer already exists
+f5b5bca81f27: Layer already exists
+02bea5b709fa: Layer already exists
+4bdf3c4a59c8: Layer already exists
+eeece50a9eae: Layer already exists
+6f9432833129: Layer already exists
+d9331c: digest: sha256:94fda4b0d91aa01e7f37828947855cdd86bf6705cde2e05d7c6859a176b7aaa1 size: 1991
 
 # On auth-stale: surface copy-pasteable
 # 'aws ecr get-login-password ...' remediation`
@@ -70,16 +91,17 @@ e10358715ead: Layer already exists
     sub: 'fubo Application CRD',
     sample: `> kubectl apply -f rendered.yaml
 
-application.app.smo.tools.fubotv.net/hello-world-735bac created
+application.app.smo.tools.fubotv.net/quote-of-the-day-d9331c created
 
 # Operator reconciles into:
-#   Deployment    hello-world-735bac
-#   Service       hello-world-735bac
-#   Ingress       hello-world-735bac (ALB target group)
-#   Route 53      hello-world-735bac-training.tools.fubotv.net
+#   Deployment    quote-of-the-day-d9331c
+#   Service       quote-of-the-day-d9331c
+#   Ingress       quote-of-the-day-d9331c (ALB target group)
+#   Route 53      quote-of-the-day-d9331c-training.tools.fubotv.net
 
-# (If kubectl is missing on the agent host:
-#  return YAML + copy-paste command for client-side apply.)`
+# kubectl wasn't available on the agent host for this run — the app
+# surfaced the YAML + a copy-pasteable command instead, and this apply
+# was run from a laptop with cluster auth. See next slide.`
   },
   {
     id: 'poll',
@@ -87,15 +109,15 @@ application.app.smo.tools.fubotv.net/hello-world-735bac created
     symbol: '▲',
     color: '#22c55e',
     sub: 'Wait for HTTP 200',
-    sample: `# Poll up to 120s (Route53 + ALB target registration ~90s)
-while elapsed < 120s:
-  resp = GET https://hello-world-735bac-training.tools.fubotv.net/healthz
-  if resp.status_code in (200, 302):
-    print("✓ Live at", url)
-    return
-  sleep 5s
+    sample: `> kubectl get application quote-of-the-day-d9331c -n training
 
-# UI flips:  "Will deploy to" → "Deploying to" → "✓ Live at"`
+NAME                      IMAGE                                       REPLICAS   AVAILABLE   AGE
+quote-of-the-day-d9331c   .../architect-builds/app:d9331c            1          True        26s
+
+> curl -s -o /dev/null -w "%{http_code}" https://quote-of-the-day-d9331c-training.tools.fubotv.net/healthz
+200
+
+# {"status":"ok"} — live on the first attempt, no retries needed`
   },
 ];
 
