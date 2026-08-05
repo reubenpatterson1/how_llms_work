@@ -188,7 +188,7 @@ Constraints: (same auth constraints as above)
     body: 'Four stages: Spec → Decompose → Build → Deploy. Four artifacts: dense spec, build-package YAML, container image, live URL. The agent is yours to run on your own apps now.' },
 
   { id: 's18', type: 'assessment', title: 'Assessment',
-    body: '8-10 MCQ on pipeline mechanics. Skeleton MCQ component lives in src/components/Assessment.jsx (will be expanded in a follow-up).' },
+    body: '15 MCQ across 3 sections: Decompose & Wave Planning, The Build Agent, Deploy Agent & K8s Reconcile. Pass threshold 11/15. Certificate on pass.' },
 ];
 
 const COMPONENTS = { WaveGridReplay, PipelineFlow, BuildFlow, DeployFlow, Assessment, DeploymentStack };
