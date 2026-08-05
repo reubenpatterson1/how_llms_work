@@ -15,7 +15,7 @@ fields = {
   'name':              'quote-of-the-day-d9331c',       # spec_slug-run_short
   'namespace':         'training',
   'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c',
-  'port':              3000,                             # from generated app.listen()
+  'port':              3000,                             # fell back to default (port auto-detect is Node-only)
   'host':              'quote-of-the-day-d9331c-training.tools.fubotv.net',
   'healthcheck_path':  '/healthz',                        # scanned from generated handler
 }
@@ -89,7 +89,9 @@ d9331c: digest: sha256:94fda4b0d91aa01e7f37828947855cdd86bf6705cde2e05d7c6859a17
     symbol: '◉',
     color: '#22d3ee',
     sub: 'fubo Application CRD',
-    sample: `> kubectl apply -f rendered.yaml
+    sample: `> cat <<'EOF' | kubectl apply -f -
+[rendered.yaml content]
+EOF
 
 application.app.smo.tools.fubotv.net/quote-of-the-day-d9331c created
 
@@ -109,15 +111,18 @@ application.app.smo.tools.fubotv.net/quote-of-the-day-d9331c created
     symbol: '▲',
     color: '#22c55e',
     sub: 'Wait for HTTP 200',
-    sample: `> kubectl get application quote-of-the-day-d9331c -n training
+    sample: `# Poll up to 120s (Route53 + ALB target registration ~90s)
+while elapsed < 120s:
+  resp = GET https://quote-of-the-day-d9331c-training.tools.fubotv.net/healthz
+  if resp.status_code in (200, 302):
+    print("✓ Live at", url)
+    return
+  sleep 5s
 
-NAME                      IMAGE                                       REPLICAS   AVAILABLE   AGE
-quote-of-the-day-d9331c   .../architect-builds/app:d9331c            1          True        26s
-
+# This run: live on the very first poll, no retries needed
 > curl -s -o /dev/null -w "%{http_code}" https://quote-of-the-day-d9331c-training.tools.fubotv.net/healthz
 200
-
-# {"status":"ok"} — live on the first attempt, no retries needed`
+# {"status":"ok"}`
   },
 ];
 

@@ -100,9 +100,9 @@
   justify-content: center;
 }
 
-.image-slide-grid img {
+.image-slide-multi .image-slide-grid img {
   width: 100%;
-  max-width: 530px;
+  max-width: 415px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
@@ -189,6 +189,11 @@
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.78rem; line-height: 1.5;
   color: #cbd5e1; white-space: pre-wrap; margin: 0;
+}
+.app > main pre.pipeline-popover-code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 .pipeline-actions {
   margin-top: 1.25rem; display: flex; align-items: center;

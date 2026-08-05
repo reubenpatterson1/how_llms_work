@@ -155,6 +155,7 @@ Constraints: (same auth constraints as above)
 
   { id: 's8b', type: 'image', title: 'The Real Handoff — and the Real Result',
     images: [deployManualApplyImg, quoteAppLiveImg],
+    imageAlts: ['Manual apply handoff panel with rendered YAML and copy-pasteable kubectl command', 'Live deployed app response in the browser at the real ingress URL'],
     caption: 'Left: this agent host has no kubectl, so instead of applying directly it hands back the exact YAML and a copy-pasteable command — this is the correct, by-design outcome, not a failure. Right: after running that command from a machine with cluster auth, the app really is live — the actual HTTP response from the deployed pod.' },
 
   { id: 's9', type: 'text', title: 'What Gets Generated',
@@ -230,7 +231,7 @@ export default function App() {
           <div className="image-slide image-slide-multi">
             <div className="image-slide-grid">
               {slide.images.map((src, i) => (
-                <img key={i} src={src} alt={`${slide.title} (${i + 1})`} />
+                <img key={i} src={src} alt={slide.imageAlts?.[i] ?? `${slide.title} (${i + 1})`} />
               ))}
             </div>
             {slide.caption && <p className="caption">{slide.caption}</p>}
