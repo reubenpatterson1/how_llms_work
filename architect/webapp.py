@@ -291,7 +291,9 @@ def deploy_page():
     cfg = _bdcfg.load()
     healthcheck_path = _deployer.derive_healthcheck_path(workspace) or "/"
     port = _deployer.derive_port(workspace) or 3000
-    image = f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{package.spec_slug}:{run_short}"
+    # ECR repo is shared across all builds (cfg.ecr_shared_repo_slug); only the tag is
+    # per-run. resource_name/host above stay spec_slug-based, preserving per-user isolation.
+    image = f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{cfg.ecr_shared_repo_slug}:{run_short}"
     host = f"{resource_name}-{cfg.default_namespace}.tools.fubotv.net"
 
     template_path = os.path.join(os.path.dirname(__file__), "templates", "deploy_template.yaml")
@@ -323,7 +325,8 @@ def _resolve_deploy_fields(run_id: str):
     return {
         "name": resource_name,
         "namespace": cfg.default_namespace,
-        "image": f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{package.spec_slug}:{run_short}",
+        # Shared ECR repo, per-run-unique tag — see cfg.ecr_shared_repo_slug.
+        "image": f"{cfg.ecr_registry}/{cfg.ecr_repository_prefix}/{cfg.ecr_shared_repo_slug}:{run_short}",
         "port": _deployer.derive_port(workspace) or 3000,
         "host": f"{resource_name}-{cfg.default_namespace}.tools.fubotv.net",
         "healthcheck_path": _deployer.derive_healthcheck_path(workspace) or "/",

@@ -83,7 +83,8 @@ if (resetTemplateBtn) {
 }
 
 // Use the server-rendered ECR image tag (full registry/repo:tag format)
-// e.g. 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/<spec_slug>:<run_short>
+// e.g. 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:<run_short>
+// The repo is shared across all builds; the <run_short> tag is what makes it unique.
 const imageTag = window.IMAGE_TAG;
 if (!imageTag) {
   append("ERROR: window.IMAGE_TAG not set — server rendered the deploy page without an image. Reload?");

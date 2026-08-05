@@ -13,6 +13,11 @@ DEFAULTS = {
     "ollama_base_url": "http://localhost:11434",
     "ecr_registry": "650127479436.dkr.ecr.us-east-1.amazonaws.com",
     "ecr_repository_prefix": "architect-builds",
+    # Single shared ECR repository for every build, decoupled from the app's spec_slug.
+    # Invariant: one repo, per-run-unique tags (<run_id[:6]>) — so images from different
+    # runs and different app ideas coexist without collision. The deployed K8s Application
+    # name and ingress host stay derived from spec_slug, so per-user isolation is unaffected.
+    "ecr_shared_repo_slug": "app",
     "default_namespace": "training",
     "aws_region": "us-east-1",
 }
@@ -24,6 +29,7 @@ class BuildDeployConfig:
     ollama_base_url: str = DEFAULTS["ollama_base_url"]
     ecr_registry: str = DEFAULTS["ecr_registry"]
     ecr_repository_prefix: str = DEFAULTS["ecr_repository_prefix"]
+    ecr_shared_repo_slug: str = DEFAULTS["ecr_shared_repo_slug"]
     default_namespace: str = DEFAULTS["default_namespace"]
     aws_region: str = DEFAULTS["aws_region"]
 

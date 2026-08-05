@@ -9,6 +9,8 @@ def test_defaults_are_sensible():
     assert DEFAULTS["ollama_base_url"] == "http://localhost:11434"
     assert DEFAULTS["default_namespace"] == "training"
     assert DEFAULTS["aws_region"] == "us-east-1"
+    assert DEFAULTS["ecr_repository_prefix"] == "architect-builds"
+    assert DEFAULTS["ecr_shared_repo_slug"] == "app"
 
 
 def test_load_returns_defaults_when_no_file(tmp_path):
