@@ -379,10 +379,10 @@ def _parse_llm_response(text: str) -> Optional[dict]:
     return None
 
 
-def query_ollama(config: ProviderConfig, user_response: str, context: str = "",
+def query_ollama(config: ProviderConfig, prompt: str,
                  system_prompt: str = "") -> Optional[dict]:
-    """Query Ollama local LLM."""
-    prompt = _build_prompt(user_response, context)
+    """Query Ollama local LLM. `prompt` must already be the complete prompt text —
+    callers build it themselves (e.g. via _build_prompt for intake analysis)."""
     try:
         r = requests.post(
             f"{config.base_url}/api/generate",
@@ -414,10 +414,10 @@ def query_ollama(config: ProviderConfig, user_response: str, context: str = "",
     return None
 
 
-def query_openai(config: ProviderConfig, user_response: str, context: str = "",
+def query_openai(config: ProviderConfig, prompt: str,
                  system_prompt: str = "") -> Optional[dict]:
-    """Query OpenAI API."""
-    prompt = _build_prompt(user_response, context)
+    """Query OpenAI API. `prompt` must already be the complete prompt text —
+    callers build it themselves (e.g. via _build_prompt for intake analysis)."""
     if not config.api_key:
         print("[LLM Judge] OpenAI API key not set", file=sys.stderr)
         return None
@@ -455,10 +455,10 @@ def query_openai(config: ProviderConfig, user_response: str, context: str = "",
     return None
 
 
-def query_anthropic(config: ProviderConfig, user_response: str, context: str = "",
+def query_anthropic(config: ProviderConfig, prompt: str,
                     system_prompt: str = "") -> Optional[dict]:
-    """Query Anthropic API."""
-    prompt = _build_prompt(user_response, context)
+    """Query Anthropic API. `prompt` must already be the complete prompt text —
+    callers build it themselves (e.g. via _build_prompt for intake analysis)."""
     if not config.api_key:
         print("[LLM Judge] Anthropic API key not set", file=sys.stderr)
         return None
@@ -714,7 +714,8 @@ class LLMJudge:
                 print(f"[LLM Judge] Querying {self._config.type.value}:{self._config.model} (phase={self._phase.value})", file=sys.stderr)
                 context = self._build_context()
                 phase_prompt = build_system_prompt(self._phase)
-                result = query_fn(self._config, response, context, system_prompt=phase_prompt)
+                prompt = _build_prompt(response, context)
+                result = query_fn(self._config, prompt, system_prompt=phase_prompt)
                 if result is None:
                     self._last_fallback_reason = f"{self._config.type.value} query failed — check provider status in Settings"
                     print(f"[LLM Judge] Provider returned None — falling back to regex", file=sys.stderr)

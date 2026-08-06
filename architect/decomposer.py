@@ -224,7 +224,7 @@ class DecompositionEngine:
         # Build a decomposition-specific prompt
         prompt = f"Decompose this Dense Architecture Specification into single-function components:\n\n{spec}"
 
-        result = query_fn(self._llm_config, prompt, context="", system_prompt=_DECOMPOSE_SYSTEM_PROMPT)
+        result = query_fn(self._llm_config, prompt, system_prompt=_DECOMPOSE_SYSTEM_PROMPT)
         if result is None or "components" not in result:
             print("[Decomposer] LLM extraction failed, falling back to regex", file=sys.stderr)
             return None
@@ -353,6 +353,19 @@ class DecompositionEngine:
                     label=wave.label,
                     components=filtered_comps,
                 ))
+
+        # Floor: phase pruning must never zero out a non-empty plan. If every
+        # component's channel sources fall entirely inside this phase's optional
+        # set, the priority signal is meaningless (nothing is lower-priority than
+        # anything else), so keep the unpruned waves — Builder needs a DAG.
+        if not adjusted and any(w.components for w in waves):
+            print(f"[Decomposer] Phase pruning ({self._phase.value}) removed all "
+                  f"components; keeping unpruned plan", file=sys.stderr)
+            non_empty = [w for w in waves if w.components]
+            adjusted = [
+                Wave(number=i, label=w.label, components=list(w.components))
+                for i, w in enumerate(non_empty)
+            ]
 
         # Cap wave count by merging trailing waves
         if len(adjusted) > max_waves:

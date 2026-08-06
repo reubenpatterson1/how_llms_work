@@ -5,7 +5,7 @@ from architect.build_deploy_config import BuildDeployConfig, load, save, DEFAULT
 
 
 def test_defaults_are_sensible():
-    assert DEFAULTS["ollama_model"] == "mistral:7b"
+    assert DEFAULTS["ollama_model"] == "gemma4:e4b"
     assert DEFAULTS["ollama_base_url"] == "http://localhost:11434"
     assert DEFAULTS["default_namespace"] == "training"
     assert DEFAULTS["aws_region"] == "us-east-1"
@@ -16,7 +16,7 @@ def test_defaults_are_sensible():
 def test_load_returns_defaults_when_no_file(tmp_path):
     cfg_path = tmp_path / "missing.json"
     cfg = load(str(cfg_path))
-    assert cfg.ollama_model == "mistral:7b"
+    assert cfg.ollama_model == "gemma4:e4b"
     assert cfg.default_namespace == "training"
 
 

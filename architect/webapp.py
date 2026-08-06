@@ -791,7 +791,7 @@ def api_decompose():
         spec_text = gen.generate()
 
     try:
-        plan = run_decompose_programmatic(spec_text, registry, phase=phase)
+        plan = run_decompose_programmatic(spec_text, registry, phase=phase, llm_config=_global_config)
         return jsonify({
             "ok": True,
             "wave_plan": plan.to_dict(),
