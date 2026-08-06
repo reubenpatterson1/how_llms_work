@@ -4,7 +4,7 @@ import pytest
 from architect.decomposer import DecompositionEngine, parse_spec, run_decompose_programmatic
 from architect.decompose_patterns import PatternComponentExtractor, _extract_entities, _extract_resources
 from architect.llm_judge import ProjectPhase
-from architect.wave_plan import Component, DependencyEdge
+from architect.wave_plan import Component, DependencyEdge, Wave
 
 
 # ── Sample spec for testing ──
@@ -292,6 +292,106 @@ class TestDecompositionEngine:
         engine = DecompositionEngine(phase=ProjectPhase.MVP)
         engine.decompose(SAMPLE_SPEC)
         assert engine.method_used == "regex"
+
+
+# ── Specs whose every component is optional-only for lean phases ──
+
+OPTIONAL_ONLY_POC_SPEC = """# Dense Architecture Specification
+
+## Deployment
+- Infrastructure: single static HTML page served by nginx
+- CI/CD: manual copy to S3
+
+## Testing
+- Manual smoke test in browser
+"""
+
+OPTIONAL_ONLY_MVP_SPEC = """# Dense Architecture Specification
+
+## Testing
+- Manual smoke test in browser
+- Coverage: none required
+"""
+
+
+def _stub_component(cid, channels):
+    return Component(
+        id=cid, name=cid, description="stub",
+        component_type="service", channel_sources=list(channels),
+    )
+
+
+class TestPhasePruningFloor:
+    """Phase pruning must never reduce a non-empty plan to zero components."""
+
+    def test_poc_optional_only_component_survives(self):
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        waves = [Wave(number=0, label="Foundation", components=[
+            _stub_component("deploy-config", ["deployment", "testing"]),
+        ])]
+        adjusted = engine._apply_phase_adjustments(waves)
+
+        assert sum(len(w.components) for w in adjusted) >= 1
+        assert [c.id for w in adjusted for c in w.components] == ["deploy-config"]
+        assert adjusted[0].number == 0
+        assert adjusted[0].label == "Foundation"
+
+    def test_mvp_optional_only_component_survives(self):
+        engine = DecompositionEngine(phase=ProjectPhase.MVP)
+        waves = [Wave(number=0, label="Tests", components=[
+            _stub_component("test-suite", ["testing"]),
+        ])]
+        adjusted = engine._apply_phase_adjustments(waves)
+        assert sum(len(w.components) for w in adjusted) >= 1
+
+    def test_pruning_still_drops_optional_when_critical_exists(self):
+        """The floor must not defeat normal pruning."""
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        waves = [Wave(number=0, label="Foundation", components=[
+            _stub_component("task-model", ["data_model"]),
+            _stub_component("test-suite", ["testing"]),
+        ])]
+        adjusted = engine._apply_phase_adjustments(waves)
+        assert [c.id for w in adjusted for c in w.components] == ["task-model"]
+
+    def test_empty_input_stays_empty(self):
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        assert engine._apply_phase_adjustments([]) == []
+
+    def test_componentless_waves_stay_empty(self):
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        assert engine._apply_phase_adjustments([Wave(number=0, label="X", components=[])]) == []
+
+    def test_wave_cap_still_applies_to_fallback(self):
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        waves = [
+            Wave(number=i, label=f"W{i}", components=[_stub_component(f"c{i}", ["testing"])])
+            for i in range(5)
+        ]
+        adjusted = engine._apply_phase_adjustments(waves)
+
+        assert len(adjusted) == 3
+        assert sum(len(w.components) for w in adjusted) == 5
+        assert [w.number for w in adjusted] == [0, 1, 2]
+        assert adjusted[-1].label == "Remaining Components"
+
+    def test_poc_end_to_end_yields_buildable_package(self):
+        engine = DecompositionEngine(phase=ProjectPhase.POC)
+        plan = engine.decompose(OPTIONAL_ONLY_POC_SPEC)
+
+        assert plan.metrics.total_components >= 1
+        assert plan.metrics.total_waves >= 1
+        assert plan.metrics.components_per_wave and all(
+            n > 0 for n in plan.metrics.components_per_wave
+        )
+
+        package = plan.to_build_package(OPTIONAL_ONLY_POC_SPEC)
+        dag_body = package.split("dag:", 1)[1]
+        assert dag_body.strip(), "build package dag section must not be empty"
+
+    def test_mvp_end_to_end_yields_buildable_package(self):
+        plan = DecompositionEngine(phase=ProjectPhase.MVP).decompose(OPTIONAL_ONLY_MVP_SPEC)
+        assert plan.metrics.total_components >= 1
 
 
 class TestRunDecomposeProgrammatic:

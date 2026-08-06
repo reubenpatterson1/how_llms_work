@@ -144,6 +144,15 @@ class IntakeEngine:
         measurable success criteria, API versioning, and realtime specs
         are unnecessary friction. Set them to a sensible default so the
         intake engine doesn't keep drilling into them.
+
+        Do NOT add auth.* entries here. Seeding auth sub-dimensions makes
+        Channel("auth").resolution non-zero, so SpecGenerator (which only
+        skips a channel below 0.01) emits an "## Auth" section for apps that
+        never mentioned authentication, and the Decomposer extracts phantom
+        AuthService/AuthMiddleware components from it. Auth is optional for
+        the PoC phase (PHASE_CHANNEL_WEIGHTS), so it is never targeted by
+        _next_question() and never gates is_complete() — leaving it at 0.0
+        costs nothing. See tests/test_poc_auth_regression.py.
         """
         poc_defaults = [
             ("data_model", "cardinality", 0.8, "PoC scope — cardinality deferred to MVP"),
@@ -152,8 +161,6 @@ class IntakeEngine:
             ("purpose", "success_criteria", 0.8, "PoC scope — success = working demo, formal metrics at MVP"),
             ("api", "versioning", 0.9, "PoC scope — no versioning needed"),
             ("api", "realtime", 0.7, "PoC scope — defer real-time to MVP unless core to concept"),
-            ("auth", "mfa", 0.9, "PoC scope — MFA not required, deferred to MVP"),
-            ("auth", "session", 0.7, "PoC scope — basic session handling, full lifecycle at MVP"),
         ]
         for ch_id, sub_id, resolution, constraint in poc_defaults:
             ch = self.registry.channels.get(ch_id)
