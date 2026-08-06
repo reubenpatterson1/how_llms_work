@@ -80,7 +80,7 @@ def parse_build_package(path: str) -> BuildPackage:
     spec = data.get("spec", {})
     name = metadata.get("name") or _derive_name_from_purpose(spec.get("purpose", [])) or "app"
 
-    dag = data.get("dag", {})
+    dag = data.get("dag") or {}
     waves_dict: dict[int, list[dict]] = {}
     for component_id, comp in dag.items():
         comp_with_id = {**comp, "id": component_id}
@@ -263,6 +263,118 @@ app.listen(PORT, () => console.log(`app-server listening on :${PORT}`));
 '''
 
 
+_APP_SERVER_SHIM_PY = '''"""Auto-generated entry point. Built by architect.builder.assemble_project
+because the build-package's components didn't include an `app-server`.
+
+The Python Dockerfile CMD is fixed at `python src/app.py`, but decompose-output
+build-packages emit Flask *Blueprint fragments* (`bp = Blueprint(...)` plus
+`@bp.get(...)` handlers) with no `Flask(__name__)` and no `app.run(...)`, so
+without this file the container dies at once with
+`python: can't open file '/app/src/app.py'`.
+
+This shim creates the Flask app, auto-registers every module-level Blueprint
+found in sibling `src/*.py` files, and always serves `/healthz` so the K8s
+healthcheck passes even when no generated component provided one.
+"""
+import importlib.util
+import os
+import re
+import sys
+
+from flask import Blueprint, Flask, jsonify
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+# Sibling modules may import each other by module name. `python src/app.py` already
+# puts src on sys.path; be explicit so in-process loading behaves identically.
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+# Keep __pycache__ out of src/: architect.deployer scans every file under src/ as
+# text, and a .pyc there makes derive_healthcheck_path() fail on decode.
+sys.dont_write_bytecode = True
+
+app = Flask(__name__)
+# Read PORT without dict.get() on purpose: architect.deployer's route scraper treats
+# any `.get('literal')` as an HTTP route, so os.environ.get('PORT') would become a
+# bogus healthcheck candidate in the rendered deploy YAML.
+PORT = int(os.environ["PORT"]) if "PORT" in os.environ else __PORT__
+
+
+# Always-on healthcheck - guarantees the K8s probe passes even if no generated
+# handler provided one. Declared with @app.get (not @app.route) so that
+# architect.deployer.derive_healthcheck_path() can discover it.
+@app.get("/healthz")
+def _healthz():
+    return jsonify({"status": "ok"}), 200
+
+
+# A module-level `<name>.run(` in a component (app.run/asyncio.run/uvicorn.run) would
+# block this loop forever and the app would never start listening. Skip those files.
+_MODULE_LEVEL_RUN = re.compile(r"^\\w+\\.run\\(", re.MULTILINE)
+
+
+def _load_module(path, mod_name):
+    spec = importlib.util.spec_from_file_location(mod_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError("no loader for " + path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+# Auto-register any module-level Flask Blueprint from sibling files. Blueprints are
+# Blueprint instances; models/configs/services that are not blueprints get skipped.
+_seen_blueprints = set()
+for _fname in sorted(os.listdir(_HERE)):
+    if not _fname.endswith(".py") or _fname == "app.py" or _fname.startswith("_"):
+        continue
+    _path = os.path.join(_HERE, _fname)
+    _mod_name = "_arch_component_" + re.sub(r"[^0-9A-Za-z_]", "_", _fname[:-3])
+    try:
+        with open(_path, "r") as _f:
+            _source = _f.read()
+        if _MODULE_LEVEL_RUN.search(_source):
+            print("skip " + _fname + ": module-level .run() would block startup", file=sys.stderr)
+            continue
+        _module = _load_module(_path, _mod_name)
+    except Exception as _exc:
+        print("skip " + _fname + ": " + repr(_exc), file=sys.stderr)
+        continue
+    for _attr, _obj in vars(_module).items():
+        if not isinstance(_obj, Blueprint) or id(_obj) in _seen_blueprints:
+            continue
+        _seen_blueprints.add(id(_obj))
+        try:
+            try:
+                app.register_blueprint(_obj)
+            except ValueError:
+                app.register_blueprint(_obj, name=_mod_name + "_" + _attr)
+            print("registered blueprint " + _obj.name + " from " + _fname, file=sys.stderr)
+        except Exception as _exc:
+            print("skip blueprint " + _attr + " in " + _fname + ": " + repr(_exc), file=sys.stderr)
+
+# Fallback root response if no generated blueprint claimed "/".
+if not any(_rule.rule == "/" for _rule in app.url_map.iter_rules()):
+
+    @app.get("/")
+    def _root():
+        return (
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Hello World</title></head>'
+            '<body style="font-family:sans-serif;text-align:center;margin-top:4rem;background:#0f172a;color:#e2e8f0;">'
+            '<h1>Hello, World!</h1><div id="clock"></div>'
+            '<script>function tick(){document.getElementById("clock").textContent=new Date().toLocaleTimeString()};tick();setInterval(tick,1000)</script>'
+            '</body></html>'
+        )
+
+
+if __name__ == "__main__":
+    # host=0.0.0.0 is required: Flask defaults to 127.0.0.1, which is unreachable
+    # from outside the container network namespace.
+    app.run(host="0.0.0.0", port=PORT)
+'''
+
+
 def assemble_project(workspace: str, language: str, port: int, packages: list[str]) -> None:
     if language == "javascript":
         with open(os.path.join(workspace, "Dockerfile"), "w") as f:
@@ -290,6 +402,15 @@ def assemble_project(workspace: str, language: str, port: int, packages: list[st
             f.write(_DOCKERFILE_PY.format(port=port))
         with open(os.path.join(workspace, "requirements.txt"), "w") as f:
             f.write("\n".join(packages) + "\n")
+        # Write app.py shim ONLY if the build agent didn't already generate one.
+        # Decompose-output build-packages emit Flask Blueprint fragments with no
+        # Flask app and no app.run(), so the Dockerfile's `python src/app.py` CMD
+        # has nothing to run without this.
+        os.makedirs(os.path.join(workspace, "src"), exist_ok=True)
+        shim_path = os.path.join(workspace, "src", "app.py")
+        if not os.path.exists(shim_path):
+            with open(shim_path, "w") as f:
+                f.write(_APP_SERVER_SHIM_PY.replace("__PORT__", str(port)))
     else:
         raise ValueError(f"Unsupported language for assembly: {language}")
 
@@ -298,7 +419,7 @@ def assemble_project(workspace: str, language: str, port: int, packages: list[st
 
 
 _LANG_TO_EXT = {"javascript": "js", "python": "py", "typescript": "ts"}
-_LANG_TO_PORT = {"javascript": 3000, "python": 5000, "typescript": 3000}
+_LANG_TO_PORT = {"javascript": 3000, "python": 3000, "typescript": 3000}
 _DEFAULT_PACKAGES_BY_LANG = {
     "javascript": ["express", "node-fetch", "dotenv"],
     "python": ["flask", "requests"],

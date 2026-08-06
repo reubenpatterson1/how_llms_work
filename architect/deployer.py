@@ -76,7 +76,7 @@ def derive_healthcheck_path(workspace: str) -> str | None:
     for fp in _scan_files(workspace):
         try:
             text = open(fp, "r").read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         for m in _GET_ROUTE_RE.finditer(text):
             found_routes.add(m.group(1))
@@ -93,7 +93,7 @@ def derive_port(workspace: str) -> int | None:
     for fp in _scan_files(workspace):
         try:
             text = open(fp, "r").read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         m = _LISTEN_RE.search(text)
         if m:
@@ -109,7 +109,7 @@ class EcrAuthError(DeployError):
     """ECR docker login is missing or expired."""
 
 
-_ECR_AUTH_MARKERS = ("no basic auth credentials", "denied: User", "401 Unauthorized")
+_ECR_AUTH_MARKERS = ("no basic auth credentials", "denied: User", "401 Unauthorized", "authorization token has expired")
 
 
 def docker_build(image_tag: str, workspace: str, platform: str = "linux/amd64") -> str:
