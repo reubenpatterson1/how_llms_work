@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, asdict
 
 DEFAULTS = {
-    "ollama_model": "mistral:7b",
+    "ollama_model": "gemma4:e4b",
     "ollama_base_url": "http://localhost:11434",
     "ecr_registry": "650127479436.dkr.ecr.us-east-1.amazonaws.com",
     "ecr_repository_prefix": "architect-builds",

@@ -2,6 +2,13 @@
 
 Usage: python -m architect [--port PORT] [--host HOST]
 """
+import eventlet
+# socket=True fixes the Ollama-call freeze (a blocking requests.post() call
+# stalls the whole eventlet worker without this). subprocess=False is
+# deliberate: deployer.py's docker/kubectl subprocess calls are left
+# unpatched to avoid known eventlet+subprocess deadlock/ECHILD issues.
+eventlet.monkey_patch(socket=True, select=True, thread=True, time=True, os=True, subprocess=False)
+
 import argparse
 from .webapp import run
 
