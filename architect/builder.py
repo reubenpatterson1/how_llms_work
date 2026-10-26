@@ -253,7 +253,14 @@ def validate_generated_code(code: str, language: str) -> str | None:
         return f"SyntaxError: {getattr(e, 'msg', str(e))} (line {getattr(e, 'lineno', '?')})"
     m = _STUB_MARKER_RE.search(code)
     if m:
-        return f"it contains the forbidden text {m.group(0)!r} (no TODOs, placeholders or stub values)"
+        found = m.group(0)
+        if found == "placeholder":
+            return ("the word 'placeholder' is forbidden anywhere in the file, including the HTML "
+                    "placeholder= attribute; set the default with value= instead and do not use the word")
+        if found == "TODO":
+            return ("the text 'TODO' is forbidden anywhere in the file, including names such as TODOS "
+                    "and titles; rename it")
+        return f"it contains the forbidden text {found!r} (no TODOs, placeholders or stub values)"
     return None
 
 

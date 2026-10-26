@@ -125,3 +125,17 @@ def test_ollama_error_is_not_retried(tmp_path):
     errors = _payloads(events, "build:component:error")
     assert len(errors) == 1
     assert errors[0]["attempts"] == 1
+
+
+def test_retry_reason_names_placeholder_attribute_and_todo_names(tmp_path):
+    ollama = _ScriptedOllama(['import os\nPAGE = \'<input placeholder="City">\'\n', "import os\n"])
+    _run(tmp_path, ollama)
+    assert len(ollama.prompts) == 2
+    assert ("the word 'placeholder' is forbidden anywhere in the file, including the HTML placeholder= "
+            "attribute; set the default with value= instead and do not use the word") in ollama.prompts[1]
+    ollama = _ScriptedOllama(["import os\nTODOS = []\n", "import os\n"])
+    (tmp_path / "second").mkdir()
+    _run(tmp_path / "second", ollama)
+    assert len(ollama.prompts) == 2
+    assert ("the text 'TODO' is forbidden anywhere in the file, including names such as TODOS and titles; "
+            "rename it") in ollama.prompts[1]
