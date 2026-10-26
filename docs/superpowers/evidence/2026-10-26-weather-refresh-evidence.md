@@ -197,11 +197,18 @@ Success means real current weather for any valid city.
 ```
 None, no persistence.
 ```
-### api (03-api.txt)
+### api (03-api.txt) -- original, used for T4 and the Stage 1 re-checks
 ```
 `GET /` serves the HTML page.
 `GET /api/weather?city=<name>` → 200 `{"city": str, "temp_f": number, "description": str}`.
 Error responses: 400 `{"error": "city is required"}` if `city` is missing or empty; 404 `{"error": "city not found"}` when OpenWeather returns 404; 502 `{"error": "weather service unavailable"}` on any other upstream failure or a timeout; 500 `{"error": "OPENWEATHER_API_KEY not set"}` if the env var is absent.
+Upstream call: `https://api.openweathermap.org/data/2.5/weather?q=<city>&appid=<key>&units=imperial` with a 5s timeout.
+```
+### api (03-api.txt) -- run 1 tightened
+```
+`GET /api/weather?city=<name>` is the main endpoint. It returns JSON `{"city": str, "temp_f": number, "description": str}` with status 200 on success. Fixed status codes: 400 `{"error": "city is required"}` if `city` is missing or empty; 404 `{"error": "city not found"}` when OpenWeather returns 404; 502 `{"error": "weather service unavailable"}` on any other upstream failure or a timeout; 500 `{"error": "OPENWEATHER_API_KEY not set"}` if the env var is absent.
+`GET /` serves the single-page HTML with a city input defaulting to New York and a "Get weather" button.
+`GET /healthz` returns 200.
 Upstream call: `https://api.openweathermap.org/data/2.5/weather?q=<city>&appid=<key>&units=imperial` with a 5s timeout.
 ```
 ### tech-stack (04-tech-stack.txt)
@@ -235,7 +242,76 @@ pytest, with `requests.get` mocked. No real network calls in tests.
 
 ## Stage 2 runs
 
-(pending)
+### 2.1 Step 3 custom template
+`diff architect/templates/deploy_template.yaml $WORK/artifacts/weather-deploy-template.yaml` | PASS | 2026-10-26 11:55 EDT
+```
+17a18,23
+>   env:
+>     - name: OPENWEATHER_API_KEY
+>       valueFrom:
+>         secretKeyRef:
+>           name: {{name}}-openweather
+>           key: OPENWEATHER_API_KEY
+```
+Full template ($WORK/artifacts/weather-deploy-template.yaml; no key value):
+```yaml
+apiVersion: app.smo.tools.fubotv.net/v1alpha1
+kind: Application
+metadata:
+  name: {{name}}
+  namespace: {{namespace}}
+spec:
+  image: {{image}}
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { memory: 128Mi }
+  ports:
+    - name: http
+      containerPort: {{port}}
+  healthcheck:
+    path: {{healthcheck_path}}
+    portName: http
+  env:
+    - name: OPENWEATHER_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: {{name}}-openweather
+          key: OPENWEATHER_API_KEY
+  ingress:
+    enabled: true
+    host: {{host}}
+    path: /
+    portName: http
+    tls:
+      certificateArn: arn:aws:acm:us-east-1:650127479436:certificate/18d4217b-cfa1-4420-8710-269e7cf37f36
+```
+(2.1 Step 1 key gate and Step 2 ECR refresh left to the user.)
+
+### Run 1 (of at most 3) | FAIL | 2026-10-26 12:02 EDT
+- Intake sid run1-202610261159, phase poc, answers with 03-api tightened (see Intake answer sheet), 10x ollama:gemma4:e4b. Dense spec contains `GET /api/weather?city=<name>`, no Auth requirement beyond "no login and no sessions". Spec dropped `GET /healthz`, "Get weather" button and the 400/404/502/500 codes except the 400.
+- Step 2 | PASS | decompose 16:02:21Z-16:02:48Z: total_components 6, total_waves 3, max_parallelism 3, time_savings_percent 40, est sequential 100 min, parallel 60 min. Components: WeatherMiddleware, APIConfig, WeatherTestSuite | OpenWeatherApiClient | WeatherService, WeatherHandler. journal 'falling back to regex' = 0, 'done_reason=length' = 0.
+- Build | run_id RUN_ID=b6cb0a5da5c8, build:complete, no failure events. SPEC_SLUG: none in package/YAML (render names app-b6cb0a, so RUN_SHORT=b6cb0a); box _package.yaml names the weather spec.
+- Step 5 stub check | FAIL
+```
+ws/src/openweather-api-client.py:70: print("... replace 'YOUR_API_KEY' placeholder.")
+ws/src/weather-test-suite.py:7: # ... we will define a placeholder function ...
+openweathermap.org/data/2.5/weather: openweather-api-client.py:10, weather-service.py:9 (BASE_URL constants)
+```
+Beyond the grep, the handler IS a stub: ws/src/weather-handler.py `@bp.get('/api/weather')` calls a mock `IWeatherService` with hard-coded New York 20/Sunny and London 15/Cloudy and returns `{"city", "weather": {...}}` (not `temp_f`/`description`); it never calls OpenWeather.
+- Step 6 import smoke test | FAIL
+```
+env -u OPENWEATHER_API_KEY ... -> "200 400 200"   (expected third = 500)
+routes: /static/<path:filename>, /healthz, /api/weather, /
+skip openweather-api-client.py: SyntaxError (line 80: ...{e}")<unused56>)
+skip weather-middleware.py: SyntaxError (line 54: ...<unused56>)
+skip weather-service.py: SyntaxError (line 82: ...<unused56>)
+skip weather-test-suite.py: ModuleNotFoundError pytest (not in requirements.txt)
+registered blueprint weather from weather-handler.py
+GET / -> app.py fallback "Hello, World!" clock page (no city input / Get weather)
+```
+Three generated modules end with a stray `<unused56>` token (model output artifact) and fail to import; the working route is the mock handler.
+- Run 1 FAILED Steps 5 and 6. Not fixing, run 2 not started; controller decides (tighten answers vs Task 1.6 fix). Artifacts: $WORK/artifacts/run-1/{dense-spec.md,build-package.yaml,build-events.json,ws/}, shots in $WORK/shots/run-1/.
 
 ## Stage 2 artifacts
 
@@ -247,7 +323,7 @@ pytest, with `requests.get` mocked. No real network calls in tests.
 
 ## Real route paths
 
-(pending)
+- run 1 (b6cb0a5da5c8, FAILED run): spec route `GET /api/weather?city=<name>`; generated app routes `/healthz`, `/api/weather`, `/` (root is the shim fallback page). WEATHER_ROUTE=/api/weather (provisional, run 1 failed Step 6).
 
 ## Stage 3a checks
 
@@ -295,4 +371,3 @@ tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part tot
 ## Final verification
 
 (pending)
-
