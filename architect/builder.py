@@ -522,6 +522,20 @@ _DEFAULT_PACKAGES_BY_LANG = {
 }
 
 
+def _allowed_packages(language: str, component: dict) -> list[str]:
+    packages = list(_DEFAULT_PACKAGES_BY_LANG[language])
+    if language == "python" and component.get("type") == "test":
+        packages.append("pytest")
+    return packages
+
+
+def _requirements_for(package: BuildPackage) -> list[str]:
+    packages = list(_DEFAULT_PACKAGES_BY_LANG[package.language])
+    if package.language == "python" and any(c.get("type") == "test" for wave in package.waves for c in wave):
+        packages.append("pytest")
+    return packages
+
+
 def _safe_filename(component_id: str) -> str:
     """Slugify a component_id for use as a filename. Decompose may emit names like
     'city entity with name-model' that don't work as ESM import paths.
@@ -550,7 +564,7 @@ def _build_component(
         component,
         language=package.language,
         runtime=runtime,
-        allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+        allowed_packages=_allowed_packages(package.language, component),
         target_relpath=target_relpath,
         spec=package.spec,
     )
@@ -632,7 +646,7 @@ def run_build(
             workspace,
             language=package.language,
             port=_LANG_TO_PORT[package.language],
-            packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+            packages=_requirements_for(package),
         )
 
     total_ms = int((time.time() - started) * 1000)
