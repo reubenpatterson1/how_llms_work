@@ -1,0 +1,54 @@
+import os
+from typing import Dict, Any, Tuple
+
+def weather_middleware(request_params: Dict[str, str]) -> Tuple[int, Dict[str, str]]:
+    """
+    Middleware function to validate request parameters and handle known error states 
+    for the weather endpoint.
+
+    Args:
+        request_params: Dictionary containing query or path parameters (e.g., {'city': 'London'}).
+
+    Returns:
+        A tuple (status_code, response_body) representing the outcome of the middleware check.
+    """
+    # 1. Validate city parameter
+    city = request_params.get('city')
+
+    if not city or str(city).strip() == "":
+        return 400, {"error": "city is required"}
+
+    # Normalize city name for comparison
+    clean_city = city.lower().strip()
+
+    # 2. Handle unknown cities (Simulated API check)
+    if clean_city in ["unknown", "nonexistent"]:
+        return 404, {"message": "City not found"}
+
+    # 3. Successful validation - proceed to the main handler logic
+    # In a real Flask/Django setup, this would pass control to the view function.
+    print(f"Middleware passed for city: {city}")
+    return 200, {"status": "ok", "message": f"Weather data retrieved successfully for {city}"}
+
+if __name__ == '__main__':
+    # --- Test Cases ---
+
+    # Case 1: Missing city parameter (Should fail with 400)
+    print("--- Testing missing city ---")
+    status, body = weather_middleware({})
+    print(f"Status: {status}, Body: {body}")
+
+    # Case 2: Empty city parameter (Should fail with 400)
+    print("\n--- Testing empty city ---")
+    status, body = weather_middleware({'city': '   '})
+    print(f"Status: {status}, Body: {body}")
+
+    # Case 3: Unknown city (Should fail with 404/specific message)
+    print("\n--- Testing unknown city ---")
+    status, body = weather_middleware({'city': 'UnknownCityName'})
+    print(f"Status: {status}, Body: {body}")
+
+    # Case 4: Valid city (Should pass with 200)
+    print("\n--- Testing valid city ---")
+    status, body = weather_middleware({'city': 'London'})
+    print(f"Status: {status}, Body: {body}")<unused56>

@@ -5,9 +5,11 @@ with type/language-specific shape examples, dispatches to local Ollama wave-by-w
 post-processes output, writes files into a workspace, and assembles the project skeleton.
 """
 
+import ast
 import json
 import os
 import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -145,8 +147,14 @@ class PostProcessError(Exception):
 _FENCE_RE = re.compile(r"```(?:[a-zA-Z0-9_+-]*)?\s*\n(.*?)\n```", re.DOTALL)
 
 
+# gemma4:e4b sometimes emits a literal "<unusedNN>" vocab token (a normal-type token, so Ollama
+# detokenizes it as text) just before end-of-turn. Build run b6cb0a5da5c8 ended 3 of 6 Python
+# files with "<unused56>", which made them fail to import. Remove it anywhere in the output.
+_GEMMA_UNUSED_TOKEN_RE = re.compile(r"<unused\d+>")
+
+
 def post_process_output(raw: str) -> str:
-    text = (raw or "").strip()
+    text = _GEMMA_UNUSED_TOKEN_RE.sub("", raw or "").strip()
     if not text:
         raise PostProcessError("LLM returned empty output")
 

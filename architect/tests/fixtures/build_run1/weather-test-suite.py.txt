@@ -1,0 +1,79 @@
+import pytest
+from unittest.mock import patch
+import requests
+import json
+
+# Assuming there is a module/function under test that uses requests.get
+# For this example, we will define a placeholder function to simulate the component logic
+def fetch_weather(city: str) -> dict:
+    """Simulates fetching weather data from an external API."""
+    API_URL = f"https://api.weather.com/v1/current?q={city}"
+    try:
+        response = requests.get(API_URL, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        return data['weather']
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 404:
+            return {"error": f"City '{city}' not found."}
+        raise
+    except requests.exceptions.RequestException as e:
+        return {"error": "Network or connection error occurred."}
+
+@pytest.fixture(autouse=True)
+def mock_requests():
+    """Fixture to patch requests.get globally for all tests in this suite."""
+    with patch('requests.get') as mock_get:
+        yield mock_get
+
+def test_fetch_weather_success(mock_requests):
+    """Tests successful retrieval of weather data."""
+    # Setup the mock response object
+    mock_response = mock_requests.return_value
+    mock_response.status_code = 200
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {
+        "city": "London",
+        "weather": {"description": "Cloudy", "temp": 15, "unit": "C"}
+    }
+
+    result = fetch_weather("London")
+    assert result['description'] == "Cloudy"
+    assert result['temp'] == 15
+    mock_requests.assert_called_once()
+
+def test_fetch_weather_city_not_found(mock_requests):
+    """Tests handling of 404 Not Found errors."""
+    # Setup the mock response object for 404
+    mock_response = mock_requests.return_value
+    mock_response.status_code = 404
+    
+    # Simulate raise_for_status raising an HTTPError
+    http_error = requests.exceptions.HTTPError("404 Client Error: Not Found")
+    mock_response.raise_for_status.side_effect = http_error
+
+    result = fetch_weather("NonExistentCity")
+    assert "error" in result
+    assert "not found" in result["error"]
+
+def test_fetch_weather_network_failure(mock_requests):
+    """Tests handling of general network connection errors."""
+    # Setup the mock response to raise a RequestException (e.g., Timeout)
+    mock_requests.side_effect = requests.exceptions.Timeout("Connection timed out")
+
+    result = fetch_weather("Paris")
+    assert "error" in result
+    assert "Network or connection error" in result["error"]
+
+def test_fetch_weather_api_down(mock_requests):
+    """Tests handling of server errors (500)."""
+    # Setup the mock response object for 500
+    mock_response = mock_requests.return_value
+    mock_response.status_code = 500
+    
+    # Simulate raise_for_status raising an HTTPError
+    http_error = requests.exceptions.HTTPError("500 Server Error: Internal Server Error")
+    mock_response.raise_for_status.side_effect = http_error
+
+    with pytest.raises(requests.exceptions.HTTPError):
+        fetch_weather("Berlin")

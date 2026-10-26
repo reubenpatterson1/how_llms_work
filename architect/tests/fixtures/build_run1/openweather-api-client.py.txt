@@ -1,0 +1,80 @@
+import os
+import requests
+from datetime import datetime, timezone
+
+class OpenWeatherApiClient:
+    """
+    Client for interacting with the OpenWeather API.
+    Handles fetching current weather data for a given city.
+    """
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    TIMEOUT = 5  # seconds
+
+    def __init__(self, api_key: str):
+        if not api_key:
+            raise ValueError("API key must be provided.")
+        self._api_key = api_key
+
+    def get_weather(self, city: str) -> dict:
+        """
+        Fetches current weather data for a specified city.
+
+        Args:
+            city: The name of the city (e.g., "London").
+
+        Returns:
+            A dictionary containing structured weather data.
+
+        Raises:
+            requests.exceptions.RequestException: If the API call fails or times out.
+        """
+        params = {
+            'q': city,
+            'appid': self._api_key,
+            'units': 'imperial'  # Using imperial units as specified in constraints
+        }
+
+        try:
+            response = requests.get(self.BASE_URL, params=params, timeout=self.TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
+
+            # Structure the returned data for consistency
+            return {
+                'city': data.get('name'),
+                'country': data.get('sys', {}).get('country'),
+                'description': data.get('weather', [{}])[0].get('description'),
+                'temperature_f': data.get('main', {}).get('temp'),
+                'feels_like_f': data.get('main', {}).get('feels_like'),
+                'humidity': data.get('main', {}).get('humidity')
+            }
+
+        except requests.exceptions.Timeout:
+            raise TimeoutError(f"OpenWeather API request timed out after {self.TIMEOUT} seconds.")
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 401:
+                raise PermissionError("Invalid API key provided to OpenWeather API.") from e
+            elif response.status_code == 404:
+                raise ValueError(f"City '{city}' not found by OpenWeather API.") from e
+            else:
+                raise RuntimeError(f"HTTP error fetching weather data: {e}") from e
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f"A connection error occurred while connecting to the OpenWeather API: {e}") from e
+
+# Example usage (optional, but good for testing/demonstration)
+if __name__ == '__main__':
+    # NOTE: Replace 'YOUR_API_KEY' with a real key for testing
+    API_KEY = os.environ.get("OPENWEATHER_API_KEY", "YOUR_API_KEY")
+
+    if API_KEY == "YOUR_API_KEY":
+        print("Please set the OPENWEATHER_API_KEY environment variable or replace 'YOUR_API_KEY' placeholder.")
+    else:
+        client = OpenWeatherApiClient(api_key=API_KEY)
+        try:
+            weather_data = client.get_weather("New York")
+            print("\n--- Weather Data for New York ---")
+            for key, value in weather_data.items():
+                print(f"{key}: {value}")
+
+        except (TimeoutError, PermissionError, ValueError, ConnectionError, RuntimeError) as e:
+            print(f"\n[ERROR] Failed to fetch weather data: {e}")<unused56>

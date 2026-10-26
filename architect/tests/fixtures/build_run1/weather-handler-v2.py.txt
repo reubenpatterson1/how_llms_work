@@ -1,0 +1,102 @@
+import os
+
+import requests
+from flask import Blueprint, jsonify, request
+
+bp = Blueprint('items', __name__)
+
+UPSTREAM_URL = 'https://api.openweathermap.org/data/2.5/weather'
+
+
+@bp.get('/api/weather')
+def get_weather():
+    city = request.args.get('city', '').strip()
+    if not city:
+        return jsonify({'error': 'city is required'}), 400
+
+    api_key = os.environ.get('OPENWEATHER_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'OPENWEATHER_API_KEY not set'}), 500
+
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'imperial'
+    }
+
+    try:
+        upstream = requests.get(UPSTREAM_URL, params=params, timeout=5)
+    except requests.RequestException:
+        return jsonify({'error': 'weather service unavailable'}), 502
+
+    if upstream.status_code == 404:
+        return jsonify({'error': 'city not found'}), 404
+    if upstream.status_code != 200:
+        return jsonify({'error': 'weather service unavailable'}), 502
+
+    data = upstream.json()
+    try:
+        temp_f = data['main']['temp']
+        description = data['weather'][0]['description']
+        return jsonify({
+            'city': data['name'],
+            'temp_f': temp_f,
+            'description': description
+        }), 200
+    except KeyError:
+        return jsonify({'error': 'Invalid weather data received'}), 500
+
+
+@bp.get('/')
+def index():
+    default_city = 'New York'
+    return PAGE
+
+PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Weather Lookup</title></head>
+<body>
+  <h1>Weather lookup</h1>
+  <input id="city" type="text" value="New York">
+  <button id="get_weather">Get weather</button>
+  <div id="result"></div>
+  <script>
+    async function getWeather() {
+      const city = document.getElementById('city').value.trim();
+      const resultDiv = document.getElementById('result');
+      if (!city) {
+        resultDiv.textContent = 'City name is required';
+        return;
+      }
+
+      const url = '/api/weather?city=' + encodeURIComponent(city);
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (res.ok) {
+          resultDiv.innerHTML = `<strong>${data.city}</strong>: ${data.description}, ${Math.round(data.temp_f)}°F`;
+        } else if (res.status === 400) {
+          resultDiv.textContent = 'City name is required';
+        } else if (res.status === 404) {
+          resultDiv.textContent = 'City not found';
+        } else if (res.status === 502) {
+          resultDiv.textContent = 'Weather service unavailable';
+        } else {
+          // Handles 500 or other errors from the API endpoint
+          resultDiv.textContent = data.error || 'An unknown error occurred.';
+        }
+      } catch (error) {
+        resultDiv.textContent = 'Network error: Could not connect to weather service.';
+      }
+    }
+
+    document.getElementById('get_weather').addEventListener('click', getWeather);
+    // On first page load, display default city's weather
+    window.onload = () => {
+        getWeather();
+    };
+  </script>
+</body>
+</html>
+"""
