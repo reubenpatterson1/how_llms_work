@@ -774,7 +774,12 @@ class LLMJudge:
         return "\n".join(lines)
 
     def _parse_updates(self, raw_updates: list[dict]) -> list[DimensionUpdate]:
-        """Convert LLM JSON updates to DimensionUpdate objects."""
+        """Convert LLM JSON updates to DimensionUpdate objects.
+
+        One answer may carry several updates for the same (channel, sub) — e.g. three endpoints
+        in one API answer — and all are kept (SubDimension.update appends each distinct
+        constraint and keeps the max resolution). Only exact repeats are dropped.
+        """
         updates = []
         seen = set()
         for u in raw_updates:
@@ -788,7 +793,7 @@ class LLMJudge:
             if not channel or sub not in channel.sub_dimensions:
                 continue
 
-            key = (ch, sub)
+            key = (ch, sub, constraint)
             if key in seen:
                 continue
             seen.add(key)
