@@ -188,7 +188,7 @@
       "review": { "slideNumber": 10, "slideTitle": "Vague vs Dense: The Experiment" },
       "q": "In Part 2's vague-versus-dense experiment, what was the only thing that changed between the two runs?",
       "options": [
-        "The model, switching from a small local model to Claude Sonnet",
+        "The model, from a small local model to Claude Sonnet",
         "The prompt: a one-line request versus the agent's dense spec",
         "The task, switching from a simple API to a real-time application",
         "The sampling settings, from a high temperature down to a low one"
@@ -205,7 +205,7 @@
       "options": [
         "Correct, incorrect, partially correct, and unknown",
         "Prompt, system, tool output, and retrieved document",
-        "Noun, verb, technical identifier, and connective",
+        "Noun, verb, identifier, and connective",
         "Grounded, inferred, defaulted, and confabulated"
       ],
       "answer": 3,
@@ -281,7 +281,7 @@
         "They mean the same thing: the text the user types in each turn",
         "The prompt is the system message; the context is the user's message",
         "The prompt is this turn's text; the context is everything the model sees",
-        "The context is the model's training data; the prompt is the live input"
+        "The context is the model's training data, and the prompt is the live input"
       ],
       "answer": 2,
       "explanation": "Context includes the system prompt, every prior turn, tool calls and outputs, attachments, retrieved documents and finally your prompt. All of it competes for the same attention budget; the user turn is often the smallest slice."
@@ -321,15 +321,15 @@
       "part": 3,
       "term": "Dense spec → wave plan (decompose, waves)",
       "review": { "slideNumber": 15, "slideTitle": "From Dense Spec to Wave Plan" },
-      "q": "When a dense spec is decomposed into a wave plan, what is a wave?",
+      "q": "Your spec is already fully dense. Why does Part 3 still decompose it into a wave plan before building?",
       "options": [
-        "One full retry of the whole build, run again after any test fails",
-        "A set of independent components built in parallel, in dependency order",
-        "A single long session that receives the entire spec in one prompt",
-        "A production release that ships every component of the app at the same time"
+        "To lower the density so the model has more room to make its own choices",
+        "One session holding it all hits lost-in-the-middle; scoped sessions avoid it",
+        "Because a denser prompt is the real fix, and decomposing is just a temporary stopgap",
+        "So each small piece can skip testing, since it is too simple to go wrong"
       ],
       "answer": 1,
-      "explanation": "Decompose splits the spec into scoped components ordered by dependency. Interfaces are defined in Wave 0; independent components within a wave are built in parallel. Density stays high, but each session gets one small concern."
+      "explanation": "Even a perfectly dense spec is too much context for one session, which hits the lost-in-the-middle wall. Decomposition keeps density high but delivers it to agent sessions each scoped to one small concern."
     },
     {
       "id": "P3-7",
