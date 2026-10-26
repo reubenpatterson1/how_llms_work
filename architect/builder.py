@@ -196,6 +196,9 @@ class OllamaClient:
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
+                    # Disable gemma4 hidden reasoning (as Decompose does since 1580c6c): it adds
+                    # hundreds of unseen tokens per call inside the box's 4096-token context.
+                    "think": False,
                     "options": {"temperature": 0.1},
                 },
                 timeout=self.timeout,
@@ -204,6 +207,11 @@ class OllamaClient:
         except requests.RequestException as e:
             raise OllamaError(f"Ollama request failed: {e}") from e
         body = r.json()
+        print(
+            f"[Builder] Ollama {self.model}: done_reason={body.get('done_reason')} "
+            f"eval_count={body.get('eval_count')} prompt_eval_count={body.get('prompt_eval_count')}",
+            file=sys.stderr,
+        )
         return body.get("response", "")
 
 
