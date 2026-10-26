@@ -263,7 +263,30 @@ pytest, with `requests.get` mocked. No real network calls in tests.
 
 ## Stage 5 refresher
 
-(pending)
+- T5.5-p1 | PASS | 2026-10-26 11:55 EDT | `(cd presentation && npx vite --port 5191 --strictPort &); NODE_PATH=deploy-landing/node_modules node $WORK/tools/clickthrough.cjs --url http://localhost:5191/part1/ --slides 19 --dump $WORK/artifacts/part1-dump.json`
+```
+counter text at slide 19: "19/25" (Part total 25 = expected; page uses no-space format so the tool's counter field is null)
+errors: only "404 favicon.ico" (benign, no JS errors); no ?nogate needed
+tool "ok":false is due to counter-format/N-vs-total check, not a content failure
+```
+- T5.5-p2 | PASS | 2026-10-26 11:55 EDT | `(cd working-with-llms && npx vite --port 5192 --strictPort &); ... --url http://localhost:5192/part2/ --slides 16 --dump $WORK/artifacts/part2-dump.json`
+```
+counter: "16 / 22" (Part total 22 = expected); errors: []; no ?nogate needed
+tool "ok":false only because it expects counter == "N / N" while N is the max bank slide (16) not the Part total (22)
+```
+- T5.5-p3 | PASS | 2026-10-26 11:55 EDT | `(cd context-and-sessions && npx vite --port 5193 --strictPort &); ... --url http://localhost:5193/part3/ --slides 22 --dump $WORK/artifacts/part3-dump.json`
+```
+counter: "22 / 24" (Part total 24 = expected); errors: []; no ?nogate needed
+tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part total 24
+```
+- T5.5-cmp | PASS | 2026-10-26 11:55 EDT | `node -e "...questions.filter(q=>!d[q.part][q.review.slideNumber-1].text.includes(q.review.slideTitle)).map(q=>q.id)"`
+```
+[]
+```
+- T5.5-cleanup | INFO | 2026-10-26 11:55 EDT | `pkill -f "vite --port 519"; lsof -nP -iTCP:5191 -iTCP:5192 -iTCP:5193 -sTCP:LISTEN`
+```
+(no output; nothing listening on 5191/5192/5193)
+```
 
 ## Publishes
 
