@@ -237,6 +237,26 @@ def post_process_output(raw: str) -> str:
     )
 
 
+# Mirrors the plan's Task 2.2 Step 5 stub grep (plus the single-quote form of the old template's
+# stub), so a component that passes this check passes that grep.
+_STUB_MARKER_RE = re.compile(r"""\{["']result["']: ?["']value["']\}|TODO|placeholder""")
+_MAX_ATTEMPTS = 2  # first try + one retry with the rejection reason appended
+
+
+def validate_generated_code(code: str, language: str) -> str | None:
+    """Return None if `code` is acceptable, else a one-line reason. Only Python is checked."""
+    if language != "python":
+        return None
+    try:
+        ast.parse(code)
+    except (SyntaxError, ValueError) as e:
+        return f"SyntaxError: {getattr(e, 'msg', str(e))} (line {getattr(e, 'lineno', '?')})"
+    m = _STUB_MARKER_RE.search(code)
+    if m:
+        return f"it contains the forbidden text {m.group(0)!r} (no TODOs, placeholders or stub values)"
+    return None
+
+
 class OllamaError(Exception):
     """Raised when Ollama returns an error or is unreachable."""
 
@@ -526,28 +546,44 @@ def _build_component(
 
     emit("build:component:start", {"component_id": component_id})
     started = time.time()
-    try:
-        wrapped = wrap_prompt(
-            component,
-            language=package.language,
-            runtime=runtime,
-            allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
-            target_relpath=target_relpath,
-            spec=package.spec,
+    wrapped = wrap_prompt(
+        component,
+        language=package.language,
+        runtime=runtime,
+        allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+        target_relpath=target_relpath,
+        spec=package.spec,
+    )
+    prompt = wrapped
+    reason = ""
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            raw = ollama.generate(prompt)
+        except OllamaError as e:
+            emit("build:component:error", {"component_id": component_id, "error": str(e), "attempts": attempt})
+            return {"component_id": component_id, "ok": False, "error": str(e)}
+        try:
+            cleaned = post_process_output(raw)
+            reason = validate_generated_code(cleaned, package.language) or ""
+        except PostProcessError as e:
+            reason = str(e)
+        if not reason:
+            with open(target_path, "w") as f:
+                f.write(cleaned)
+            duration_ms = int((time.time() - started) * 1000)
+            emit(
+                "build:component:done",
+                {"component_id": component_id, "file_path": target_relpath,
+                 "duration_ms": duration_ms, "attempts": attempt},
+            )
+            return {"component_id": component_id, "ok": True}
+        print(f"[Builder] {component_id}: attempt {attempt} rejected: {reason}", file=sys.stderr)
+        prompt = (
+            wrapped + "\n\nYour previous output was rejected: " + reason
+            + ". Output the complete corrected file now, following every instruction above."
         )
-        raw = ollama.generate(wrapped)
-        cleaned = post_process_output(raw)
-        with open(target_path, "w") as f:
-            f.write(cleaned)
-        duration_ms = int((time.time() - started) * 1000)
-        emit(
-            "build:component:done",
-            {"component_id": component_id, "file_path": target_relpath, "duration_ms": duration_ms},
-        )
-        return {"component_id": component_id, "ok": True}
-    except (OllamaError, PostProcessError) as e:
-        emit("build:component:error", {"component_id": component_id, "error": str(e)})
-        return {"component_id": component_id, "ok": False, "error": str(e)}
+    emit("build:component:error", {"component_id": component_id, "error": reason, "attempts": _MAX_ATTEMPTS})
+    return {"component_id": component_id, "ok": False, "error": reason}
 
 
 def run_build(
