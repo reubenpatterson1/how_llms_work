@@ -93,18 +93,18 @@ FAILED architect/tests/test_analyzer.py::TestAmbiguityDetection::test_detects_et
 ```
 ok
 ```
-- T3 | PASS | 2026-10-26 11:13 EDT | `curl -s $PUB/architect/api/settings | python3 -c '...print(type,model,active_model_found,ollama_models)'`
+- T3 (before fix) | PASS | 2026-10-26 11:13 EDT | `curl -s $PUB/architect/api/settings | python3 -c '...print(type,model,active_model_found,ollama_models)'`
 ```
 ollama gemma4:e4b True ['gemma4:e4b', 'gemma4:12b', 'gemma4:31b', 'mistral:7b', 'gemma3:12b', 'gemma3:4b', 'gemma:7b', 'sve-llm:latest', 'llama3.2:latest']
 (/architect/api/status -> 200 JSON, analysis_method gemma4:e4b)
 ```
-- T4 | PASS | 2026-10-26 11:16 EDT | 10 answers POSTed to `$PUB/architect/api/send`, sid t4-202610261113, phase poc
+- T4 (before fix) | PASS | 2026-10-26 11:16 EDT | 10 answers POSTed to `$PUB/architect/api/send`, sid t4-202610261113, phase poc
 ```
 10 x ollama:gemma4:e4b  (no regex)
 spec auth: "## Auth" -> "No login required for PoC", "No sessions required for PoC"; no JWT/OAuth requirement
 (note: dense spec is lossy: Tech Stack has 5 "N/A" bullets, Deployment omits env var / Secret, Error Handling only the 400 case)
 ```
-- T5 | FAIL | 2026-10-26 11:17 EDT | browser `$PUB/decompose/`, spec pasted, PoC, Run Decompose (start 15:16:59Z, end ~15:17:48Z)
+- T5 (before fix) | FAIL | 2026-10-26 11:17 EDT | browser `$PUB/decompose/`, spec pasted, PoC, Run Decompose (start 15:16:59Z, end ~15:17:48Z)
 ```
 Components: AuthService, ErrorHandler, DeploymentConfig, TestSuite (wave 0); AuthMiddleware (wave 1). No weather component, Auth* present.
 journal: [LLM Judge] Failed to parse response (LLM did return WeatherService/OpenWeatherConfig JSON, 2899 chars, ```json fenced)
@@ -112,7 +112,7 @@ journal: [Decomposer] LLM extraction failed, falling back to regex  (count in wi
 journal: [Decomposer] Phase pruning (poc) removed all components; keeping unpruned plan
 ```
 Screenshot .claude/weather-refresh-work/shots/t5-decompose.png; package artifacts/t5/build-package.yaml (build-package-poc.yaml).
-- T6 | PASS | 2026-10-26 11:19 EDT | browser `$PUB/architect/build`, upload t5/build-package.yaml, Start Build (package is the regex/Auth one from T5)
+- T6 (before fix) | PASS | 2026-10-26 11:19 EDT | browser `$PUB/architect/build`, upload t5/build-package.yaml, Start Build (package is the regex/Auth one from T5)
 ```
 POST /architect/build/start -> run_id 18c40b01bb22; GET /architect/build/status?run=... polled -> complete:true; "Continue to Deploy ->" href /architect/deploy?run=18c40b01bb22
 _package.yaml on box names the weather spec ("A weather page that displays current weather information."); workspace has Dockerfile requirements.txt src/ (no app.py listed)
@@ -137,14 +137,49 @@ Original error: denied: Your authorization token has expired. Reauthenticate and
 ```
 Retry after ECR refresh not possible: refresh script run was blocked (T0.4).
 - T7.apply | BLOCKED | 2026-10-26 11:21 EDT | Apply button stays disabled until push succeeds; kubectl_missing handoff not exercised. Screenshot shots/t7-deploy.png.
+- T3 (after fix 1580c6c) | PASS | 2026-10-26 11:38 EDT | `curl -s $PUB/architect/api/settings | python3 -c '...'` (service restarted once)
+```
+status 200; ollama gemma4:e4b True ['gemma4:e4b', 'gemma4:12b', 'gemma4:31b', 'mistral:7b', 'gemma3:12b', 'gemma3:4b', 'gemma:7b', 'sve-llm:latest', 'llama3.2:latest']
+```
+- T4 (after fix 1580c6c) | PASS | 2026-10-26 11:41 EDT | fresh intake sid t4b-202610261138, phase poc, 10 answers to `$PUB/architect/api/send`
+```
+10 x ollama:gemma4:e4b (no regex)
+spec "## Auth": "no login and no sessions (public PoC)", "no sessions required for public PoC"; no JWT/OAuth/login requirement
+```
+- T5 (after fix 1580c6c) | PASS | 2026-10-26 11:42 EDT | browser `$PUB/decompose/`, spec t4b-spec.md pasted, PoC, Run Decompose (15:41:51Z -> 15:42:15Z, 24s)
+```
+6 components / 3 waves: ErrorHandlingMiddleware, ApiConfig, WeatherTestSuite | OpenWeatherApiClient | WeatherService, WeatherHandler
+no Auth* component; weather feature + route handler (WeatherHandler) + config + tests present
+journalctl 15:41:45-15:42:30Z: grep -c 'LLM extraction failed, falling back to regex' = 0 ; grep -c 'done_reason=length' = 0
+minor: dependency graph names "weather-middleware" for the component named ErrorHandlingMiddleware; Interface Contracts shows IWeatherApiClient with empty body
+```
+Screenshot shots/t5-decompose-after-fix.png; package artifacts/t5/build-package.yaml.
+- T6 (after fix 1580c6c) | PASS | 2026-10-26 11:45 EDT | browser `$PUB/architect/build`, upload t5/build-package.yaml, Start Build
+```
+POST /architect/build/start 200 -> run_id cef24f1f47b6; status polled to complete:true (build:complete, no failure events); "Continue to Deploy" -> /architect/deploy?run=cef24f1f47b6
+box _package.yaml names weather spec; src/ has weather-handler, weather-service, openweather-api-client, api-config, weather-middleware, weather-test-suite, app.py; Dockerfile, requirements.txt, .env.example
+```
+Screenshot shots/t6-build-after-fix.png.
+- T7.render (after fix, run cef24f1f47b6) | PASS | 2026-10-26 11:46 EDT | `curl -s -X POST $PUB/architect/deploy/render ... | grep -nE "containerPort|path:"`
+```
+14:      containerPort: 3000
+16:    path: /healthz
+21:    path: /
+```
+T7 image build/push/apply NOT re-run (push pending user's ECR token refresh).
 
 ## Stage 1 known open issues
 
-(pending)
+- Regex-fallback auth/no-feature rule | open | not on the weather path after fix | repro: decompose with the LLM unreachable (e.g. no Ollama / bad model) and observe Auth* components and no feature component
+- Live nginx config (/etc/nginx/conf.d/llm-course.conf) not in git | open | repro: `ssh -i ~/key.pem $SSH_TARGET 'sudo nginx -T'` vs `git ls-files | grep -i nginx`
+- Cross-account EC2 443514608959 vs ECR/EKS 650127479436 | open | manual kubectl handoff by design | repro: `ssh -i ~/key.pem $SSH_TARGET 'aws sts get-caller-identity'` vs the ECR/EKS account
+- Poll-ingress button dead on http (browser Private Network Access block) | open | repro: Deploy page poll ingress on http://<host>:8080 hangs "still waiting"
+- 2 pre-existing test_analyzer failures | open, unrelated | repro: `python -m pytest architect/tests/test_analyzer.py -q` (test_detects_simple, test_detects_etc)
+- D1 decompose truncation (LLM response failed to parse, regex fallback) | fixed by 1580c6c | repro: T5 journal count of 'falling back to regex' (0 after fix)
 
 ## Stage 1 blocking fixes
 
-(pending)
+- D1 decompose truncation -> test_decompose_ollama_think.py (7 tests) -> architect/llm_judge.py, architect/decomposer.py -> commit 1580c6c
 
 ## Intake answer sheet
 
