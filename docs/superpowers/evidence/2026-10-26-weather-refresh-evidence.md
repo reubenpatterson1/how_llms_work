@@ -313,6 +313,33 @@ GET / -> app.py fallback "Hello, World!" clock page (no city input / Get weather
 Three generated modules end with a stray `<unused56>` token (model output artifact) and fail to import; the working route is the mock handler.
 - Run 1 FAILED Steps 5 and 6. Not fixing, run 2 not started; controller decides (tighten answers vs Task 1.6 fix). Artifacts: $WORK/artifacts/run-1/{dense-spec.md,build-package.yaml,build-events.json,ws/}, shots in $WORK/shots/run-1/.
 
+### Run 2 (of at most 3) | FAIL (check 6 only) | 2026-10-26 12:43-12:55 EDT
+Generator fixes 7e8a52a..5355e91 shipped and service restarted once before this run. RUN_ID=ab23193b2194, RUN_SHORT=ab2319, sid run2-202610261243 (SPEC_SLUG: none in package, app name app-ab2319). Answers: run-1 files unchanged (01 first, then driven by next_question: 04, 02, 03, 05..10), 10x ollama:gemma4:e4b.
+- Check 1 (dense spec grep, before Decompose) | PASS
+```
+GET /healthz: 2 | GET / : 2 | 404: 2 | 502: 2 | 500: 2 | Get weather: 4 | temp_f: 2 | OPENWEATHER_API_KEY: 2
+```
+(dense spec still has 6 "Not required / out of scope (user marked N/A)" bullets; Auth section has no auth requirement)
+- Step 2 decompose (16:47:15Z-16:47:54Z) | PASS: total_components 10, total_waves 3, max_parallelism 6, time_savings_percent 70, estimated_sequential_minutes 200, parallel 60. Components: CityName, WeatherData, HealthzHandler, ErrorHandlingMiddleware, ApiKeyConfig, WeatherTestSuite | OpenWeatherClient | WeatherService, RootHandler, WeatherApiHandler. journal 'falling back to regex' = 0; no done_reason line (and no length) in the decompose window.
+- Build (start 16:48:06Z, complete by 16:50:12Z): build:complete; all 10 components build:component:done with attempts=1; no errors. Check 2 [Builder] journal: 10 x `done_reason=stop` (eval_count 21..804), 0 x `done_reason=length`, 0 x `rejected`.
+```
+[Builder] Ollama gemma4:e4b: done_reason=stop eval_count=804 prompt_eval_count=1377
+[Builder] Ollama gemma4:e4b: done_reason=stop eval_count=771 prompt_eval_count=1406
+[Builder] Ollama gemma4:e4b: done_reason=stop eval_count=798 prompt_eval_count=1394
+```
+- Step 4 | PASS: box _package.yaml names the weather spec ("display real current weather for any valid city", "A 'Hello, World!' weather page with input, button, and result area.").
+- Step 5 stub check | PASS: first grep prints nothing; second has 6 hits (base_url constants in openweather-client, weather-service, weather-data, and UPSTREAM_URL in healthz-handler, root-handler, weather-api-handler). requirements.txt: flask, requests, pytest.
+- Step 6 import smoke test | PASS: `200 400 500`. Routes: `/`, `/`, `/`, `/api/weather` x3, `/healthz`, `/static/<path:filename>` (the three handler files each define `/api/weather` and `/` via blueprint named "items"; `/` is present).
+- Check 6 in-process page and contract | FAIL
+```
+page True True True
+200 {'city': 'Chicago', 'description': 'clear sky', 'temp_f': -367.51}     (expected temp_f 51.2)
+404 404
+```
+Cause: weather-api-handler.py (and siblings) call upstream without `units=imperial` (params = {q, appid}) and convert Kelvin to F: `temp_f = temp_kelvin*9/5 - 459.67`. The mock returns an imperial value, so conversion gives -367.51. Live behavior would likely still give a correct F value (Kelvin default), but it departs from the spec's upstream URL (`units=imperial`), and the temp_f differs between handler copies (round 1 vs round 2 decimals). Also 4 of 6 files use http:// (not https) for the upstream URL, sending the key in clear text.
+- Other observations: three of the 10 components (healthz-handler, root-handler, weather-api-handler) are near-duplicates each defining all routes; healthz-handler.py defines `/api/weather` and `/`, not `/healthz` (that is served by the app.py shim). Service/client/model files are unused (as predicted in the build-fix spec section 7).
+- Run 3 not started; nothing fixed. Artifacts: $WORK/artifacts/run-2/{dense-spec.md,spec-grep.txt,build-package.yaml,build-events.json,builder-journal.txt,intake-log.txt,ws/}; shots in $WORK/shots/run-2/.
+
 ## Stage 2 artifacts
 
 (pending)
@@ -323,6 +350,7 @@ Three generated modules end with a stray `<unused56>` token (model output artifa
 
 ## Real route paths
 
+- run 2 (ab23193b2194, FAILED check 6): handler route `GET /api/weather?city=<name>` (weather-api-handler.py `@bp.get('/api/weather')`), page `GET /`, health `GET /healthz` (app.py shim). WEATHER_ROUTE=/api/weather.
 - run 1 (b6cb0a5da5c8, FAILED run): spec route `GET /api/weather?city=<name>`; generated app routes `/healthz`, `/api/weather`, `/` (root is the shim fallback page). WEATHER_ROUTE=/api/weather (provisional, run 1 failed Step 6).
 
 ## Stage 3a checks
