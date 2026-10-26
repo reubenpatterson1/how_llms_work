@@ -224,7 +224,10 @@ class DecompositionEngine:
         # Build a decomposition-specific prompt
         prompt = f"Decompose this Dense Architecture Specification into single-function components:\n\n{spec}"
 
-        result = query_fn(self._llm_config, prompt, system_prompt=_DECOMPOSE_SYSTEM_PROMPT)
+        # Ollama: disable model reasoning so it cannot consume the num_predict
+        # budget and truncate the JSON (gemma4:e4b, 2026-10-26).
+        extra = {"think": False} if self._llm_config.type == ProviderType.OLLAMA else {}
+        result = query_fn(self._llm_config, prompt, system_prompt=_DECOMPOSE_SYSTEM_PROMPT, **extra)
         if result is None or "components" not in result:
             print("[Decomposer] LLM extraction failed, falling back to regex", file=sys.stderr)
             return None
