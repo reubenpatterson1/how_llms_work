@@ -112,17 +112,75 @@ def _load_shape_template(component_type: str, language: str) -> str:
         return f.read().strip()
 
 
+_LANG_TO_RUNTIME = {"javascript": "Node 20", "python": "Python 3.12", "typescript": "Node 20"}
+
+# Spec channels a handler sees verbatim, in this order.
+_HANDLER_SPEC_SECTIONS = [
+    ("purpose", "Purpose"),
+    ("api", "API"),
+    ("error_handling", "Error Handling"),
+    ("data_model", "Data Model"),
+    ("security", "Security"),
+    ("performance", "Performance"),
+]
+# Intake auto-fill / dismissal lines carry no build information.
+_SPEC_NOISE_PREFIXES = ("PoC scope —", "Not required / out of scope")
+# Decompose prompt lines that ask for cross-file imports. Python component files are named with
+# hyphens and loaded one by one by the shim, so a component can never import another.
+_PROMPT_IMPORT_LINE_PREFIXES = ("Depends on (import, do not implement):", "Dependencies:")
+
+_PY_FILE_RULES = [
+    "The app shell loads this file on its own. Other generated files cannot be imported. Do not import project modules, and do not write mock, fake, stub, placeholder or hard-coded stand-in classes or data for them. Implement everything this file needs directly with the allowed packages.",
+    'No `if __name__ == "__main__":` block, no example usage, no TODO comments.',
+    "Read environment variables inside functions at request time, never at import time. Never log, return or render a secret.",
+]
+_PY_HANDLER_RULES = [
+    "The app shell already serves GET /healthz. Do not define it.",
+    "Implement every other route in the API section in this one Blueprint named `bp`. A route that serves an HTML page returns the whole page as an inline Python string (no render_template, no template or static files).",
+    "Return exactly the JSON fields and status codes the spec lists. Copy UI labels, button text and error messages from the spec exactly, with the same capitalisation.",
+    "In page JavaScript, put GET parameters in the URL query string as the shape does; a GET fetch() has no body.",
+]
+
+
+def _spec_excerpt(spec: dict) -> str:
+    lines: list[str] = []
+    for key, title in _HANDLER_SPEC_SECTIONS:
+        items = [str(x) for x in (spec.get(key) or []) if not str(x).startswith(_SPEC_NOISE_PREFIXES)]
+        if items:
+            lines.append(f"{title}:")
+            lines.extend(f"- {x}" for x in items)
+    return "\n".join(lines)
+
+
 def wrap_prompt(
     component: dict,
     language: str,
     runtime: str,
     allowed_packages: list[str],
     target_relpath: str,
+    spec: dict | None = None,
 ) -> str:
     shape = _load_shape_template(component["type"], language)
     constraints_block = "\n".join(f"- {c}" for c in component.get("constraints", []))
     if not constraints_block:
         constraints_block = "- (none)"
+
+    component_prompt = component.get("prompt", "").strip()
+    extra = ""
+    if language == "python":
+        component_prompt = "\n".join(
+            line for line in component_prompt.split("\n")
+            if not line.startswith(_PROMPT_IMPORT_LINE_PREFIXES)
+        ).strip()
+        component_type = component.get("type")
+        # Test files must reach the code under test, so they do not get the no-imports rule.
+        rules = ([] if component_type == "test" else _PY_FILE_RULES[:1]) + _PY_FILE_RULES[1:]
+        if component_type == "handler":
+            rules = rules + _PY_HANDLER_RULES
+            excerpt = _spec_excerpt(spec or {})
+            if excerpt:
+                extra += "Application spec (this file must implement all of it):\n" + excerpt + "\n\n"
+        extra += "Rules for this file:\n" + "\n".join(f"- {r}" for r in rules) + "\n\n"
 
     return (
         "You are generating one source file. Output the file CONTENTS ONLY — "
@@ -135,7 +193,8 @@ def wrap_prompt(
         f"{shape}\n\n"
         f"Component purpose: {component.get('id', 'unnamed')} ({component.get('type', 'unknown')})\n"
         f"Architecture constraints:\n{constraints_block}\n\n"
-        f"Original component prompt: {component.get('prompt', '').strip()}\n\n"
+        f"Original component prompt: {component_prompt}\n\n"
+        f"{extra}"
         f"Produce {target_relpath} now."
     )
 
@@ -474,6 +533,7 @@ def _build_component(
             runtime=runtime,
             allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
             target_relpath=target_relpath,
+            spec=package.spec,
         )
         raw = ollama.generate(wrapped)
         cleaned = post_process_output(raw)
@@ -495,9 +555,11 @@ def run_build(
     workspace: str,
     ollama: OllamaClient,
     emit,
-    runtime: str = "Node 20",
+    runtime: str | None = None,
 ) -> dict:
     package = parse_build_package(package_path)
+    if runtime is None:
+        runtime = _LANG_TO_RUNTIME[package.language]
     started = time.time()
     emit(
         "build:start",

@@ -1,7 +1,64 @@
-from flask import Blueprint, jsonify
+import os
 
-bp = Blueprint('thing', __name__)
+import requests
+from flask import Blueprint, jsonify, request
 
-@bp.get('/path')
-def handler():
-    return jsonify({'result': 'value'}), 200
+bp = Blueprint('items', __name__)
+
+UPSTREAM_URL = 'https://api.example.com/v1/items'
+
+
+@bp.get('/api/items')
+def get_item():
+    name = request.args.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    api_key = os.environ.get('EXAMPLE_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'EXAMPLE_API_KEY not set'}), 500
+    try:
+        upstream = requests.get(UPSTREAM_URL, params={'q': name, 'key': api_key}, timeout=5)
+    except requests.RequestException:
+        return jsonify({'error': 'upstream unavailable'}), 502
+    if upstream.status_code == 404:
+        return jsonify({'error': 'item not found'}), 404
+    if upstream.status_code != 200:
+        return jsonify({'error': 'upstream unavailable'}), 502
+    data = upstream.json()
+    return jsonify({'name': data['name'], 'price': data['price']}), 200
+
+
+# Only when the spec's API section lists a GET / page:
+@bp.get('/')
+def index():
+    return PAGE
+
+
+PAGE = """<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Items</title></head>
+<body>
+  <h1>Item lookup</h1>
+  <input id="name" type="text" value="Widget">
+  <button id="go">Look up</button>
+  <div id="result"></div>
+  <script>
+    async function lookUp() {
+      const name = document.getElementById('name').value.trim();
+      const result = document.getElementById('result');
+      const res = await fetch('/api/items?name=' + encodeURIComponent(name));
+      const data = await res.json();
+      if (res.ok) {
+        result.textContent = data.name + ': ' + data.price;
+      } else if (res.status === 404) {
+        result.textContent = 'Item not found';
+      } else {
+        result.textContent = data.error;
+      }
+    }
+    document.getElementById('go').addEventListener('click', lookUp);
+    lookUp();
+  </script>
+</body>
+</html>
+"""
