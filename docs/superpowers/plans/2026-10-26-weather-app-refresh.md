@@ -31,17 +31,19 @@
 - Fixed names: role `arn:aws:iam::650127479436:role/Github-Actions-OIDC-Policy`; region `us-east-1`; ECR repo `650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app`; namespace `training`; Secret `<app-name>-openweather` with key `OPENWEATHER_API_KEY`; learner repo/app `llm-wx-<github-login>`; host `<app-name>-training.tools.fubotv.net`; image tag `<app-name>-<short-sha>`.
 - Unchanged: `architect/templates/deploy_template.yaml`, `deploy-landing/flow-through.js`, `testing-with-llms/index.html`, `cicd-with-llms/`, `presentation/`, `working-with-llms/`, `context-and-sessions/`, `DeploymentStack.jsx`. Dead code (`WaveGridReplay.jsx`, `wave-trace.js`, `building-with-llms/`, `deploying-with-llms/`) is mentioned in stage reports and never removed.
 - `$EVID` entry format: `- <check-id> | PASS/FAIL/INFO | <YYYY-MM-DD HH:MM TZ> | \`<command>\`` followed by a fenced output excerpt of at most 15 lines.
+- Shared files and ordering: `deploy-landing/index.html` edits and their commit happen back to back and the file is never left dirty; `$EVID` commits include only completed sections; stages execute sequentially, Stage 5 after Stage 4 (or when Stage 4 is blocked at a human gate).
 
 **Runtime values** (resolved during execution, recorded in `$EVID`, then used verbatim by later tasks):
 
 | Name | Produced by | Meaning |
 | --- | --- | --- |
 | `LIVE_HOST`, `SSH_TARGET` (`ec2-user@$LIVE_HOST`), `PUB` | 1.1 | live EC2 hostname; public base URL (expected `http://$LIVE_HOST:8080`) |
-| `BOX_ARCHITECT_DIR`, `BOX_VENV`, `DOCROOT_MAP`, `NGINX_FILE` | 1.1 | systemd WorkingDirectory; venv from ExecStart; URL-path → box-dir map; nginx config path |
+| `BOX_ARCHITECT_DIR`, `BOX_VENV`, `DOCROOT_MAP`, `NGINX_FILE` | 1.1 | directory that contains the loaded `webapp.py` (not the systemd WorkingDirectory); venv from ExecStart; URL-path → box-dir map; nginx config path |
 | `TRAINING_CLUSTER` | 0b.1 | EKS cluster name that hosts `training` |
 | `SECRET_REF_FIELD_PATH`, `SECRET_REF_BLOCK` | 0c.1 | CRD field path, plus the exact YAML block under `spec:` that sources `OPENWEATHER_API_KEY` from a Secret |
-| `RUN_ID`, `SPEC_SLUG`, `RUN_SHORT`, `APP_NAME`, `APP_HOST`, `WEATHER_ROUTE` | 2.2–2.4 | successful worked-example run; `APP_NAME=$SPEC_SLUG-$RUN_SHORT`; real weather route path |
+| `RUN_ID`, `SPEC_SLUG`, `RUN_SHORT`, `APP_NAME`, `APP_HOST`, `WEATHER_ROUTE` | 2.2–2.4 | successful worked-example run; `APP_NAME=$SPEC_SLUG-$RUN_SHORT`; real weather route path (`WEATHER_ROUTE=/api/weather` unless 2.2 Step 6 records a different path) |
 | `REHEARSAL_REPO`, `REHEARSAL_HOST` | 3b.4 | `fubotv/llm-wx-rpatterson-fubotv`; `llm-wx-rpatterson-fubotv-training.tools.fubotv.net` (login from `gh api user -q .login`) |
+| `REHEARSAL_WEATHER_ROUTE` | 3b.4 Step 2 | real weather route path of the rehearsal generation (`/api/weather` unless the 3b.4 Step 2 Task 2.2 Step 6 check records a different path); used in 3b.4 Step 7, 4.3 and 4.4 |
 
 ## Review Focus
 
@@ -55,7 +57,7 @@ Five failure modes the spec implies that its own criteria do not catch, most lik
 
 ## Stage order and parallelism
 
-`0a → {0c, 0b, 1, 5}` start together. `0c` (read-only) must pass before Task 2.3 (deploy). `0b` runs alongside 1 → 2 → 3a. `3b` needs 3a + 0b PASS + 0c PASS. `4` needs 3b. `5` needs only 0a and runs in parallel, but Task 5.7 (publish) runs last, after Stage 4 is done or stopped. If 0b FAILs: stop 3b and 4, and continue 1, 2, 3a and 5.
+`0a → {0c, 0b, 1, 5}` start together. `0c` (read-only) must pass before Task 2.3 (deploy). `0b` runs alongside 1 → 2 → 3a. `3b` needs 3a + 0b PASS + 0c PASS. `4` needs 3b. `5` needs only 0a, but tasks execute one at a time (pre-flight ruling I6): Stage 5 runs after Stage 4, or earlier only while Stage 4 is parked at a human gate and never while `deploy-landing/index.html` is dirty. Task 5.7 (publish) runs last, after Stage 4 is done or stopped. If 0b FAILs: stop 3b and 4, and continue 1, 2, 3a and 5.
 
 ---
 
@@ -155,8 +157,8 @@ Five failure modes the spec implies that its own criteria do not catch, most lik
         - id: s6
           continue-on-error: true
           run: |
-            aws eks update-kubeconfig --name eks-staging-observability --region us-east-1
-            if [ "$TRAINING_CLUSTER" != "eks-staging-observability" ]; then aws eks update-kubeconfig --name "$TRAINING_CLUSTER" --region us-east-1; fi
+            aws eks update-kubeconfig --name eks-staging-observability --region us-east-1 || echo "observability kubeconfig failed"
+            aws eks update-kubeconfig --name "$TRAINING_CLUSTER" --region us-east-1
         - { id: s7, continue-on-error: true, run: kubectl version }
         - { id: s8, continue-on-error: true, run: kubectl auth can-i create applications.app.smo.tools.fubotv.net -n training }
         - { id: s9, continue-on-error: true, run: kubectl auth can-i get deployments -n training }
@@ -168,7 +170,7 @@ Five failure modes the spec implies that its own criteria do not catch, most lik
           run: |
             for s in s1:${{ steps.s1.outcome }} s2:${{ steps.s2.outcome }} s3login:${{ steps.s3login.outcome }} s3:${{ steps.s3.outcome }} s4:${{ steps.s4.outcome }} s5:${{ steps.s5.outcome }} s6:${{ steps.s6.outcome }} s7:${{ steps.s7.outcome }} s8:${{ steps.s8.outcome }} s9:${{ steps.s9.outcome }} s10a:${{ steps.s10a.outcome }} s10b:${{ steps.s10b.outcome }} s10c:${{ steps.s10c.outcome }}; do echo "$s"; done
   ```
-  (Plan resolution: the `report` step and the split of step 10 into s10a–c make per-check pass/fail exact. `kubectl auth can-i` exits 1 on "no".)
+  (Plan resolution: the `report` step and the split of step 10 into s10a–c make per-check pass/fail exact. `kubectl auth can-i` exits 1 on "no". In s6 the `TRAINING_CLUSTER` kubeconfig runs last, so it is the current context and the only command that can fail the step.)
 - [ ] **Step 3:** Create and push: `gh repo create fubotv/llm-course-oidc-spike --private && cd $WORK/oidc-spike && git init -b staging && git add .github/workflows/spike.yml && git commit -m "OIDC spike" && git remote add origin git@github.com:fubotv/llm-course-oidc-spike.git && git push -u origin staging && gh repo edit fubotv/llm-course-oidc-spike --default-branch staging`.
 - [ ] **Step 4:** `RID=$(gh run list -R fubotv/llm-course-oidc-spike -L1 --json databaseId -q '.[0].databaseId'); gh run watch $RID -R fubotv/llm-course-oidc-spike; gh run view $RID -R fubotv/llm-course-oidc-spike --log > $WORK/artifacts/spike-$RID.log`.
 
@@ -193,10 +195,10 @@ All live checks use the public URL. Run the snapshot (`<stage>=1`) before Task 1
 **Files:** Modify `$EVID §Environment (T0)`. **Interfaces:** Produces `LIVE_HOST`, `SSH_TARGET`, `PUB`, `BOX_ARCHITECT_DIR`, `BOX_VENV`, `DOCROOT_MAP`, `NGINX_FILE`, and `NGINX_PROXIES_BUILD: bool`.
 
 - [ ] **Step 1:** `for h in ec2-100-58-203-210.compute-1.amazonaws.com ec2-52-91-187-71.compute-1.amazonaws.com; do echo "$h $(curl -s -m 10 -o /dev/null -w '%{http_code}' http://$h:8080/)"; done`. The host returning 200 is `LIVE_HOST`. If neither does, ask the user for the host.
-- [ ] **Step 2:** `ssh -i ~/key.pem $SSH_TARGET 'systemctl cat llm-architect.service; systemctl is-active llm-architect.service; ls -la /var/www/llm-course/'`. Record WorkingDirectory as `BOX_ARCHITECT_DIR`, the ExecStart interpreter dir as `BOX_VENV`, any `URL_PREFIX`, and the docroot listing.
+- [ ] **Step 2:** `ssh -i ~/key.pem $SSH_TARGET 'systemctl cat llm-architect.service; systemctl is-active llm-architect.service; ls -la /var/www/llm-course/'`. Set `BOX_ARCHITECT_DIR` to the directory that contains the loaded `webapp.py`, NOT the WorkingDirectory: WorkingDirectory + `/architect` when ExecStart uses `-m architect.webapp`, otherwise the directory of the `webapp.py` path in ExecStart. Verify with `ssh -i ~/key.pem $SSH_TARGET "test -f $BOX_ARCHITECT_DIR/webapp.py && echo ok"`, expected `ok`; if not `ok`, stop and ask the user. Record `BOX_ARCHITECT_DIR`, the WorkingDirectory, the ExecStart interpreter dir as `BOX_VENV`, any `URL_PREFIX`, and the docroot listing.
 - [ ] **Step 3 (read-only):** `ssh -i ~/key.pem $SSH_TARGET 'sudo nginx -T 2>/dev/null' > $WORK/artifacts/nginx-T.txt; grep -nE "server_name|listen|location|proxy_pass|root |alias" $WORK/artifacts/nginx-T.txt`. Record `NGINX_FILE`, `DOCROOT_MAP` (`/`, `/part1/`…`/part5/`, `/architect/`, `/decompose/` → dir or upstream), and whether `/build/`, `/deploy/` and `/architect/build/` reach Flask (`NGINX_PROXIES_BUILD`).
 - [ ] **Step 4:** `EC2_HOST=$SSH_TARGET ./scripts/refresh-ec2-ecr-auth.sh`. Expected output includes `Login Succeeded`. Do not edit the script.
-- [ ] **Step 5:** Define the ship command in `$EVID`: `rsync -az --exclude workspaces/ --exclude __pycache__/ --exclude .provider_config.json --exclude .build_deploy_config.json --exclude analytics.db --exclude test_results.json architect/ $SSH_TARGET:$BOX_ARCHITECT_DIR/` (no `--delete`; plan resolution). Restart command: `ssh -i ~/key.pem $SSH_TARGET 'sudo systemctl restart llm-architect.service && sleep 3 && systemctl is-active llm-architect.service'`, expected `active`.
+- [ ] **Step 5:** Define the ship command in `$EVID`: `rsync -az -e "ssh -i ~/key.pem" --exclude workspaces/ --exclude __pycache__/ --exclude .provider_config.json --exclude .build_deploy_config.json --exclude analytics.db --exclude test_results.json architect/ $SSH_TARGET:$BOX_ARCHITECT_DIR/` (no `--delete`; plan resolution). The first ship is a dry run, made now, before any real run: the same command with `-n -i` added after `rsync`, piped to `tee $WORK/artifacts/ship-dryrun.txt`, then `grep -cE '^(>f\++ webapp\.py|cd\++ (templates|static)/)$' $WORK/artifacts/ship-dryrun.txt`. Expected `0` (a new `webapp.py`, `templates/` or `static/` means the destination is the wrong directory); if not `0`, stop and fix `BOX_ARCHITECT_DIR` before any real ship. Record the dry-run output excerpt in `$EVID`. Restart command: `ssh -i ~/key.pem $SSH_TARGET 'sudo systemctl restart llm-architect.service && sleep 3 && systemctl is-active llm-architect.service'`, expected `active`.
 
 ### Task 1.2: T1 + T2 — local suite and clean install
 
@@ -219,12 +221,12 @@ All live checks use the public URL. Run the snapshot (`<stage>=1`) before Task 1
 - [ ] **Step 1:** Write the 10 answer files, and paste them verbatim into `$EVID §Intake answer sheet`.
 - [ ] **Step 2 (T4):** `SID=t4-$(date +%Y%m%d%H%M); P=$PUB/architect; curl -s -X POST $P/api/reset -H 'Content-Type: application/json' -d "{\"sid\":\"$SID\"}" >/dev/null; curl -s -X POST $P/api/phase -H 'Content-Type: application/json' -d "{\"sid\":\"$SID\",\"phase\":\"poc\"}" | head -c 200; for f in $WORK/answers/*.txt; do python3 -c 'import json,sys;print(json.dumps({"sid":sys.argv[1],"message":open(sys.argv[2]).read()}))' "$SID" "$f" | curl -s -X POST $P/api/send -H 'Content-Type: application/json' -d @- | python3 -c 'import json,sys;print(json.load(sys.stdin).get("method"))'; done`. Expected: 10 lines, each starting `ollama:`. Any `regex` is a FAIL.
 - [ ] **Step 3 (T4):** `curl -s "$P/api/spec?sid=$SID" | python3 -c 'import json,sys;print(json.load(sys.stdin)["spec"])' > $WORK/artifacts/t4-spec.md; grep -niE "auth" $WORK/artifacts/t4-spec.md`. Expected: the only auth requirement is "none". Any JWT, OAuth, session or login requirement is a FAIL (a regression of `2c5d40f`).
-- [ ] **Step 4 (T5):** Note the UTC start time. In a browser on `$PUB/decompose/`, paste `t4-spec.md`, run Decompose, note the end time, and save the JSON/markdown to `$WORK/artifacts/t5-decompose.md`. Expected: a component implementing the weather lookup, and no component whose name starts with `Auth`.
+- [ ] **Step 4 (T5):** Note the UTC start time. In a browser on `$PUB/decompose/`, paste `t4-spec.md`, run Decompose, note the end time, save the JSON/markdown to `$WORK/artifacts/t5-decompose.md`, and save the YAML from the Decompose page's "Download Build Package" to `$WORK/artifacts/t5/build-package.yaml`. Never click "Continue to Build →" (it points at a canned example package). Expected: a component implementing the weather lookup, and no component whose name starts with `Auth`.
 - [ ] **Step 5 (T5):** `ssh -i ~/key.pem $SSH_TARGET "sudo journalctl -u llm-architect.service --since '<start>' --until '<end>' --no-pager | grep -c 'LLM extraction failed, falling back to regex'"`. Expected: `0`.
 
 ### Task 1.5: T6 + T7 — Build and Deploy pages via public URL
 
-- [ ] **Step 1 (T6):** In a browser, open `$PUB/architect/build`, upload the T5 build package, Start Build. Expected: `POST …/build/start` returns `run_id`, `GET …/build/status?run=` polls to `complete:true`, and "Continue to Deploy →" appears. Record the run id.
+- [ ] **Step 1 (T6):** In a browser, open `$PUB/architect/build` directly (never via "Continue to Build →", which points at a canned example), upload `$WORK/artifacts/t5/build-package.yaml`, Start Build. Expected: `POST …/build/start` returns `run_id`, `GET …/build/status?run=` polls to `complete:true`, and "Continue to Deploy →" appears. Record the run id. Then `ssh -i ~/key.pem $SSH_TARGET "cat $BOX_ARCHITECT_DIR/workspaces/<run_id>/_package.yaml" | head -20`. Expected: it names the weather spec (not the canned example).
 - [ ] **Step 2 (T6):** If any build request 404s or reaches the static docroot instead of Flask, T6 FAILs. Go to Task 1.6 with the nginx variant.
 - [ ] **Step 3 (T7):** `curl -s -X POST $PUB/architect/deploy/render -H 'Content-Type: application/json' -d "$(python3 -c 'import json,sys;print(json.dumps({"run_id":sys.argv[1],"template_text":open("architect/templates/deploy_template.yaml").read()}))' <run_id>)" | python3 -c 'import json,sys;y=json.load(sys.stdin)["yaml"];print(y)' | grep -nE "containerPort|path:"`. Expected: `containerPort: 3000` and `path: /healthz`.
 - [ ] **Step 4 (T7):** On the Deploy page click image build (expect a success log) and image push (expect a digest; if you get 401, rerun Task 1.1 Step 4 and retry once). Then click apply. Expected: the `kubectl_missing` handoff panel. That outcome is a PASS by design.
@@ -238,7 +240,7 @@ All live checks use the public URL. Run the snapshot (`<stage>=1`) before Task 1
 - [ ] **Step 2:** `code-executor` fixes it in the smallest diff. Run that test (PASS), then the whole `python -m pytest architect/tests -q` (0 failures).
 - [ ] **Step 3: Opus review gate:** `design-reviewer` reviews the diff and the test.
 - [ ] **Step 4: Commit** the test file and the changed file(s) by explicit path, message `Architect: fix <defect> (blocks weather run)`.
-- [ ] **Nginx variant: HUMAN GATE.** Before any edit on the box, show the user the exact proposed `location` diff and ask for approval. On yes: `ssh … "sudo cp $NGINX_FILE $NGINX_FILE.bak-$(date +%Y%m%d)"`, then `scp $SSH_TARGET:$NGINX_FILE $WORK/artifacts/`, then apply, `sudo nginx -t && sudo systemctl reload nginx`, and record the diff in `$EVID`.
+- [ ] **Nginx variant: HUMAN GATE.** Before any edit on the box, show the user the exact proposed `location` diff and ask for approval. On yes: `ssh … "sudo cp $NGINX_FILE $NGINX_FILE.bak-$(date +%Y%m%d)"`, then `scp -i ~/key.pem $SSH_TARGET:$NGINX_FILE $WORK/artifacts/`, then apply, `sudo nginx -t && sudo systemctl reload nginx`, and record the diff in `$EVID`.
 - [ ] **Step 5 (once, after all fixes):** Run the ship command, then `$BOX_VENV/bin/pip install -r $BOX_ARCHITECT_DIR/requirements.txt` if `architect/requirements.txt` changed, then the restart command, exactly once. Rerun only the affected checks (T3–T7).
 
 ### Task 1.7: Known open issues and stage close
@@ -267,11 +269,11 @@ Snapshot `<stage>=2` before Task 2.1.
 **Interfaces:** Produces `RUN_ID` (12 hex), `SPEC_SLUG`, `RUN_SHORT=${RUN_ID:0:6}`, and the decompose metrics (`total_components`, `total_waves`, `max_parallelism`, `time_savings_percent`, `estimated_sequential_minutes`, `estimated_parallel_minutes`).
 
 - [ ] **Step 1:** On `$PUB/architect/` (fresh session, phase PoC), answer each intake question with the `$WORK/answers` file for the channel it targets. If a question spans several channels, send their files concatenated. Never add text outside the files. Screenshot the dashboard → `architect-dashboard.png`.
-- [ ] **Step 2:** Generate the spec (screenshot `dense-spec.png`, save `dense-spec.md`). Decompose with the spec loaded (screenshots `decompose-spec-loaded.png`, `decompose-wave-plan.png`; save `build-package.yaml` and the metrics). Note the UTC window and run the Task 1.4 Step 5 journal grep. Expected `0`.
-- [ ] **Step 3:** Build on `$PUB/architect/build` with that package. On completion, screenshot `build-ui.png`, then `curl -s "$PUB/architect/build/status?run=$RUN_ID" > $WORK/artifacts/run-<n>/build-events.json`.
-- [ ] **Step 4:** `scp -r -i ~/key.pem $SSH_TARGET:$BOX_ARCHITECT_DIR/workspaces/$RUN_ID $WORK/artifacts/run-<n>/ws` (read-only copy; never edited).
+- [ ] **Step 2:** Generate the spec (screenshot `dense-spec.png`, save `dense-spec.md`). Decompose with the spec loaded (screenshots `decompose-spec-loaded.png`, `decompose-wave-plan.png`; save the YAML from the Decompose page's "Download Build Package" to `$WORK/artifacts/run-<n>/build-package.yaml`, and save the metrics). Never click "Continue to Build →" (it points at a canned example package). Note the UTC window and run the Task 1.4 Step 5 journal grep. Expected `0`.
+- [ ] **Step 3:** Open `$PUB/architect/build` directly and upload `$WORK/artifacts/run-<n>/build-package.yaml` (never via "Continue to Build →"). On completion, screenshot `build-ui.png`, then `curl -s "$PUB/architect/build/status?run=$RUN_ID" > $WORK/artifacts/run-<n>/build-events.json`.
+- [ ] **Step 4:** `scp -r -i ~/key.pem $SSH_TARGET:$BOX_ARCHITECT_DIR/workspaces/$RUN_ID $WORK/artifacts/run-<n>/ws` (read-only copy; never edited). Then `head -20 $WORK/artifacts/run-<n>/ws/_package.yaml`. Expected: it names the weather spec (not the canned example); otherwise the run failed.
 - [ ] **Step 5 (stub check):** `grep -rnE '\{"result": ?"value"\}|TODO|placeholder' $WORK/artifacts/run-<n>/ws/src; grep -rn "openweathermap.org/data/2.5/weather" $WORK/artifacts/run-<n>/ws/src`. Expected: the first command returns nothing, and the second returns at least one hit.
-- [ ] **Step 6 (Review Focus 1):** `cd $WORK/artifacts/run-<n>/ws && python3.12 -m venv .v && .v/bin/pip install -q -r requirements.txt && env -u OPENWEATHER_API_KEY .v/bin/python -c "import sys,importlib.util as u; sys.path.insert(0,'src'); s=u.spec_from_file_location('app','src/app.py'); m=u.module_from_spec(s); s.loader.exec_module(m); c=m.app.test_client(); print(c.get('/healthz').status_code, c.get('/api/weather').status_code, c.get('/api/weather?city=X').status_code)"`. Expected: first `200` (the import did not crash without the key) and third `500`. The second is `400` or `500`, because the spec does not fix the precedence between missing city and missing key. Use the real route if it differs, and record it under `§Real route paths`.
+- [ ] **Step 6 (Review Focus 1):** `cd $WORK/artifacts/run-<n>/ws && python3.12 -m venv .v && .v/bin/pip install -q -r requirements.txt && env -u OPENWEATHER_API_KEY .v/bin/python -c "import sys,importlib.util as u; sys.path.insert(0,'src'); s=u.spec_from_file_location('app','src/app.py'); m=u.module_from_spec(s); s.loader.exec_module(m); c=m.app.test_client(); print(c.get('/healthz').status_code, c.get('/api/weather').status_code, c.get('/api/weather?city=X').status_code)"`. Expected: first `200` (the import did not crash without the key) and third `500`. The second is `400` or `500`, because the spec does not fix the precedence between missing city and missing key. Use the real route if it differs, and record it under `§Real route paths`. `WEATHER_ROUTE=/api/weather` unless this step records a different path.
 - [ ] **Step 7:** Record the run in `$EVID §Stage 2 runs` (run n, `RUN_ID`, result). If any of Steps 2, 5 or 6 FAILed, the run failed. Tighten the answers or apply a generator fix via Task 1.6 (then ship and restart once), and repeat this task as run n+1. **After a third failure: stop and report to the user what failed in each run, with run ids.**
 
 ### Task 2.3: Deploy (render → build → push → apply handoff)
@@ -290,7 +292,7 @@ Snapshot `<stage>=2` before Task 2.1.
 
 - [ ] **Step 1:** DNS wait (Global rule), then `kubectl get application $APP_NAME -n training; kubectl get deployment $APP_NAME -n training`.
 - [ ] **Step 2:** `curl -s https://$APP_HOST/ > $WORK/artifacts/root.html; grep -c 'Get weather' $WORK/artifacts/root.html; grep -c '<input' $WORK/artifacts/root.html; grep -c 'id="clock"' $WORK/artifacts/root.html; curl -s -o /dev/null -w '%{http_code}\n' "https://$APP_HOST$WEATHER_ROUTE?city=zzzznotacity"`. Expected: ≥1, ≥1, `0`, `404` (criteria 4–5).
-- [ ] **Step 3 (Review Focus 2):** `kubectl get deployment $APP_NAME -n training -o jsonpath='{.spec.template.spec.containers[0].env}{.spec.template.spec.containers[0].envFrom}'`. Expected: it contains `$APP_NAME-openweather` (a reference only, no value).
+- [ ] **Step 3 (Review Focus 2):** Names only, never env values: `kubectl get deployment $APP_NAME -n training -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"<-"}{.valueFrom.secretKeyRef.name}{"\n"}{end}{.spec.template.spec.containers[0].envFrom[*].secretRef.name}'`. Expected: it contains `$APP_NAME-openweather` (for example `OPENWEATHER_API_KEY<-$APP_NAME-openweather`). Then the boolean-only literal-value check: `kubectl get deployment $APP_NAME -n training -o json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(any(e.get("name")=="OPENWEATHER_API_KEY" and "value" in e for e in d["spec"]["template"]["spec"]["containers"][0].get("env",[])))'`. Expected: `False`.
 - [ ] **Step 4: HUMAN GATE (key).** Ask the user to run: `date -u +%T; curl -s "https://$APP_HOST$WEATHER_ROUTE?city=Chicago"; echo; curl -s "https://api.openweathermap.org/data/2.5/weather?q=Chicago&appid=$OPENWEATHER_API_KEY&units=imperial" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(json.dumps({"city":d["name"],"temp_f":d["main"]["temp"],"description":d["weather"][0]["description"]}))'; date -u +%T`, and paste the output. Expected: both lines have the same `description`, `|Δtemp| ≤ 2`, and the two times are ≤ 60s apart (criterion 3). Record it, with the command shown as typed.
 - [ ] **Step 5:** In a browser, type `Chicago`, submit, and screenshot → `weather-app-live.png`. Expected: the city, °F temperature and description are visible.
 - [ ] **Step 6: HUMAN GATE (key).** Ask the user to run `grep -rlF -- "$OPENWEATHER_API_KEY" /Users/reubenpatterson/LLM_Presentation --exclude-dir=node_modules | wc -l; git -C /Users/reubenpatterson/LLM_Presentation log -p --all | grep -cF -- "$OPENWEATHER_API_KEY"` and report the two numbers. Expected `0` and `0` (criterion 6). Also run `grep -cE "[0-9a-f]{32}" $EVID`, expected `0`.
@@ -351,8 +353,8 @@ Snapshot `<stage>=3a` before Task 3a.2.
 - [ ] **Step 1:** Edit the number. `git diff deploy-landing/index.html` should show exactly one changed line.
 - [ ] **Step 2:** `cd module4 && npm run lint && npm run build`, then serve and run the click-through tool exactly as in Task 0a.2 Step 3 (`--slides 26 --progress-key part4`). Expected: `"ok":true`. Run `cd deploy-landing && npx playwright test tests/e2e/landing-renumber.spec.js`, expected 3 passed. Run the unlock-gate check.
 - [ ] **Step 3: Opus review gate:** `design-reviewer` checks the diff against `$EVID` (every number in the bank and in the slides matches; criteria 1–6 and 9).
-- [ ] **Step 4: Commit** `git add module4/src/App.jsx module4/src/components/DeployFlow.jsx module4/src/components/PipelineFlow.jsx module4/src/components/BuildFlow.jsx module4/src/data/assessment-questions.json module4/src/assets/screenshots/architect-dashboard.png module4/src/assets/screenshots/decompose-spec-loaded.png module4/src/assets/screenshots/decompose-wave-plan.png module4/src/assets/screenshots/build-ui.png module4/src/assets/screenshots/deploy-ui.png module4/src/assets/screenshots/deploy-manual-apply.png module4/src/assets/screenshots/weather-app-live.png module4/src/assets/screenshots/quote-app-live.png deploy-landing/index.html docs/superpowers/evidence/2026-10-26-weather-refresh-evidence.md`, with message `Module 4: replace worked examples with the real weather run`.
-- [ ] **Step 5 (publish, plan resolution):** `ssh … "cp -a <part4 dir> <part4 dir>.bak-$(date +%Y%m%d)"` then `rsync -az --delete module4/dist/ $SSH_TARGET:<part4 dir>/` (dir from `DOCROOT_MAP`). Check: `curl -s -o /dev/null -w '%{http_code}' $PUB/part4/`, expected `200`. Record under `$EVID §Publishes`.
+- [ ] **Step 4: Commit** `git add module4/src/App.jsx module4/src/components/DeployFlow.jsx module4/src/components/PipelineFlow.jsx module4/src/components/BuildFlow.jsx module4/src/data/assessment-questions.json module4/src/assets/screenshots/architect-dashboard.png module4/src/assets/screenshots/decompose-spec-loaded.png module4/src/assets/screenshots/decompose-wave-plan.png module4/src/assets/screenshots/build-ui.png module4/src/assets/screenshots/deploy-ui.png module4/src/assets/screenshots/deploy-manual-apply.png module4/src/assets/screenshots/weather-app-live.png deploy-landing/index.html docs/superpowers/evidence/2026-10-26-weather-refresh-evidence.md`, with message `Module 4: replace worked examples with the real weather run`. (The `quote-app-live.png` deletion is already staged by the `git rm` in Task 3a.2 Step 1, so it is not in the `git add` list.)
+- [ ] **Step 5 (publish, plan resolution):** `ssh … "cp -a <part4 dir> <part4 dir>.bak-$(date +%Y%m%d)"` then `rsync -az -e "ssh -i ~/key.pem" --delete module4/dist/ $SSH_TARGET:<part4 dir>/` (dir from `DOCROOT_MAP`). Check: `curl -s -o /dev/null -w '%{http_code}' $PUB/part4/`, expected `200`. Record under `$EVID §Publishes`.
 
 ---
 
@@ -548,7 +550,7 @@ Snapshot `<stage>=3b` before Task 3b.1.
             echo "deployed=$DEPLOYED expected=$IMAGE"
             if [ "$DEPLOYED" != "$IMAGE" ]; then echo "::error::deployed image is stale"; exit 1; fi
   ```
-- [ ] **Step 4:** Static checks: `grep -rnE "[0-9a-f]{32}" module4/public/follow-along/` (no output); `grep -nE "smo-cicd-pipeline|argocd|helm|set -x|echo .*OPENWEATHER_API_KEY\b" module4/public/follow-along/deploy.yml` (no output); `grep -nE "ssl-redirect|annotations" module4/public/follow-along/app.yaml` (no output); `python3 -c "import yaml;[yaml.safe_load(open(f'module4/public/follow-along/{f}')) for f in ('deploy.yml','app.yaml')];print('ok')"` (`ok`).
+- [ ] **Step 4:** Static checks: `grep -rnE "[0-9a-f]{32}" module4/public/follow-along/` (no output); `grep -nE 'smo-cicd-pipeline|argocd|helm|set -x|echo .*\$\{?OPENWEATHER_API_KEY|(echo|run:) .*secrets\.' module4/public/follow-along/deploy.yml` (no output; it matches `$OPENWEATHER_API_KEY`/`${OPENWEATHER_API_KEY}` and `secrets.` expansions in echo/run lines, not the bare name in the step-0 error message); `grep -nE "ssl-redirect|annotations" module4/public/follow-along/app.yaml` (no output); `python3 -c "import yaml;[yaml.safe_load(open(f'module4/public/follow-along/{f}')) for f in ('deploy.yml','app.yaml')];print('ok')"` (`ok`).
 - [ ] **Step 5 (Review Focus 1):** `mkdir -p $WORK/artifacts/run-<ok>/ws/tests && cp module4/public/follow-along/test_health.py $WORK/artifacts/run-<ok>/ws/tests/ && cd $WORK/artifacts/run-<ok>/ws && env -u OPENWEATHER_API_KEY .v/bin/python -m pip install -q pytest && env -u OPENWEATHER_API_KEY .v/bin/python -m pytest -q tests/test_health.py`. Expected: `1 passed`.
 - [ ] **Step 6: Commit** the three kit files by explicit path, with message `Module 4: follow-along kit (deploy workflow, app manifest, health test)`.
 
@@ -558,13 +560,13 @@ Snapshot `<stage>=3b` before Task 3b.1.
 **Interfaces:** Produces `REHEARSAL_REPO`, `REHEARSAL_HOST`, the rehearsal `run_id`, and the first deploy run URL.
 
 - [ ] **Step 1: HUMAN GATE (outward-facing).** Ask: "May I create private repo `fubotv/llm-wx-rpatterson-fubotv` (branch `staging` only) for the rehearsal? It deploys Application `llm-wx-rpatterson-fubotv` and Secret `llm-wx-rpatterson-fubotv-openweather` into `training`."
-- [ ] **Step 2:** Walk `s15b`–`s15d` for real on `$PUB/architect/`: fresh intake with the answer files, then spec, decompose, build, and download the zip. The Task 2.2 Step 5/6 checks and the 3-run limit apply here too.
+- [ ] **Step 2:** Walk `s15b`–`s15d` for real on `$PUB/architect/`: fresh intake with the answer files, then spec, decompose (save the YAML from "Download Build Package" to `$WORK/artifacts/rehearsal/build-package.yaml`; never click "Continue to Build →", which points at a canned example), build by uploading that file on `$PUB/architect/build`, and download the zip. After the build, `ssh -i ~/key.pem $SSH_TARGET "cat $BOX_ARCHITECT_DIR/workspaces/<rehearsal run_id>/_package.yaml" | head -20`; expected: it names the weather spec. The Task 2.2 Step 5/6 checks and the 3-run limit apply here too. Set `REHEARSAL_WEATHER_ROUTE=/api/weather` unless the Task 2.2 Step 6 check on this generation records a different path; record it in `$EVID §Real route paths`.
 - [ ] **Step 3:** `K=/Users/reubenpatterson/LLM_Presentation/module4/public/follow-along; gh repo create fubotv/llm-wx-rpatterson-fubotv --private && mkdir -p $WORK/rehearsal/llm-wx-rpatterson-fubotv && cd $WORK/rehearsal/llm-wx-rpatterson-fubotv && git init -b staging && unzip -q <downloaded zip> -d . && mkdir -p .github/workflows deploy tests && cp $K/deploy.yml .github/workflows/ && cp $K/app.yaml deploy/ && cp $K/test_health.py tests/`.
 - [ ] **Step 4: HUMAN GATE (key).** Ask the user to run `gh secret set OPENWEATHER_API_KEY -R fubotv/llm-wx-rpatterson-fubotv` and paste the key at the hidden prompt.
 - [ ] **Step 5:** `git add Dockerfile requirements.txt .env.example src .github deploy tests && git commit -m "Initial weather app" && git remote add origin git@github.com:fubotv/llm-wx-rpatterson-fubotv.git && git push -u origin staging`.
 - [ ] **Step 6:** `gh run watch -R fubotv/llm-wx-rpatterson-fubotv $(gh run list -R fubotv/llm-wx-rpatterson-fubotv -L1 --json databaseId -q '.[0].databaseId')`. Expected: `test` and `deploy` green. Screenshot the run page → `follow-along-actions-green.png` (no key visible). Record the run URL.
-- [ ] **Step 7:** Repeat Task 2.4 Steps 2 and 4 against `REHEARSAL_HOST` (Step 4 is a HUMAN GATE for the key). Expected: `/` has "Get weather" with no `id="clock"`, the 404 for `zzzznotacity`, and the Chicago comparison within ±2°F (criterion 8).
-- [ ] **Step 8 (Review Focus 2):** `kubectl get deployment llm-wx-rpatterson-fubotv -n training -o jsonpath='{.spec.template.spec.containers[0].env}{.spec.template.spec.containers[0].envFrom}{"\n"}{.spec.template.spec.containers[0].image}'`. Expected: it contains `llm-wx-rpatterson-fubotv-openweather` and the image tag the run pushed.
+- [ ] **Step 7:** Repeat Task 2.4 Steps 2 and 4 against `REHEARSAL_HOST`, with `$REHEARSAL_WEATHER_ROUTE` in place of `$WEATHER_ROUTE` (Step 4 is a HUMAN GATE for the key). Expected: `/` has "Get weather" with no `id="clock"`, the 404 for `zzzznotacity`, and the Chicago comparison within ±2°F (criterion 8).
+- [ ] **Step 8 (Review Focus 2):** Names only, never env values: `kubectl get deployment llm-wx-rpatterson-fubotv -n training -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"<-"}{.valueFrom.secretKeyRef.name}{"\n"}{end}{.spec.template.spec.containers[0].envFrom[*].secretRef.name}{"\n"}{.spec.template.spec.containers[0].image}'`. Expected: it contains `llm-wx-rpatterson-fubotv-openweather` and the image tag the run pushed. Then `kubectl get deployment llm-wx-rpatterson-fubotv -n training -o json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(any(e.get("name")=="OPENWEATHER_API_KEY" and "value" in e for e in d["spec"]["template"]["spec"]["containers"][0].get("env",[])))'`. Expected: `False` (no literal `value` for `OPENWEATHER_API_KEY`).
 - [ ] **Step 9:** `cd $WORK/rehearsal/llm-wx-rpatterson-fubotv && git log -p --all --format= | grep -cE "[0-9a-f]{32}"`. Expected `0` (criterion 10). Record it in `$EVID §Stage 3b rehearsal`.
 
 ### Task 3b.5: Follow-along slides
@@ -620,7 +622,7 @@ Snapshot `<stage>=4` before Task 4.1.
 - **Path A:** the default city `New York` becomes `<learner's city>` in the input prefill and the first-load fetch. Tests: positive (page HTML contains the new default) and negative (`/api/weather` with an empty city still returns 400).
 - **Path B:** `GET /api/weather?city=<name>&units=<imperial|metric>`, default `imperial`, response `{"city": str, "temp": number, "units": "imperial"|"metric", "description": str}`. An invalid `units` returns 400 `{"error": "units must be imperial or metric"}` (plan resolution). The upstream call passes `units=<units>`. The page gets a °F/°C toggle that refetches. Tests use mocked `requests.get`: positive `test_units_metric_passed_upstream_and_echoed`, negative `test_units_invalid_returns_400`.
 
-- [ ] **Step 1:** Dispatch `spec-author`. Both specs must use the real route (`WEATHER_ROUTE`) and the real file names from the rehearsal repo.
+- [ ] **Step 1:** Dispatch `spec-author`. Both specs must use the real route (`REHEARSAL_WEATHER_ROUTE`) and the real file names from the rehearsal repo.
 
 ### Task 4.4: The loop, for real, in the rehearsal repo
 
@@ -634,7 +636,7 @@ Snapshot `<stage>=4` before Task 4.1.
 - [ ] **Step 5:** `kubectl get secrets -n training -o custom-columns=NAME:.metadata.name,RV:.metadata.resourceVersion --no-headers > $WORK/artifacts/secrets-before.txt`.
 - [ ] **Step 6:** `gh pr merge <path-b pr> -R … --merge`, then watch the staging run. Expected: `deploy` green, including "Wait for operator" and "Assert deployed image". Screenshot → `merge-run-green.png`.
 - [ ] **Step 7 (criterion 9):** Run the same `kubectl get secrets …` into `secrets-after.txt`, then `diff secrets-before.txt secrets-after.txt`. Expected: no changed line other than `llm-wx-rpatterson-fubotv-openweather`. Run `kubectl get secret llm-wx-rpatterson-fubotv-openweather -n training -o name` (exists; never decoded).
-- [ ] **Step 8: HUMAN GATE (key).** Ask the user to run: `date -u +%T; curl -s "https://$REHEARSAL_HOST$WEATHER_ROUTE?city=Chicago&units=metric"; echo; curl -s "https://api.openweathermap.org/data/2.5/weather?q=Chicago&appid=$OPENWEATHER_API_KEY&units=metric" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d["main"]["temp"],d["weather"][0]["description"])'; date -u +%T`. Expected: `"units":"metric"` and `|Δtemp| ≤ 1`. Toggle °C in the browser and screenshot → `verify-change-live.png`.
+- [ ] **Step 8: HUMAN GATE (key).** Ask the user to run: `date -u +%T; curl -s "https://$REHEARSAL_HOST$REHEARSAL_WEATHER_ROUTE?city=Chicago&units=metric"; echo; curl -s "https://api.openweathermap.org/data/2.5/weather?q=Chicago&appid=$OPENWEATHER_API_KEY&units=metric" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d["main"]["temp"],d["weather"][0]["description"])'; date -u +%T`. Expected: `"units":"metric"` and `|Δtemp| ≤ 1`. Toggle °C in the browser and screenshot → `verify-change-live.png`.
 - [ ] **Step 9 (Review Focus 3):** `gh run view <merge run> -R … --log | grep -E "attempt [0-9]+: deployment image=|deployed="`. Expected: the final line shows `deployed=…:llm-wx-rpatterson-fubotv-<merge short sha>`. A prior attempt showing the old tag is fine.
 - [ ] **Step 10: HUMAN GATE (key).** Ask the user to run `gh run view <merge run> -R fubotv/llm-wx-rpatterson-fubotv --log | grep -cF -- "$OPENWEATHER_API_KEY"`, and report the number. Expected `0`.
 - [ ] **Step 11:** With the user's go-ahead (part of this gate): `gh secret delete OPENWEATHER_API_KEY -R fubotv/llm-wx-rpatterson-fubotv && gh workflow run deploy.yml -R fubotv/llm-wx-rpatterson-fubotv --ref staging`. Expected: the run fails at the first `deploy` step with `repo secret OPENWEATHER_API_KEY is not set`. **HUMAN GATE (key):** the user re-adds the secret with `gh secret set OPENWEATHER_API_KEY -R fubotv/llm-wx-rpatterson-fubotv`.
@@ -697,8 +699,8 @@ Snapshot `<stage>=4` before Task 4.1.
 
 - [ ] **Step 1:** Edit. `git diff deploy-landing/index.html` shows only the part5 line changed. Run the unlock-gate check.
 - [ ] **Step 2: Opus review gate:** `design-reviewer` checks Part 5 against criteria 1–10 and the "Illustrative"/"real" labelling.
-- [ ] **Step 3: Commit** `git add testing-with-llms/src/App.jsx testing-with-llms/src/components/HappyPathFallacy.jsx testing-with-llms/src/components/UnitTestExplorer.jsx testing-with-llms/src/components/FunctionalTestViz.jsx testing-with-llms/src/components/TestingQuiz.jsx testing-with-llms/src/components/CheckpointPipeline.jsx testing-with-llms/src/components/OwnershipModel.jsx testing-with-llms/src/components/E2ETestRunner.jsx testing-with-llms/src/components/LoadTestDashboard.jsx testing-with-llms/src/assets/screenshots/rehearsal-live.png testing-with-llms/src/assets/screenshots/pr-checks.png testing-with-llms/src/assets/screenshots/merge-run-green.png testing-with-llms/src/assets/screenshots/verify-change-live.png deploy-landing/index.html docs/superpowers/evidence/2026-10-26-weather-refresh-evidence.md` with message `Part 5: rebuild around the weather app staging loop`.
-- [ ] **Step 4 (publish, plan resolution; stays admin-locked):** Back up and rsync `testing-with-llms/dist/` to the part5 dir from `DOCROOT_MAP`. Check `curl -s -o /dev/null -w '%{http_code}' $PUB/part5/`, expected `200`.
+- [ ] **Step 3: Commit** `git add testing-with-llms/src/App.jsx testing-with-llms/src/components/HappyPathFallacy.jsx testing-with-llms/src/components/UnitTestExplorer.jsx testing-with-llms/src/components/FunctionalTestViz.jsx testing-with-llms/src/components/TestingQuiz.jsx testing-with-llms/src/components/CheckpointPipeline.jsx testing-with-llms/src/components/OwnershipModel.jsx testing-with-llms/src/assets/screenshots/rehearsal-live.png testing-with-llms/src/assets/screenshots/pr-checks.png testing-with-llms/src/assets/screenshots/merge-run-green.png testing-with-llms/src/assets/screenshots/verify-change-live.png deploy-landing/index.html docs/superpowers/evidence/2026-10-26-weather-refresh-evidence.md` with message `Part 5: rebuild around the weather app staging loop`. (The `E2ETestRunner.jsx` and `LoadTestDashboard.jsx` deletions are already staged by the `git rm` in Task 4.1 Step 1, so they are not in the `git add` list.)
+- [ ] **Step 4 (publish, plan resolution; stays admin-locked):** Back up and rsync `testing-with-llms/dist/` to the part5 dir from `DOCROOT_MAP` (`rsync -az -e "ssh -i ~/key.pem" --delete testing-with-llms/dist/ $SSH_TARGET:<part5 dir>/`). Check `curl -s -o /dev/null -w '%{http_code}' $PUB/part5/`, expected `200`.
 
 ---
 
@@ -713,9 +715,11 @@ Snapshot `<stage>=5` before Task 5.1.
 - `package.json`: `"name": "refresher"`; scripts `dev`, `build`, `lint`, `preview`, `test` (`vitest run`), `test:watch`; dependencies `react`/`react-dom` `^19.2.4`; devDependencies identical to `context-and-sessions/package.json`'s devDependencies (no three.js, recharts or jspdf).
 - `vite.config.js`: `plugins: [react()]`, `base: '/refresher/'`, `server: { port: 5180 }`, `esbuild: { jsx: 'automatic' }`, `test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.js'] }`.
 - `index.html`: title `Parts 1–3 Refresher`, `<div id="root">`, the module script `/src/main.jsx`, and nothing else.
+- Every refresher test file explicitly imports what it uses from `'vitest'` (`it`, `expect`, `vi`, `describe`, `beforeEach`, `afterEach`), so the byte-copied eslint config lints it clean.
 
 - [ ] **Step 1: Failing test** `refresher/src/isolation.test.js`:
   ```js
+  import { it, expect } from 'vitest'
   import { readFileSync, readdirSync, statSync } from 'node:fs'
   import { join, dirname } from 'node:path'
   import { fileURLToPath } from 'node:url'
@@ -745,6 +749,7 @@ Snapshot `<stage>=5` before Task 5.1.
 
 - [ ] **Step 1: Failing tests:**
   ```js
+  import { it, expect } from 'vitest'
   import { buildSequence, score, breakdownByPart, missedQuestions, isReady } from './scoring'
   const mk = (p, n) => ({ id: `P${p}-${n}`, part: p, term: 't', review: { slideNumber: n, slideTitle: `T${n}` }, q: `Q${p}-${n}`,
     options: ['a', 'b', 'c', 'd'].map((x) => `${x}${p}${n}`), answer: n % 4, explanation: 'e' })
@@ -794,6 +799,7 @@ Snapshot `<stage>=5` before Task 5.1.
 - [ ] **Step 1:** Dispatch `spec-author` with the three quiz sources (`presentation/src/components/EngineeringProfQuiz.jsx`, `working-with-llms/src/components/WorkingWithQuiz.jsx`, `context-and-sessions/src/data/assessment-questions.json`) and the three slide sources. Rules: each `slideTitle` is copied character-for-character from the Part's source; explanations are ≤ 40 words; options are distinct; `q` strings are unique.
 - [ ] **Step 2: Failing test** `bank.test.js`:
   ```js
+  import { it, expect } from 'vitest'
   import { readFileSync } from 'node:fs'
   import { fileURLToPath } from 'node:url'
   import bank from './refresher-questions.json'
@@ -835,6 +841,7 @@ Retake sets a fresh `buildSequence(...)`, clears answers, sets the index to 0, a
 
 - [ ] **Step 1: Failing tests** `App.test.jsx`:
   ```jsx
+  import { it, expect, vi, beforeEach, afterEach } from 'vitest'
   import { render, screen, fireEvent, within } from '@testing-library/react'
   import App from './App'
   import bank from './data/refresher-questions.json'
@@ -936,7 +943,7 @@ Retake sets a fresh `buildSequence(...)`, clears answers, sets the index to 0, a
 ### Task 5.7: Publish (last) and close
 
 - [ ] **Step 1:** Confirm Stage 4 is done or stopped. `cd refresher && npm run build`.
-- [ ] **Step 2:** `ssh … "mkdir -p <docroot>/refresher"`, then `rsync -az --delete refresher/dist/ $SSH_TARGET:<docroot>/refresher/`. Back up and copy `deploy-landing/index.html` to the landing dir from `DOCROOT_MAP` (`flow-through.js` is not copied).
+- [ ] **Step 2:** `ssh … "mkdir -p <docroot>/refresher"`, then `rsync -az -e "ssh -i ~/key.pem" --delete refresher/dist/ $SSH_TARGET:<docroot>/refresher/`. Back up and copy `deploy-landing/index.html` to the landing dir from `DOCROOT_MAP` with `scp -i ~/key.pem` (`flow-through.js` is not copied).
 - [ ] **Step 3:** `curl -sI $PUB/refresher/ | head -1; A=$(curl -s $PUB/refresher/ | grep -oE '/refresher/assets/[^"]+\.js' | head -1); curl -sI $PUB$A | head -1; curl -s $PUB/ | grep -c refresherCard`. Expected: `200`, `200`, `1`. If `/refresher/` is not 200, an nginx location is needed: the Task 1.6 nginx variant (HUMAN GATE).
 - [ ] **Step 4: Opus review gate:** `design-reviewer` checks Stage 5 against criteria 1–6.
 - [ ] **Step 5: Commit** `$EVID` by explicit path, with message `Weather refresh: Stage 5 evidence`.
@@ -945,11 +952,11 @@ Retake sets a fresh `buildSequence(...)`, clears answers, sets the index to 0, a
 
 ## Final task F.1: Whole-plan verification
 
-- [ ] **Step 1:** Builds and lints: `for d in module4 testing-with-llms refresher; do (cd $d && npm run lint && npm run build) || echo "FAIL $d"; done; (cd refresher && npm test); (cd deploy-landing && npm test && npx playwright test); python -m pytest architect/tests -q`. Expected: no `FAIL`, and every suite at 0 failures.
+- [ ] **Step 1:** Builds and lints: `for d in module4 testing-with-llms refresher; do (cd $d && npm run lint && npm run build) || echo "FAIL $d"; done; (cd refresher && npm test); (cd deploy-landing && npm test && npx playwright test); python -m pytest architect/tests -q`. Expected: no `FAIL`, and every suite at 0 failures. (Refresher lint passes because every refresher test file explicitly imports what it uses from `'vitest'`: `it`, `expect`, `vi`, `describe`, `beforeEach`, `afterEach`.)
 - [ ] **Step 2:** slideRefs: the Task 3a.4 Step 2 node check. Expected: `"bad":[]` and `"slides":33` (or `26` if 0b failed).
 - [ ] **Step 3:** No leftovers: the Task 3a.3 Step 2 grep and the Task 4.6 Step 2 grep, both with no output.
 - [ ] **Step 4:** Refresher isolation: `cd refresher && npx vitest run src/isolation.test.js src/App.test.jsx`. Expected: pass (Storage spies show zero calls).
-- [ ] **Step 5:** Landing chain: the unlock-gate check, plus `git diff main -- deploy-landing/flow-through.js testing-with-llms/index.html module4/index.html architect/templates/deploy_template.yaml cicd-with-llms presentation working-with-llms context-and-sessions | wc -l`. Expected `0`. Run `grep -c "var serverLocks={part5: true};" deploy-landing/index.html`, expected `1`.
+- [ ] **Step 5:** Landing chain: the unlock-gate check, plus `git diff main HEAD -- deploy-landing/flow-through.js testing-with-llms/index.html module4/index.html architect/templates/deploy_template.yaml cicd-with-llms presentation working-with-llms context-and-sessions | wc -l`. Expected `0`. Run `grep -c "var serverLocks={part5: true};" deploy-landing/index.html`, expected `1`.
 - [ ] **Step 6:** Evidence: `grep -c "(pending)" $EVID`, expected `0` (any stage skipped because of a gate says `SKIPPED — <gate>`). `grep -cE "[0-9a-f]{32}" $EVID`, expected `0`. **HUMAN GATE (key):** the user reruns the Task 2.4 Step 6 grep pair over the repo and both rehearsal histories, and reports `0`s.
 - [ ] **Step 7: Opus review gate:** `design-reviewer` reads `$EVID` end to end against the spec's six "Overall success criteria" and lists the dead code that was left (`WaveGridReplay.jsx`, `wave-trace.js`, and the non-slug task-tracker text in `BuildFlow.jsx`).
 - [ ] **Step 8: Commit** `$EVID` (explicit path), with message `Weather refresh: final verification evidence`.
