@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { buildSequence, score, breakdownByPart, missedQuestions, isReady } from './lib/scoring'
 import bank from './data/refresher-questions.json'
 
 const C = {
   bg: '#0f172a', surface: '#1e293b', border: '#334155',
-  text: '#E2E8F0', textDim: '#94A3B8', accent: '#3B82F6',
+  text: '#E2E8F0', textDim: '#94A3B8', accent: '#2563EB',
   green: '#22C55E', red: '#EF4444',
 }
 
@@ -37,6 +37,13 @@ export default function App() {
   const [revealed, setRevealed] = useState(false)
 
   const total = sequence.length
+  const questionRef = useRef(null)
+  const explanationRef = useRef(null)
+  const resultsRef = useRef(null)
+
+  useEffect(() => { if (phase === 'quiz') questionRef.current?.focus() }, [phase, index])
+  useEffect(() => { if (revealed) explanationRef.current?.focus() }, [revealed])
+  useEffect(() => { if (phase === 'results') resultsRef.current?.focus() }, [phase])
 
   const choose = (i) => {
     setSelected(i)
@@ -50,6 +57,7 @@ export default function App() {
       setRevealed(false)
     } else {
       setPhase('results')
+      window.scrollTo?.(0, 0)
     }
   }
 
@@ -60,6 +68,7 @@ export default function App() {
     setSelected(null)
     setRevealed(false)
     setPhase('quiz')
+    window.scrollTo?.(0, 0)
   }
 
   let body
@@ -82,15 +91,23 @@ export default function App() {
           <span data-testid="question-counter" style={S.dim}>Question {index + 1} of {total}</span>
           <span data-testid="part-label" style={{ color: C.accent }}>Part {q.part}</span>
         </div>
-        <h2 data-testid="question-text" style={{ fontSize: 18, marginTop: 0 }}>{q.q}</h2>
+        <h2 data-testid="question-text" ref={questionRef} tabIndex={-1} style={{ fontSize: 18, marginTop: 0 }}>{q.q}</h2>
         {q.options.map((opt, i) => (
           <button
             key={i}
             data-testid={`opt-${i}`}
             style={optionStyle(i, q, selected, revealed)}
+            aria-pressed={i === selected}
             disabled={revealed}
             onClick={() => choose(i)}
-          >{opt}</button>
+          >
+            {opt}
+            {revealed && (i === selected || i === q.answer) && (
+              <span style={{ display: 'block', marginTop: 4, fontSize: 13, fontWeight: 600 }}>
+                {[i === selected && 'Your answer', i === q.answer && 'Correct'].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </button>
         ))}
         {selected !== null && !revealed && (
           <button data-testid="reveal-btn" style={{ ...S.btn, marginTop: 8 }} onClick={() => setRevealed(true)}>Reveal answer</button>
@@ -99,8 +116,11 @@ export default function App() {
           <>
             <div
               data-testid="explanation"
+              ref={explanationRef}
+              tabIndex={-1}
+              role="status"
               style={{ marginTop: 8, padding: 12, borderRadius: 8, background: C.bg, borderLeft: `4px solid ${selected === q.answer ? C.green : C.red}` }}
-            >{q.explanation}</div>
+            ><strong>{selected === q.answer ? 'Correct' : 'Incorrect'}</strong> {q.explanation}</div>
             <button data-testid="next-btn" style={{ ...S.btn, marginTop: 12 }} onClick={next}>
               {index + 1 < total ? 'Next' : 'See results'}
             </button>
@@ -116,7 +136,7 @@ export default function App() {
     body = (
       <>
         <div style={S.card}>
-          <h2 style={{ marginTop: 0 }}>Results</h2>
+          <h2 ref={resultsRef} tabIndex={-1} style={{ marginTop: 0 }}>Results</h2>
           <div data-testid="score" style={{ fontSize: 24, fontWeight: 700 }}>Score: {s}/{total} ({p}%)</div>
           <div data-testid="verdict" style={{ marginTop: 8, color: ready ? C.green : C.red, fontWeight: 600 }}>
             {ready ? 'Ready for Parts 4 & 5' : 'Review recommended'}

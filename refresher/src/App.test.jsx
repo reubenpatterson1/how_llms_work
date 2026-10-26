@@ -3,7 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import App from './App'
 import bank from './data/refresher-questions.json'
 let spies
-beforeEach(() => { spies = ['getItem', 'setItem', 'removeItem'].map((m) => vi.spyOn(Storage.prototype, m)) })
+beforeEach(() => { vi.spyOn(window, 'scrollTo').mockImplementation(() => {}); spies = ['getItem', 'setItem', 'removeItem'].map((m) => vi.spyOn(Storage.prototype, m)) })
 afterEach(() => vi.restoreAllMocks())
 function runThrough(wrongIds) {
   fireEvent.click(screen.getByTestId('start-btn'))
@@ -41,4 +41,59 @@ it('retake resets to question 1 with no results', () => {
   fireEvent.click(screen.getByTestId('retake-btn'))
   expect(screen.getByTestId('question-counter')).toHaveTextContent('Question 1 of 24')
   expect(screen.queryByTestId('score')).toBeNull()
+})
+const current = () => {
+  const o = bank.questions.find((q) => q.q === screen.getByTestId('question-text').textContent)
+  const opts = [0, 1, 2, 3].map((k) => screen.getByTestId(`opt-${k}`))
+  return { o, opts, right: o.options[o.answer] }
+}
+it('reveal-btn is absent before selection; aria-pressed follows the latest selection', () => {
+  render(<App />); fireEvent.click(screen.getByTestId('start-btn'))
+  expect(screen.queryByTestId('reveal-btn')).toBeNull()
+  const { opts } = current()
+  opts.forEach((b) => expect(b).toHaveAttribute('aria-pressed', 'false'))
+  fireEvent.click(opts[0]); fireEvent.click(opts[2])
+  expect(opts.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true', 'false'])
+  expect(screen.getByTestId('reveal-btn')).toBeInTheDocument()
+})
+it('final grading uses the last selection made before reveal', () => {
+  render(<App />); fireEvent.click(screen.getByTestId('start-btn'))
+  for (let i = 0; i < 24; i++) {
+    const { opts, right } = current()
+    fireEvent.click(opts.find((x) => x.textContent !== right))
+    fireEvent.click(opts.find((x) => x.textContent === right))
+    fireEvent.click(screen.getByTestId('reveal-btn')); fireEvent.click(screen.getByTestId('next-btn'))
+  }
+  expect(screen.getByTestId('score')).toHaveTextContent('Score: 24/24 (100%)')
+})
+it('next label is Next until the last question, then See results', () => {
+  render(<App />); fireEvent.click(screen.getByTestId('start-btn'))
+  for (let i = 0; i < 24; i++) {
+    fireEvent.click(current().opts[0]); fireEvent.click(screen.getByTestId('reveal-btn'))
+    expect(screen.getByTestId('next-btn')).toHaveTextContent(i === 23 ? 'See results' : /^Next$/)
+    fireEvent.click(screen.getByTestId('next-btn'))
+  }
+})
+it('after reveal: options disabled, markers shown, explanation focused and labelled; next focuses question', () => {
+  render(<App />); fireEvent.click(screen.getByTestId('start-btn'))
+  const { opts, right } = current()
+  const wrong = opts.find((x) => x.textContent !== right)
+  fireEvent.click(wrong); fireEvent.click(screen.getByTestId('reveal-btn'))
+  opts.forEach((b) => expect(b).toBeDisabled())
+  expect(opts.find((x) => x.textContent.includes(right))).toHaveTextContent('Correct')
+  expect(wrong).toHaveTextContent('Your answer')
+  const ex = screen.getByTestId('explanation')
+  expect(ex).toHaveTextContent(/^Incorrect/)
+  expect(ex).toHaveAttribute('role', 'status')
+  expect(document.activeElement).toBe(ex)
+  fireEvent.click(screen.getByTestId('next-btn'))
+  expect(document.activeElement).toBe(screen.getByTestId('question-text'))
+})
+it('right answer shows combined marker and Correct explanation prefix', () => {
+  render(<App />); fireEvent.click(screen.getByTestId('start-btn'))
+  const { opts, right } = current()
+  const good = opts.find((x) => x.textContent === right)
+  fireEvent.click(good); fireEvent.click(screen.getByTestId('reveal-btn'))
+  expect(good).toHaveTextContent('Your answer · Correct')
+  expect(screen.getByTestId('explanation')).toHaveTextContent(/^Correct/)
 })
