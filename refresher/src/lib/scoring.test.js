@@ -47,3 +47,50 @@ it('score / breakdown / missed / isReady', () => {
   expect(missed.every((m) => m.href === '/part1/' && m.correctAnswer === BANK.find((b) => b.id === m.id).options[BANK.find((b) => b.id === m.id).answer])).toBe(true)
   expect(isReady(18)).toBe(true); expect(isReady(17)).toBe(false)
 })
+
+const wrongAns = (s) => (s.answer + 1) % 4
+// answers where exactly `n` questions of each listed part are correct (first n of that part in sequence order), rest wrong
+const answersWith = (seq, nByPart) => {
+  const ans = {}
+  const seen = { 1: 0, 2: 0, 3: 0 }
+  for (const s of seq) { ans[s.id] = seen[s.part]++ < nByPart[s.part] ? s.answer : wrongAns(s) }
+  return ans
+}
+
+it('edge: part review flag boundary', () => {
+  const seq = buildSequence(BANK, () => 0)
+  const six = breakdownByPart(seq, answersWith(seq, { 1: 6, 2: 8, 3: 8 }))
+  expect(six[0]).toEqual({ part: 1, correct: 6, total: 8, flagged: false })
+  const five = breakdownByPart(seq, answersWith(seq, { 1: 5, 2: 8, 3: 8 }))
+  expect(five[0]).toEqual({ part: 1, correct: 5, total: 8, flagged: true })
+})
+it('edge: ready boundary via real score', () => {
+  const seq = buildSequence(BANK, () => 0)
+  const a18 = answersWith(seq, { 1: 6, 2: 6, 3: 6 })
+  expect(score(seq, a18)).toBe(18)
+  expect(isReady(score(seq, a18))).toBe(true)
+  const a17 = answersWith(seq, { 1: 6, 2: 6, 3: 5 })
+  expect(score(seq, a17)).toBe(17)
+  expect(isReady(score(seq, a17))).toBe(false)
+})
+it('edge: missed list keeps sequence order', () => {
+  const seq = buildSequence(BANK, () => 0)
+  const ans = correctAll(seq)
+  const p1 = seq.filter((s) => s.part === 1)
+  const p3 = seq.filter((s) => s.part === 3)
+  const missIds = [p1[0], p1[7], p3[0], p3[7]].map((s) => s.id)
+  missIds.forEach((id) => { const s = seq.find((x) => x.id === id); ans[id] = wrongAns(s) })
+  const expected = seq.filter((s) => missIds.includes(s.id)).map((s) => s.id)
+  expect(expected).toHaveLength(4)
+  expect(missedQuestions(seq, ans).map((m) => m.id)).toEqual(expected)
+})
+it('edge: empty, all wrong, all correct', () => {
+  const seq = buildSequence(BANK, () => 0)
+  expect(score(seq, {})).toBe(0)
+  expect(missedQuestions(seq, {})).toHaveLength(24)
+  expect(breakdownByPart(seq, {}).every((r) => r.flagged)).toBe(true)
+  const all = correctAll(seq)
+  expect(score(seq, all)).toBe(24)
+  expect(missedQuestions(seq, all)).toEqual([])
+  expect(breakdownByPart(seq, all).some((r) => r.flagged)).toBe(false)
+})
