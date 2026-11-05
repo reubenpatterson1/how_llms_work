@@ -140,6 +140,7 @@ _PY_HANDLER_RULES = [
     "Return exactly the JSON fields and status codes the spec lists. Copy UI labels, button text and error messages from the spec exactly, with the same capitalisation.",
     "In page JavaScript, put GET parameters in the URL query string as the shape does; a GET fetch() has no body.",
     "Never build HTML pages with f-strings. If the page needs a value, use a plain triple-quoted string with a marker and .replace(); JavaScript template literals like ${x} must not appear inside f-strings.",
+    "Pages must show values from the API response exactly as returned: do not convert units or rescale numbers in browser JavaScript; if the field is named temp_f it is already degrees Fahrenheit.",
 ]
 
 

@@ -52,3 +52,9 @@ def test_real_failing_fixture_is_flagged():
 def test_handler_rules_include_fstring_rule():
     assert any(r.startswith("Never build HTML pages with f-strings.") and "marker" in r
                for r in _PY_HANDLER_RULES)
+
+
+def test_handler_rules_include_units_rule():
+    assert ("Pages must show values from the API response exactly as returned: do not convert units "
+            "or rescale numbers in browser JavaScript; if the field is named temp_f it is already "
+            "degrees Fahrenheit.") in _PY_HANDLER_RULES

@@ -10,7 +10,7 @@ from pathlib import Path
 from architect.builder import parse_build_package, run_build, wrap_prompt
 
 FIX = Path(__file__).parent / "fixtures" / "build_run1"
-VALIDATED_PROMPT_SHA256 = "e8989c6238baca254398a0651e908832dc88678e8c4b5ade69c1c417cc17d373"
+VALIDATED_PROMPT_SHA256 = "314904addd83f62b02218eb9405a86bd82ecc86153c76bd60c3e69af04a1efe3"
 
 
 def _pkg():
