@@ -51,11 +51,19 @@ def test_build_js_guards_continue_link_on_failures():
     assert "failedComponentIds" in js
     assert "Reload this page and upload your build package again" in js
     seg = js[js.index('case "build:complete"'):js.index('case "build:fatal"')]
-    assert "failedComponentIds" in seg
-    assert "Continue to Deploy" in seg
+    assert "addDeployLink()" in seg
+    fn = js[js.index("function addDeployLink"):js.index("socket.on", js.index("function addDeployLink"))]
+    assert "failedComponentIds" in fn
     assert "failedComponentIds" in js
 
 
 def test_templates_cache_bust_scripts():
-    assert "?v=20261105b" in _read("templates/build.html")
+    assert "?v=20261105c" in _read("templates/build.html")
     assert "?v=20261105b" in _read("templates/deploy.html")
+
+
+def test_build_js_single_deploy_link():
+    js = _read("static/build.js")
+    assert "function addDeployLink" in js
+    assert 'id = "deploy-link"' in js
+    assert js.count("Continue to Deploy") == 1

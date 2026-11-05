@@ -74,13 +74,20 @@ socket.on("build:wave:done", (p) => {
   // optional: show wave-completion progress
 });
 
-socket.on("build:complete", (p) => {
-  if (!isOurRun(p)) return;
+function addDeployLink() {
+  if (document.getElementById("deploy-link")) return;
+  if (failedComponentIds().length > 0) return;
   const link = document.createElement("a");
+  link.id = "deploy-link";
   link.href = `${window.PFX || ""}/deploy?run=${runId}`;
   link.textContent = "Continue to Deploy →";
   link.style.cssText = "display:inline-block;margin-top:1rem;color:#60a5fa;font-weight:600;";
   grid.appendChild(link);
+}
+
+socket.on("build:complete", (p) => {
+  if (!isOurRun(p)) return;
+  addDeployLink();
 });
 
 socket.on("build:fatal", (p) => {
@@ -214,12 +221,7 @@ function applyEvent(ev) {
     }
     case "build:complete": {
       showCompleteStatus(p);
-      if (failedComponentIds().length > 0) break;
-      const link = document.createElement("a");
-      link.href = `${window.PFX || ""}/deploy?run=${runId}`;
-      link.textContent = "Continue to Deploy →";
-      link.style.cssText = "display:inline-block;margin-top:1rem;color:#60a5fa;font-weight:600;";
-      grid.appendChild(link);
+      addDeployLink();
       break;
     }
     case "build:fatal":
