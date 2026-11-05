@@ -340,6 +340,25 @@ Cause: weather-api-handler.py (and siblings) call upstream without `units=imperi
 - Other observations: three of the 10 components (healthz-handler, root-handler, weather-api-handler) are near-duplicates each defining all routes; healthz-handler.py defines `/api/weather` and `/`, not `/healthz` (that is served by the app.py shim). Service/client/model files are unused (as predicted in the build-fix spec section 7).
 - Run 3 not started; nothing fixed. Artifacts: $WORK/artifacts/run-2/{dense-spec.md,spec-grep.txt,build-package.yaml,build-events.json,builder-journal.txt,intake-log.txt,ws/}; shots in $WORK/shots/run-2/.
 
+### Run 2 deploy (Task 2.3 Steps 1-3) | PASS | 2026-11-05 10:47 MST
+- Gate: Section 0c PASS. ECR token refreshed by the user (Login Succeeded). APP_NAME=app-ab2319, APP_HOST=app-ab2319-training.tools.fubotv.net.
+- Custom template uploaded on `$PUB/architect/deploy?run=ab23193b2194`; rendered YAML (saved $WORK/artifacts/run-2/rendered.yaml) has containerPort 3000, healthcheck /healthz, and the Secret reference, no key:
+```
+  env:
+    - name: OPENWEATHER_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: app-ab2319-openweather
+          key: OPENWEATHER_API_KEY
+```
+- Image build: `(image built)` for 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:ab2319.
+- Image push: 8 layers Pushed; `ab2319: digest: sha256:520dc12dd82e... size: 1992` (digest truncated to 12 hex).
+- Apply: `kubectl not available on the agent host`, so the "Manual apply needed" handoff panel appeared (PASS by design). Screenshots shots/run-2/{deploy-ui,deploy-manual-apply}.png. Handoff saved as $WORK/artifacts/run-2/apply-handoff.sh.
+- User laptop steps (Step 4, human gate; not run):
+  1. `AWS_PROFILE=fubo-tools kubectl --context vat-dev create secret generic app-ab2319-openweather -n training --from-literal=OPENWEATHER_API_KEY="$OPENWEATHER_API_KEY"`
+  2. the handoff: `cat <<'EOF' | AWS_PROFILE=fubo-tools kubectl --context vat-dev apply -f -` followed by rendered.yaml and `EOF`
+- Caveat: run 2 failed pre-deploy check 6 (temp_f conversion, see run 2 entry); deploying it is the controller's call.
+
 ## Stage 2 artifacts
 
 (pending)
