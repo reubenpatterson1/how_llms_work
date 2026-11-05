@@ -139,6 +139,7 @@ _PY_HANDLER_RULES = [
     "Implement every other route in the API section in this one Blueprint named `bp`. A route that serves an HTML page returns the whole page as an inline Python string (no render_template, no template or static files).",
     "Return exactly the JSON fields and status codes the spec lists. Copy UI labels, button text and error messages from the spec exactly, with the same capitalisation.",
     "In page JavaScript, put GET parameters in the URL query string as the shape does; a GET fetch() has no body.",
+    "Never build HTML pages with f-strings. If the page needs a value, use a plain triple-quoted string with a marker and .replace(); JavaScript template literals like ${x} must not appear inside f-strings.",
 ]
 
 
@@ -243,6 +244,28 @@ _STUB_MARKER_RE = re.compile(r"""\{["']result["']: ?["']value["']\}|TODO|placeho
 _MAX_ATTEMPTS = 2  # first try + one retry with the rejection reason appended
 
 
+def find_js_template_in_fstring(source: str) -> list[int]:
+    """Line numbers of f-strings that hold HTML/JS and a JavaScript template literal `${...}`."""
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.JoinedStr):
+            continue
+        text = "".join(v.value for v in node.values
+                       if isinstance(v, ast.Constant) and isinstance(v.value, str))
+        if "<script" not in text and "`" not in text:
+            continue
+        for a, b in zip(node.values, node.values[1:]):
+            if (isinstance(a, ast.Constant) and isinstance(a.value, str) and a.value.endswith("$")
+                    and isinstance(b, ast.FormattedValue)):
+                lines.add(node.lineno)
+                break
+    return sorted(lines)
+
+
 def validate_generated_code(code: str, language: str) -> str | None:
     """Return None if `code` is acceptable, else a one-line reason. Only Python is checked."""
     if language != "python":
@@ -251,6 +274,13 @@ def validate_generated_code(code: str, language: str) -> str | None:
         ast.parse(code)
     except (SyntaxError, ValueError) as e:
         return f"SyntaxError: {getattr(e, 'msg', str(e))} (line {getattr(e, 'lineno', '?')})"
+    flagged = find_js_template_in_fstring(code)
+    if flagged:
+        return (f"Line {flagged[0]}: HTML/JavaScript is inside an f-string and uses a JavaScript template "
+                "literal ${...}. Python reads ${x} as a Python variable x, so the page raises NameError "
+                "when served. Do not build HTML with f-strings. Use a plain (non-f) triple-quoted string "
+                "with a marker such as __CITY__ and call .replace('__CITY__', value), and use normal "
+                "single braces in the JavaScript.")
     m = _STUB_MARKER_RE.search(code)
     if m:
         found = m.group(0)
