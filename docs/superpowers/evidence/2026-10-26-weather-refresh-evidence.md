@@ -419,8 +419,8 @@ tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part tot
 - 2.4-step3 | PASS | Deployment env names only: `OPENWEATHER_API_KEY<-app-ab2319-openweather`; literal-value check `False`.
 - 2.4-step4 | PASS | Chicago: app `{"city":"Chicago","description":"overcast clouds","temp_f":52.52}` vs OpenWeather imperial `52.52` (delta 0, same minute).
 - 2.4-step2 | PASS | `/` has "Get weather" (count 2), `id="clock"` count 0, `?city=zzzznotacity` -> 404, no city -> 400.
-- 2.4-step5 | PENDING | browser screenshot (human, internal host).
-- 2.4-step6 | PENDING | human key-leak grep pair.
+- 2.4-step5 | PASS | browser screenshot (user, 266x111 PNG) shows `Chicago: overcast clouds (52.52°F)`; saved at `$WORK/shots/run-2/weather-app-live.png`.
+- 2.4-step6 | PASS | user ran the repo grep and `git log -p --all` grep for the key value: `0` and `0`. Evidence key-shape scan `grep -cE "[0-9a-f]{32}"` = 0.
 
 ## Publishes
 
