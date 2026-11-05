@@ -411,6 +411,17 @@ tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part tot
 (no output; nothing listening on 5191/5192/5193)
 ```
 
+## Stage 2 verification (run 2, app-ab2319)
+
+- 2.3-apply | PASS | 2026-11-05 | laptop: `AWS_PROFILE=fubo-tools kubectl --context vat-dev` create secret + apply -> `secret/app-ab2319-openweather created`, `application.app.smo.tools.fubotv.net/app-ab2319 created`. Image digest 520dc12dd82e.
+- 2.4-gotcha-1 | INFO | Ingress listens on HTTPS 443 only; plain `http://` returns the shared ALB 404. Slides/kit must use `https://`.
+- 2.4-gotcha-2 | INFO | First Secret was created empty (0 bytes): `read -rs` is bash-only, zsh left `$OPENWEATHER_API_KEY` unset. App correctly returned `{"error":"OPENWEATHER_API_KEY not set"}`. Fix: `stty -echo; printf "OpenWeather key: "; read -r OPENWEATHER_API_KEY; stty echo; echo; export OPENWEATHER_API_KEY; echo "len=${#OPENWEATHER_API_KEY}"` (expect len=32), then delete/recreate Secret and `rollout restart`. Follow-along must include a Secret length check.
+- 2.4-step3 | PASS | Deployment env names only: `OPENWEATHER_API_KEY<-app-ab2319-openweather`; literal-value check `False`.
+- 2.4-step4 | PASS | Chicago: app `{"city":"Chicago","description":"overcast clouds","temp_f":52.52}` vs OpenWeather imperial `52.52` (delta 0, same minute).
+- 2.4-step2 | PASS | `/` has "Get weather" (count 2), `id="clock"` count 0, `?city=zzzznotacity` -> 404, no city -> 400.
+- 2.4-step5 | PENDING | browser screenshot (human, internal host).
+- 2.4-step6 | PENDING | human key-leak grep pair.
+
 ## Publishes
 
 (pending)
