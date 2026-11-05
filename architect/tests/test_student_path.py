@@ -38,3 +38,24 @@ def test_deploy_js_handoff_panel_text():
     for needle in ["--context vat-dev", "AWS_PROFILE=fubo-tools",
                    "create secret generic", "-openweather", "HTTPS only"]:
         assert needle in text
+
+
+def _read(rel):
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(base, rel)) as f:
+        return f.read()
+
+
+def test_build_js_guards_continue_link_on_failures():
+    js = _read("static/build.js")
+    assert "failedComponentIds" in js
+    assert "Reload this page and upload your build package again" in js
+    seg = js[js.index('case "build:complete"'):js.index('case "build:fatal"')]
+    assert "failedComponentIds" in seg
+    assert "Continue to Deploy" in seg
+    assert "failedComponentIds" in js
+
+
+def test_templates_cache_bust_scripts():
+    assert "?v=20261105b" in _read("templates/build.html")
+    assert "?v=20261105b" in _read("templates/deploy.html")

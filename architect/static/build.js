@@ -147,6 +147,20 @@ function showStatus(text, color) {
   banner.style.border = `1px solid ${color === "red" ? "#7f1d1d" : color === "green" ? "#166534" : "#334155"}`;
 }
 
+function failedComponentIds() {
+  return Object.keys(cards).filter(id => cards[id].classList.contains("error"));
+}
+
+function showCompleteStatus(p) {
+  const failed = failedComponentIds();
+  if (failed.length > 0) {
+    showStatus(`Build finished with ${failed.length} failed component(s): ${failed.join(", ")}. Reload this page and upload your build package again to retry before deploying.`, "red");
+    return false;
+  }
+  showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
+  return true;
+}
+
 socket.on("build:start", (p) => {
   if (!isOurRun(p)) return;
   showStatus(`Build started — ${p.total_components} components in ${p.total_waves} waves`, "blue");
@@ -154,7 +168,7 @@ socket.on("build:start", (p) => {
 
 socket.on("build:complete", (p) => {
   if (!isOurRun(p)) return;
-  showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
+  showCompleteStatus(p);
 });
 
 socket.on("build:fatal", (p) => {
@@ -199,7 +213,8 @@ function applyEvent(ev) {
       break;
     }
     case "build:complete": {
-      showStatus(`Build complete in ${(p.duration_ms / 1000).toFixed(1)}s`, "green");
+      showCompleteStatus(p);
+      if (failedComponentIds().length > 0) break;
       const link = document.createElement("a");
       link.href = `${window.PFX || ""}/deploy?run=${runId}`;
       link.textContent = "Continue to Deploy →";
