@@ -180,6 +180,13 @@ T7 image build/push/apply NOT re-run (push pending user's ECR token refresh).
 ## Stage 1 blocking fixes
 
 - D1 decompose truncation -> test_decompose_ollama_think.py (7 tests) -> architect/llm_judge.py, architect/decomposer.py -> commit 1580c6c
+- F1 model emits stray `<unused56>` tokens in generated code (SyntaxError on import) -> architect/tests/test_builder_unused_token.py -> architect/builder.py (+ build_run1 fixtures) -> commit 7e8a52a
+- F3 Ollama think mode ate the token budget / no completion stats -> architect/tests/test_builder_ollama_think.py -> architect/builder.py -> commit 35e4afd
+- F4 builder prompt lacked the spec and handlers were not self-contained -> architect/tests/test_builder_handler_prompt.py -> architect/builder.py, architect/builder_templates/handler_python.txt -> commit daa7967
+- F2 invalid generated Python accepted with no retry -> architect/tests/test_builder_validate_retry.py, test_builder_weather_run1_replay.py -> architect/builder.py -> commit 1818f31
+- F5 intake dropped all but one update per sub-topic -> architect/tests/test_intake_keeps_all_updates_per_sub.py -> architect/llm_judge.py -> commit 90ff11a
+- F6 generated tests but pytest missing from requirements.txt -> architect/tests/test_builder_requirements_pytest.py -> architect/builder.py -> commit cb84dd3
+- Review fix: placeholder/TODO retry reasons not actionable -> architect/tests/test_builder_validate_retry.py -> architect/builder.py -> commit 5355e91
 
 ## Intake answer sheet
 
@@ -313,8 +320,9 @@ GET / -> app.py fallback "Hello, World!" clock page (no city input / Get weather
 Three generated modules end with a stray `<unused56>` token (model output artifact) and fail to import; the working route is the mock handler.
 - Run 1 FAILED Steps 5 and 6. Not fixing, run 2 not started; controller decides (tighten answers vs Task 1.6 fix). Artifacts: $WORK/artifacts/run-1/{dense-spec.md,build-package.yaml,build-events.json,ws/}, shots in $WORK/shots/run-1/.
 
-### Run 2 (of at most 3) | FAIL (check 6 only) | 2026-10-26 12:43-12:55 EDT
-Generator fixes 7e8a52a..5355e91 shipped and service restarted once before this run. RUN_ID=ab23193b2194, RUN_SHORT=ab2319, sid run2-202610261243 (SPEC_SLUG: none in package, app name app-ab2319). Answers: run-1 files unchanged (01 first, then driven by next_question: 04, 02, 03, 05..10), 10x ollama:gemma4:e4b.
+### Run 2 (of at most 3) | ACCEPTED as the worked example (in-process check 6 failed on a harness mock mismatch; see acceptance record) | 2026-10-26 12:43-12:55 EDT
+Generator fixes 7e8a52a..5355e91 shipped and service restarted once before this run. RUN_ID=ab23193b2194, RUN_SHORT=ab2319, sid run2-202610261243 (SPEC_SLUG: none in package, app name app-ab2319). Answers: run-1 files unchanged, 10x ollama:gemma4:e4b. Sent in fixed order 01, 04, 02, 03, 05..10 (see disclosed deviation below), not driven by next_question.
+- DISCLOSED DEVIATION (intake): run 2 intake was sent by script `artifacts/run-2/drive.py` (POST /api/send), not typed in the UI. `intake-log.txt` shows `complete=True` from the first scripted answer (04) with an empty next_question every time, so the files were pushed in the script's fixed order, not driven by next_question. Decompose and Build were UI-driven (screenshots exist in shots/run-2/: decompose-spec-loaded.png, decompose-wave-plan.png, build-ui.png).
 - Check 1 (dense spec grep, before Decompose) | PASS
 ```
 GET /healthz: 2 | GET / : 2 | 404: 2 | 502: 2 | 500: 2 | Get weather: 4 | temp_f: 2 | OPENWEATHER_API_KEY: 2
@@ -336,9 +344,11 @@ page True True True
 200 {'city': 'Chicago', 'description': 'clear sky', 'temp_f': -367.51}     (expected temp_f 51.2)
 404 404
 ```
-Cause: weather-api-handler.py (and siblings) call upstream without `units=imperial` (params = {q, appid}) and convert Kelvin to F: `temp_f = temp_kelvin*9/5 - 459.67`. The mock returns an imperial value, so conversion gives -367.51. Live behavior would likely still give a correct F value (Kelvin default), but it departs from the spec's upstream URL (`units=imperial`), and the temp_f differs between handler copies (round 1 vs round 2 decimals). Also 4 of 6 files use http:// (not https) for the upstream URL, sending the key in clear text.
-- Other observations: three of the 10 components (healthz-handler, root-handler, weather-api-handler) are near-duplicates each defining all routes; healthz-handler.py defines `/api/weather` and `/`, not `/healthz` (that is served by the app.py shim). Service/client/model files are unused (as predicted in the build-fix spec section 7).
-- Run 3 not started; nothing fixed. Artifacts: $WORK/artifacts/run-2/{dense-spec.md,spec-grep.txt,build-package.yaml,build-events.json,builder-journal.txt,intake-log.txt,ws/}; shots in $WORK/shots/run-2/.
+Cause: weather-api-handler.py (and siblings) call upstream without `units=imperial` (params = {q, appid}) and convert Kelvin to F: `temp_f = temp_kelvin*9/5 - 459.67`. The mock returns an imperial value, so conversion gives -367.51. Live behavior would likely still give a correct F value (Kelvin default), but it departs from the spec's upstream URL (`units=imperial`), and the temp_f differs between handler copies (round 1 vs round 2 decimals). Four of the 6 files with the upstream URL use http:// (weather-service, openweather-client, weather-data, weather-api-handler). CORRECTION (audit): those http constants live only in the unused weather-service, openweather-client and weather-data modules and in weather-api-handler.py, which is shadowed (see Real route paths). The handler that serves /api/weather is healthz-handler.py, which uses https (line 8), so the live request path does not send the key over http.
+- Other observations: three of the 10 components (healthz-handler, root-handler, weather-api-handler) are near-duplicates each defining all routes; healthz-handler.py defines `/api/weather` and `/`, not `/healthz` (confirmed by reading: only `@bp.get('/api/weather')` and `@bp.get('/')`; `/healthz` is served by the app.py shim, `@app.get("/healthz")` at line 41). Service/client/model files are unused (as predicted in the build-fix spec section 7).
+- ACCEPTANCE RECORD (run 2): against Task 2.2 Step 7's failure rule (Steps 2, 5, 6) run 2 passes. In-process check 6 is a harness mock mismatch: the code converts Kelvin to Fahrenheit, and the mock returned an imperial value, giving -367.51. A controller replay with 284.65 K gave temp_f 52.7, and live matched OpenWeather (52.52 vs 52.52, see 2.4-step4).
+- SPEC DEVIATION (recorded): the upstream call omits `units=imperial` (params = {q, appid}) and converts Kelvin to Fahrenheit in code, whereas the spec's upstream URL has `units=imperial`.
+- Budget: 2 of 3 runs used. Run 3 not started; nothing fixed. Artifacts: $WORK/artifacts/run-2/{dense-spec.md,spec-grep.txt,build-package.yaml,build-events.json,builder-journal.txt,intake-log.txt,ws/}; shots in $WORK/shots/run-2/.
 
 ### Run 2 deploy (Task 2.3 Steps 1-3) | PASS | 2026-11-05 10:47 MST
 - Gate: Section 0c PASS. ECR token refreshed by the user (Login Succeeded). APP_NAME=app-ab2319, APP_HOST=app-ab2319-training.tools.fubotv.net.
@@ -354,22 +364,24 @@ Cause: weather-api-handler.py (and siblings) call upstream without `units=imperi
 - Image build: `(image built)` for 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:ab2319.
 - Image push: 8 layers Pushed; `ab2319: digest: sha256:520dc12dd82e... size: 1992` (digest truncated to 12 hex).
 - Apply: `kubectl not available on the agent host`, so the "Manual apply needed" handoff panel appeared (PASS by design). Screenshots shots/run-2/{deploy-ui,deploy-manual-apply}.png. Handoff saved as $WORK/artifacts/run-2/apply-handoff.sh.
-- User laptop steps (Step 4, human gate; not run):
+- User laptop steps (Step 4, human gate; run by the user on 2026-11-05, see the 2.3-apply entry):
   1. `AWS_PROFILE=fubo-tools kubectl --context vat-dev create secret generic app-ab2319-openweather -n training --from-literal=OPENWEATHER_API_KEY="$OPENWEATHER_API_KEY"`
   2. the handoff: `cat <<'EOF' | AWS_PROFILE=fubo-tools kubectl --context vat-dev apply -f -` followed by rendered.yaml and `EOF`
-- Caveat: run 2 failed pre-deploy check 6 (temp_f conversion, see run 2 entry); deploying it is the controller's call.
+- Caveat: run 2 failed pre-deploy check 6 (temp_f conversion, see run 2 entry); it was later accepted (see the run 2 acceptance record).
 
 ## Stage 2 artifacts
 
-(pending)
-
-## Stage 2 verification
-
-(pending)
+Under .claude/weather-refresh-work/artifacts/run-2/:
+- dense-spec.md, spec-grep.txt, sid.txt, intake-log.txt, drive.py (intake script)
+- build-package.yaml, build-events.json, builder-journal.txt
+- ws/ (generated workspace: Dockerfile, requirements.txt, src/)
+- rendered.yaml, docker-build.log, docker-push.log (image digest 520dc12dd82e), apply-handoff.sh
+- Screenshots under .claude/weather-refresh-work/shots/run-2/: architect-dashboard.png, dense-spec.png, decompose-spec-loaded.png, decompose-wave-plan.png, build-ui.png, deploy-ui.png, deploy-manual-apply.png, weather-app-live.png
+- Step 1 note: kubectl get application/deployment output not captured; pod was 1/1 Running with a healthy /healthz in logs.
 
 ## Real route paths
 
-- run 2 (ab23193b2194, FAILED check 6): handler route `GET /api/weather?city=<name>` (weather-api-handler.py `@bp.get('/api/weather')`), page `GET /`, health `GET /healthz` (app.py shim). WEATHER_ROUTE=/api/weather.
+- run 2 (ab23193b2194, ACCEPTED): handler route `GET /api/weather?city=<name>` served by `healthz-handler.py` (`@bp.get('/api/weather')`), NOT weather-api-handler.py. Reason: app.py (ws/src/app.py:64) registers blueprints in `sorted(os.listdir)` order, so healthz-handler.py registers first and wins duplicate rules; it rounds to 2 decimals (matches live 52.52) and uses https (line 8). weather-api-handler.py is shadowed (round to 1 decimal, http). Page `GET /`, health `GET /healthz` (app.py shim). WEATHER_ROUTE=/api/weather.
 - run 1 (b6cb0a5da5c8, FAILED run): spec route `GET /api/weather?city=<name>`; generated app routes `/healthz`, `/api/weather`, `/` (root is the shim fallback page). WEATHER_ROUTE=/api/weather (provisional, run 1 failed Step 6).
 
 ## Stage 3a checks
@@ -417,10 +429,17 @@ tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part tot
 - 2.4-gotcha-1 | INFO | Ingress listens on HTTPS 443 only; plain `http://` returns the shared ALB 404. Slides/kit must use `https://`.
 - 2.4-gotcha-2 | INFO | First Secret was created empty (0 bytes) and so was the second (recreated 16:10:01Z, still 0): `$OPENWEATHER_API_KEY` expanded to nothing in the user's shell. ROOT CAUSE UNCONFIRMED. The controller first blamed zsh `read -rs`; that was WRONG (verified: `zsh -c 'read -rs X <<< abcdef; echo ${#X}'` prints 6, so zsh supports `-s`). Likely the variable was not set in the shell that ran `create secret` (e.g. different shell/tab, or the earlier London 200 key check was never run in that shell). What worked: `stty -echo; printf "OpenWeather key: "; read -r OPENWEATHER_API_KEY; stty echo; echo; export OPENWEATHER_API_KEY; echo "len=${#OPENWEATHER_API_KEY}"` (len=32, London 200), then delete/recreate Secret, `rollout restart` (recreated 16:12:30Z, 32 bytes in Secret and in pod). Lesson for the follow-along: verify `len=32` and the London 200 in the SAME shell before `create secret`, and check the Secret byte length after.
 - 2.4-step3 | PASS | Deployment env names only: `OPENWEATHER_API_KEY<-app-ab2319-openweather`; literal-value check `False`.
-- 2.4-step4 | PASS | Chicago: app `{"city":"Chicago","description":"overcast clouds","temp_f":52.52}` vs OpenWeather imperial `52.52` (delta 0, same minute).
-- 2.4-step2 | PASS | `/` has "Get weather" (count 2), `id="clock"` count 0, `?city=zzzznotacity` -> 404, no city -> 400.
+- 2.4-step4 | PASS | Chicago: app `{"city":"Chicago","description":"overcast clouds","temp_f":52.52}` vs OpenWeather imperial `52.52` (delta 0, same minute). Not captured: the OpenWeather description (only temp 52.52 was pasted for the reference call; the app and the browser screenshot both show 'overcast clouds'); the two `date -u` timestamps and the command as typed (the user ran a split variant of the Step 4 command; same-minute is the user's report, not shown).
+- 2.4-step2 | PASS | `/` has "Get weather" (count 2), `id="clock"` count 0, `?city=zzzznotacity` -> 404, no city -> 400. Not captured: `grep -c '<input'` (the 'Get weather' count 2 and clock 0 were captured).
 - 2.4-step5 | PASS | browser screenshot (user, 266x111 PNG) shows `Chicago: overcast clouds (52.52°F)`; saved at `$WORK/shots/run-2/weather-app-live.png`.
 - 2.4-step6 | PASS | user ran the repo grep and `git log -p --all` grep for the key value: `0` and `0`. Evidence key-shape scan `grep -cE "[0-9a-f]{32}"` = 0.
+
+## Honest limits
+
+- Which handler serves /api/weather: healthz-handler.py (first in sorted order), not weather-api-handler.py; the http constants are in unused or shadowed code only.
+- healthz-handler.py defines /api/weather and / but not /healthz (confirmed by reading; /healthz comes from the app.py shim).
+- The dashboard screenshot (shots/run-2/architect-dashboard.png) shows 'Channels resolved 0/10' and density 71.
+- The upstream call omits units=imperial and converts Kelvin to Fahrenheit in code (spec deviation).
 
 ## Publishes
 
