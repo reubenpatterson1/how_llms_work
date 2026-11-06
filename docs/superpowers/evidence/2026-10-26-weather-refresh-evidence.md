@@ -470,7 +470,10 @@ User declined creating the throwaway spike repo. The role trust policy answers t
 
 ## Publishes
 
-(pending)
+- part4 | PUBLISHED | 2026-11-06 | `rsync -az --delete module4/dist/ -> /var/www/llm-course/part4/` (backup part4.bak-20261106); `/part4/` 200; served bundle matched the build (index-vO9ciYSa.js).
+- refresher+landing | PUBLISHED | 2026-11-06 | `rsync -az --delete refresher/dist/ -> /var/www/llm-course/refresher/`; `rsync -c deploy-landing/index.html -> /var/www/llm-course/index.html` (backup index.html.bak-20261106). Verified on the box by the controller over ssh: index.html md5 prefix 6977e312, refresher/index.html md5 prefix b5cfb7a2, assets index-DhLFhUIx.js; landing has `refresherCard` (count 1), `slides:26` (count 1) and `var serverLocks={part5: true};` (count 1). No nginx change needed (server-level `root /var/www/llm-course`). Not done before publish: the timed 10-15 minute run (plan Task 5.5 Step 2) -- published untimed by user decision. The landing publish was built from branch weather-app-refresh only, so it does not include the SSO banner code (that ships with SSO Phase 1).
+- part5 | NOT PUBLISHED | Part 5 content and the workflow loop are pending the user's training-role decision.
+
 
 ## Final verification
 
