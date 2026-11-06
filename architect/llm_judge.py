@@ -380,26 +380,34 @@ def _parse_llm_response(text: str) -> Optional[dict]:
 
 
 def query_ollama(config: ProviderConfig, prompt: str,
-                 system_prompt: str = "") -> Optional[dict]:
+                 system_prompt: str = "", think: Optional[bool] = None) -> Optional[dict]:
     """Query Ollama local LLM. `prompt` must already be the complete prompt text —
-    callers build it themselves (e.g. via _build_prompt for intake analysis)."""
+    callers build it themselves (e.g. via _build_prompt for intake analysis).
+    `think`: None omits the field (Ollama default); False disables model reasoning."""
     try:
+        payload = {
+            "model": config.model,
+            "prompt": prompt,
+            "system": system_prompt or SYSTEM_PROMPT,
+            "stream": False,
+            "options": {
+                "temperature": config.temperature,
+                "num_predict": config.max_tokens,
+            },
+        }
+        if think is not None:
+            payload["think"] = think
         r = requests.post(
             f"{config.base_url}/api/generate",
-            json={
-                "model": config.model,
-                "prompt": prompt,
-                "system": system_prompt or SYSTEM_PROMPT,
-                "stream": False,
-                "options": {
-                    "temperature": config.temperature,
-                    "num_predict": config.max_tokens,
-                },
-            },
+            json=payload,
             timeout=config.timeout,
         )
         if r.status_code == 200:
-            text = r.json().get("response", "")
+            body = r.json()
+            text = body.get("response", "")
+            if body.get("done_reason") == "length":
+                print(f"[LLM Judge] Ollama output truncated: done_reason=length, "
+                      f"eval_count={body.get('eval_count')}, num_predict={config.max_tokens}", file=sys.stderr)
             print(f"[LLM Judge] Ollama response length: {len(text)}, first 300: {text[:300]}", file=sys.stderr)
             parsed = _parse_llm_response(text)
             if parsed is None:
@@ -766,7 +774,12 @@ class LLMJudge:
         return "\n".join(lines)
 
     def _parse_updates(self, raw_updates: list[dict]) -> list[DimensionUpdate]:
-        """Convert LLM JSON updates to DimensionUpdate objects."""
+        """Convert LLM JSON updates to DimensionUpdate objects.
+
+        One answer may carry several updates for the same (channel, sub) — e.g. three endpoints
+        in one API answer — and all are kept (SubDimension.update appends each distinct
+        constraint and keeps the max resolution). Only exact repeats are dropped.
+        """
         updates = []
         seen = set()
         for u in raw_updates:
@@ -780,7 +793,7 @@ class LLMJudge:
             if not channel or sub not in channel.sub_dimensions:
                 continue
 
-            key = (ch, sub)
+            key = (ch, sub, constraint)
             if key in seen:
                 continue
             seen.add(key)

@@ -185,16 +185,34 @@ function showApplyHandoff(body) {
   panel.innerHTML = `
     <h3 style="margin: 0 0 .5rem; font-size: .9rem; color: #fbbf24;">Manual apply needed</h3>
     <p style="font-size: .8rem; color: #cbd5e1; margin-bottom: .75rem;">
-      Run this on a machine with cluster auth (your laptop with kubeconfig pointing at the EKS cluster):
+      Run these on your laptop, in order, in the same shell (AWS_PROFILE=fubo-tools and context vat-dev are set explicitly in each command, so your default kubeconfig context does not matter).
     </p>
+    <p style="font-size: .8rem; color: #cbd5e1; margin-bottom: .25rem;">First, in the same shell, set your OpenWeather key and check it: <code>stty -echo; printf "OpenWeather key: "; read -r OPENWEATHER_API_KEY; stty echo; echo; export OPENWEATHER_API_KEY; echo "len=\${#OPENWEATHER_API_KEY}"</code> (expect len=32)</p>
+    <textarea id="secret-cmd" readonly style="width: 100%; height: 3.5rem; font-family: 'IBM Plex Mono', monospace; font-size: .75rem; background: #020617; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: .75rem; resize: vertical;"></textarea>
+    <button id="copy-secret-cmd" class="btn btn-ghost" style="font-size: .8rem; margin: .25rem 0 .75rem;">Copy command</button>
     <textarea id="apply-cmd" readonly style="width: 100%; height: 14rem; font-family: 'IBM Plex Mono', monospace; font-size: .75rem; background: #020617; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: .75rem; resize: vertical;"></textarea>
     <div style="margin-top: .5rem; display: flex; gap: .5rem; align-items: center;">
       <button id="copy-apply-cmd" class="btn btn-ghost" style="font-size: .8rem;">Copy command</button>
       <button id="poll-ingress-btn" class="btn btn-primary" style="font-size: .8rem;">I've applied — poll ingress</button>
       <span id="poll-status" style="font-size: .75rem; color: #94a3b8;"></span>
     </div>
+    <textarea id="verify-cmd" readonly style="width: 100%; height: 2.5rem; margin-top: .75rem; font-family: 'IBM Plex Mono', monospace; font-size: .75rem; background: #020617; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: .5rem .75rem; resize: vertical;"></textarea>
+    <p style="font-size: .8rem; color: #cbd5e1; margin-top: .25rem;">HTTPS only: http:// returns a 404 from the shared load balancer.</p>
   `;
-  const cmd = `cat <<'EOF' | kubectl apply -f -\n${body.yaml}EOF`;
+  const yamlText = body.yaml || "";
+  const nameMatch = yamlText.match(/^metadata:\s*\n\s+name:\s*(\S+)/m);
+  const hostMatch = yamlText.match(/^\s*host:\s*(\S+)/m);
+  const appName = nameMatch ? nameMatch[1] : "<app-name>";
+  const appHost = hostMatch ? hostMatch[1] : "<app-name>";
+  const secretCmd = `AWS_PROFILE=fubo-tools kubectl --context vat-dev -n training create secret generic ${appName}-openweather --from-literal=OPENWEATHER_API_KEY="$OPENWEATHER_API_KEY"`;
+  document.getElementById("secret-cmd").value = secretCmd;
+  document.getElementById("copy-secret-cmd").onclick = async () => {
+    await navigator.clipboard.writeText(secretCmd);
+    document.getElementById("copy-secret-cmd").textContent = "Copied ✓";
+    setTimeout(() => { document.getElementById("copy-secret-cmd").textContent = "Copy command"; }, 1500);
+  };
+  document.getElementById("verify-cmd").value = `curl -sS https://${appHost}/healthz`;
+  const cmd = `cat <<'EOF' | AWS_PROFILE=fubo-tools kubectl --context vat-dev apply -f -\n${body.yaml}EOF`;
   document.getElementById("apply-cmd").value = cmd;
   document.getElementById("copy-apply-cmd").onclick = async () => {
     await navigator.clipboard.writeText(cmd);

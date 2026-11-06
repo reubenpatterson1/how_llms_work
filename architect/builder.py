@@ -5,9 +5,11 @@ with type/language-specific shape examples, dispatches to local Ollama wave-by-w
 post-processes output, writes files into a workspace, and assembles the project skeleton.
 """
 
+import ast
 import json
 import os
 import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -110,17 +112,77 @@ def _load_shape_template(component_type: str, language: str) -> str:
         return f.read().strip()
 
 
+_LANG_TO_RUNTIME = {"javascript": "Node 20", "python": "Python 3.12", "typescript": "Node 20"}
+
+# Spec channels a handler sees verbatim, in this order.
+_HANDLER_SPEC_SECTIONS = [
+    ("purpose", "Purpose"),
+    ("api", "API"),
+    ("error_handling", "Error Handling"),
+    ("data_model", "Data Model"),
+    ("security", "Security"),
+    ("performance", "Performance"),
+]
+# Intake auto-fill / dismissal lines carry no build information.
+_SPEC_NOISE_PREFIXES = ("PoC scope —", "Not required / out of scope")
+# Decompose prompt lines that ask for cross-file imports. Python component files are named with
+# hyphens and loaded one by one by the shim, so a component can never import another.
+_PROMPT_IMPORT_LINE_PREFIXES = ("Depends on (import, do not implement):", "Dependencies:")
+
+_PY_FILE_RULES = [
+    "The app shell loads this file on its own. Other generated files cannot be imported. Do not import project modules, and do not write mock, fake, stub, placeholder or hard-coded stand-in classes or data for them. Implement everything this file needs directly with the allowed packages.",
+    'No `if __name__ == "__main__":` block, no example usage, no TODO comments.',
+    "Read environment variables inside functions at request time, never at import time. Never log, return or render a secret.",
+]
+_PY_HANDLER_RULES = [
+    "The app shell already serves GET /healthz. Do not define it.",
+    "Implement every other route in the API section in this one Blueprint named `bp`. A route that serves an HTML page returns the whole page as an inline Python string (no render_template, no template or static files).",
+    "Return exactly the JSON fields and status codes the spec lists. Copy UI labels, button text and error messages from the spec exactly, with the same capitalisation.",
+    "In page JavaScript, put GET parameters in the URL query string as the shape does; a GET fetch() has no body.",
+    "Never build HTML pages with f-strings. If the page needs a value, use a plain triple-quoted string with a marker and .replace(); JavaScript template literals like ${x} must not appear inside f-strings.",
+    "Pages must show values from the API response exactly as returned: do not convert units or rescale numbers in browser JavaScript; if the field is named temp_f it is already degrees Fahrenheit.",
+]
+
+
+def _spec_excerpt(spec: dict) -> str:
+    lines: list[str] = []
+    for key, title in _HANDLER_SPEC_SECTIONS:
+        items = [str(x) for x in (spec.get(key) or []) if not str(x).startswith(_SPEC_NOISE_PREFIXES)]
+        if items:
+            lines.append(f"{title}:")
+            lines.extend(f"- {x}" for x in items)
+    return "\n".join(lines)
+
+
 def wrap_prompt(
     component: dict,
     language: str,
     runtime: str,
     allowed_packages: list[str],
     target_relpath: str,
+    spec: dict | None = None,
 ) -> str:
     shape = _load_shape_template(component["type"], language)
     constraints_block = "\n".join(f"- {c}" for c in component.get("constraints", []))
     if not constraints_block:
         constraints_block = "- (none)"
+
+    component_prompt = component.get("prompt", "").strip()
+    extra = ""
+    if language == "python":
+        component_prompt = "\n".join(
+            line for line in component_prompt.split("\n")
+            if not line.startswith(_PROMPT_IMPORT_LINE_PREFIXES)
+        ).strip()
+        component_type = component.get("type")
+        # Test files must reach the code under test, so they do not get the no-imports rule.
+        rules = ([] if component_type == "test" else _PY_FILE_RULES[:1]) + _PY_FILE_RULES[1:]
+        if component_type == "handler":
+            rules = rules + _PY_HANDLER_RULES
+            excerpt = _spec_excerpt(spec or {})
+            if excerpt:
+                extra += "Application spec (this file must implement all of it):\n" + excerpt + "\n\n"
+        extra += "Rules for this file:\n" + "\n".join(f"- {r}" for r in rules) + "\n\n"
 
     return (
         "You are generating one source file. Output the file CONTENTS ONLY — "
@@ -133,7 +195,8 @@ def wrap_prompt(
         f"{shape}\n\n"
         f"Component purpose: {component.get('id', 'unnamed')} ({component.get('type', 'unknown')})\n"
         f"Architecture constraints:\n{constraints_block}\n\n"
-        f"Original component prompt: {component.get('prompt', '').strip()}\n\n"
+        f"Original component prompt: {component_prompt}\n\n"
+        f"{extra}"
         f"Produce {target_relpath} now."
     )
 
@@ -145,8 +208,14 @@ class PostProcessError(Exception):
 _FENCE_RE = re.compile(r"```(?:[a-zA-Z0-9_+-]*)?\s*\n(.*?)\n```", re.DOTALL)
 
 
+# gemma4:e4b sometimes emits a literal "<unusedNN>" vocab token (a normal-type token, so Ollama
+# detokenizes it as text) just before end-of-turn. Build run b6cb0a5da5c8 ended 3 of 6 Python
+# files with "<unused56>", which made them fail to import. Remove it anywhere in the output.
+_GEMMA_UNUSED_TOKEN_RE = re.compile(r"<unused\d+>")
+
+
 def post_process_output(raw: str) -> str:
-    text = (raw or "").strip()
+    text = _GEMMA_UNUSED_TOKEN_RE.sub("", raw or "").strip()
     if not text:
         raise PostProcessError("LLM returned empty output")
 
@@ -170,6 +239,62 @@ def post_process_output(raw: str) -> str:
     )
 
 
+# Mirrors the plan's Task 2.2 Step 5 stub grep (plus the single-quote form of the old template's
+# stub), so a component that passes this check passes that grep.
+_STUB_MARKER_RE = re.compile(r"""\{["']result["']: ?["']value["']\}|TODO|placeholder""")
+_MAX_ATTEMPTS = 2  # first try + one retry with the rejection reason appended
+
+
+def find_js_template_in_fstring(source: str) -> list[int]:
+    """Line numbers of f-strings that hold HTML/JS and a JavaScript template literal `${...}`."""
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.JoinedStr):
+            continue
+        text = "".join(v.value for v in node.values
+                       if isinstance(v, ast.Constant) and isinstance(v.value, str))
+        if "<script" not in text and "`" not in text:
+            continue
+        for a, b in zip(node.values, node.values[1:]):
+            if (isinstance(a, ast.Constant) and isinstance(a.value, str) and a.value.endswith("$")
+                    and isinstance(b, ast.FormattedValue)):
+                lines.add(node.lineno)
+                break
+    return sorted(lines)
+
+
+def validate_generated_code(code: str, language: str) -> str | None:
+    """Return None if `code` is acceptable, else a one-line reason. Only Python is checked."""
+    if language != "python":
+        return None
+    try:
+        ast.parse(code)
+    except (SyntaxError, ValueError) as e:
+        return f"SyntaxError: {getattr(e, 'msg', str(e))} (line {getattr(e, 'lineno', '?')})"
+    flagged = find_js_template_in_fstring(code)
+    if flagged:
+        return (f"Line {flagged[0]}: HTML/JavaScript is inside an f-string and uses a JavaScript template "
+                "literal ${...}. Python reads ${x} as a Python variable x, so the page raises NameError "
+                "when served. Do not build HTML with f-strings. Use a plain (non-f) triple-quoted string "
+                "with a marker such as __CITY__ and call .replace('__CITY__', value), and use normal "
+                "single braces in the JavaScript.")
+    m = _STUB_MARKER_RE.search(code)
+    if m:
+        found = m.group(0)
+        if found == "placeholder":
+            return ("the word 'placeholder' is forbidden anywhere in the file, including the HTML "
+                    "placeholder= attribute; set the default with value= instead and do not use the word")
+        if found == "TODO":
+            return ("the text 'TODO' is forbidden anywhere in the file, including names such as TODOS "
+                    "and titles; rename it")
+        return f"it contains the forbidden text {found!r} (no TODOs, placeholders or stub values)"
+    return None
+
+
 class OllamaError(Exception):
     """Raised when Ollama returns an error or is unreachable."""
 
@@ -188,6 +313,9 @@ class OllamaClient:
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
+                    # Disable gemma4 hidden reasoning (as Decompose does since 1580c6c): it adds
+                    # hundreds of unseen tokens per call inside the box's 4096-token context.
+                    "think": False,
                     "options": {"temperature": 0.1},
                 },
                 timeout=self.timeout,
@@ -196,6 +324,11 @@ class OllamaClient:
         except requests.RequestException as e:
             raise OllamaError(f"Ollama request failed: {e}") from e
         body = r.json()
+        print(
+            f"[Builder] Ollama {self.model}: done_reason={body.get('done_reason')} "
+            f"eval_count={body.get('eval_count')} prompt_eval_count={body.get('prompt_eval_count')}",
+            file=sys.stderr,
+        )
         return body.get("response", "")
 
 
@@ -427,6 +560,20 @@ _DEFAULT_PACKAGES_BY_LANG = {
 }
 
 
+def _allowed_packages(language: str, component: dict) -> list[str]:
+    packages = list(_DEFAULT_PACKAGES_BY_LANG[language])
+    if language == "python" and component.get("type") == "test":
+        packages.append("pytest")
+    return packages
+
+
+def _requirements_for(package: BuildPackage) -> list[str]:
+    packages = list(_DEFAULT_PACKAGES_BY_LANG[package.language])
+    if package.language == "python" and any(c.get("type") == "test" for wave in package.waves for c in wave):
+        packages.append("pytest")
+    return packages
+
+
 def _safe_filename(component_id: str) -> str:
     """Slugify a component_id for use as a filename. Decompose may emit names like
     'city entity with name-model' that don't work as ESM import paths.
@@ -451,27 +598,44 @@ def _build_component(
 
     emit("build:component:start", {"component_id": component_id})
     started = time.time()
-    try:
-        wrapped = wrap_prompt(
-            component,
-            language=package.language,
-            runtime=runtime,
-            allowed_packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
-            target_relpath=target_relpath,
+    wrapped = wrap_prompt(
+        component,
+        language=package.language,
+        runtime=runtime,
+        allowed_packages=_allowed_packages(package.language, component),
+        target_relpath=target_relpath,
+        spec=package.spec,
+    )
+    prompt = wrapped
+    reason = ""
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            raw = ollama.generate(prompt)
+        except OllamaError as e:
+            emit("build:component:error", {"component_id": component_id, "error": str(e), "attempts": attempt})
+            return {"component_id": component_id, "ok": False, "error": str(e)}
+        try:
+            cleaned = post_process_output(raw)
+            reason = validate_generated_code(cleaned, package.language) or ""
+        except PostProcessError as e:
+            reason = str(e)
+        if not reason:
+            with open(target_path, "w") as f:
+                f.write(cleaned)
+            duration_ms = int((time.time() - started) * 1000)
+            emit(
+                "build:component:done",
+                {"component_id": component_id, "file_path": target_relpath,
+                 "duration_ms": duration_ms, "attempts": attempt},
+            )
+            return {"component_id": component_id, "ok": True}
+        print(f"[Builder] {component_id}: attempt {attempt} rejected: {reason}", file=sys.stderr)
+        prompt = (
+            wrapped + "\n\nYour previous output was rejected: " + reason
+            + ". Output the complete corrected file now, following every instruction above."
         )
-        raw = ollama.generate(wrapped)
-        cleaned = post_process_output(raw)
-        with open(target_path, "w") as f:
-            f.write(cleaned)
-        duration_ms = int((time.time() - started) * 1000)
-        emit(
-            "build:component:done",
-            {"component_id": component_id, "file_path": target_relpath, "duration_ms": duration_ms},
-        )
-        return {"component_id": component_id, "ok": True}
-    except (OllamaError, PostProcessError) as e:
-        emit("build:component:error", {"component_id": component_id, "error": str(e)})
-        return {"component_id": component_id, "ok": False, "error": str(e)}
+    emit("build:component:error", {"component_id": component_id, "error": reason, "attempts": _MAX_ATTEMPTS})
+    return {"component_id": component_id, "ok": False, "error": reason}
 
 
 def run_build(
@@ -479,9 +643,11 @@ def run_build(
     workspace: str,
     ollama: OllamaClient,
     emit,
-    runtime: str = "Node 20",
+    runtime: str | None = None,
 ) -> dict:
     package = parse_build_package(package_path)
+    if runtime is None:
+        runtime = _LANG_TO_RUNTIME[package.language]
     started = time.time()
     emit(
         "build:start",
@@ -518,7 +684,7 @@ def run_build(
             workspace,
             language=package.language,
             port=_LANG_TO_PORT[package.language],
-            packages=_DEFAULT_PACKAGES_BY_LANG[package.language],
+            packages=_requirements_for(package),
         )
 
     total_ms = int((time.time() - started) * 1000)

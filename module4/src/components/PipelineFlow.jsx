@@ -7,9 +7,12 @@ const STAGES = [
     symbol: '◇',
     color: '#fbbf24',
     sub: 'A problem worth solving',
-    sample: `"Ship a team task tracker for engineering teams.
- - sprint board, task assignment, comments
- - small startups, P95 page load < 800ms"`
+    sample: `"A 'Hello, World!' weather page: a heading, a text input,
+ a 'Get weather' button, and a result area.
+ - default city New York
+ - any city → city name, current temperature in °F, description
+ - unknown city → 'City not found'
+ Success means real current weather for any valid city."`
   },
   {
     id: 'architect',
@@ -17,13 +20,15 @@ const STAGES = [
     symbol: '◆',
     color: '#60a5fa',
     sub: '10-channel structured intake',
-    sample: `## Purpose (100% resolved)
-- Objective: team task tracker
-- Success: P95 < 800ms
+    sample: `# Density Score: 0.436  (intake had already said "ready" at 78%)
 
-## Data Model (100%)
-- Entities: User, Team, Task, Comment
-- Constraints: User.email unique
+## Purpose (75% resolved)
+- A weather page to retrieve current weather information.
+- Success means real current weather for any valid city.
+
+## API (66%)
+- GET /api/weather?city= is the main endpoint.
+- GET /healthz returns 200.
    …`
   },
   {
@@ -32,11 +37,11 @@ const STAGES = [
     symbol: '◈',
     color: '#a78bfa',
     sub: 'Wave-ordered build plan',
-    sample: `# 15 components · 3 waves · 73% time saved
+    sample: `# 9 components · 2 waves · 7× parallel · 78% time saved
 
-Wave 0  ▸ 4 entity models + 2 configs   (6× parallel)
-Wave 1  ▸ CacheService, AuthService     (2× parallel)
-Wave 2  ▸ AuthMiddleware + 6 handlers   (7× parallel)`
+Wave 0  ▸ WeatherDataModel, WeatherService, HealthzHandler, APIConfig,
+          ErrorHandlingMiddleware, RateLimitMiddleware, WeatherTestSuite   (7× parallel)
+Wave 1  ▸ WeatherHandler, RootPageHandler                                  (2× parallel)`
   },
   {
     id: 'build',
@@ -44,15 +49,16 @@ Wave 2  ▸ AuthMiddleware + 6 handlers   (7× parallel)`
     symbol: '◉',
     color: '#22d3ee',
     sub: 'Wave-parallel LLM codegen',
-    sample: `// src/auth-service.js
-import jwt from 'jsonwebtoken';
-export async function authenticate(creds) {
-  const user = await Users.findByEmail(creds.email);
-  if (!user || !verify(user.hash, creds.password)) {
-    throw new Error('invalid');
-  }
-  return jwt.sign({ uid: user.id }, KEY, { expiresIn: '15m' });
-}`
+    sample: `# Ollama gemma4:e4b · Build complete in 105.8s · all 9 done on the first attempt
+Wave 0  weather-data-model      64267ms → src/weather-data-model.py
+        weather-service         23474ms → src/weather-service.py
+        healthz-handler         42888ms → src/healthz-handler.py
+        api-config               2629ms → src/api-config.py
+        error-middleware        63130ms → src/error-middleware.py
+        rate-limit-middleware   14000ms → src/rate-limit-middleware.py
+        test-suite              60601ms → src/test-suite.py
+Wave 1  weather-handler         41561ms → src/weather-handler.py
+        root-page-handler       18214ms → src/root-page-handler.py`
   },
   {
     id: 'deploy',
@@ -63,13 +69,18 @@ export async function authenticate(creds) {
     sample: `apiVersion: app.smo.tools.fubotv.net/v1alpha1
 kind: Application
 metadata:
-  name: hello-world-abc123
+  name: app-bd56da
 spec:
-  image: 650127479436.dkr.ecr.us-east-1.amazonaws.com/...
+  image: 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:bd56da
   healthcheck:
     path: /healthz
+  env:
+    - name: OPENWEATHER_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: app-bd56da-openweather
   ingress:
-    host: hello-world-abc123-training.tools.fubotv.net`
+    host: app-bd56da-training.tools.fubotv.net`
   },
   {
     id: 'test',
@@ -305,18 +316,6 @@ export default function PipelineFlow() {
           color: #1e293b;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        .deployed-mock-h1 {
-          font-size: 1.4rem;
-          font-weight: 700;
-          margin-bottom: 0.6rem;
-          color: #0f172a;
-        }
-        .deployed-mock-clock {
-          font-size: 0.95rem;
-          color: #475569;
-          margin-bottom: 0.4rem;
-          font-family: 'IBM Plex Mono', monospace;
-        }
         .deployed-mock-weather {
           font-size: 0.85rem;
           color: #64748b;
@@ -327,23 +326,16 @@ export default function PipelineFlow() {
 }
 
 function DeployedAppMock() {
-  const [time, setTime] = useState(() => new Date().toLocaleTimeString());
-  // Tick once a second
-  if (typeof window !== 'undefined') {
-    setTimeout(() => setTime(new Date().toLocaleTimeString()), 1000);
-  }
   return (
     <div className="deployed-mock">
       <div className="deployed-mock-bar">
         <span className="deployed-mock-dot" style={{ background: '#ef4444' }}></span>
         <span className="deployed-mock-dot" style={{ background: '#f59e0b' }}></span>
         <span className="deployed-mock-dot" style={{ background: '#10b981' }}></span>
-        <span className="deployed-mock-url">https://hello-world-abc123-training.tools.fubotv.net/</span>
+        <span className="deployed-mock-url">https://app-bd56da-training.tools.fubotv.net/</span>
       </div>
       <div className="deployed-mock-body">
-        <div className="deployed-mock-h1">Hello, World!</div>
-        <div className="deployed-mock-clock">{time}</div>
-        <div className="deployed-mock-weather">few clouds 70°F in NY</div>
+        <div className="deployed-mock-weather">City: Chicago, Temperature: 38.3F, Description: broken clouds</div>
       </div>
     </div>
   );

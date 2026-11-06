@@ -1,0 +1,128 @@
+```json
+{
+  "components": [
+    {
+      "id": "weather_service",
+      "name": "WeatherService",
+      "type": "service",
+      "description": "Handles the core logic of fetching and transforming weather data from OpenWeather.",
+      "channels": [
+        "GET /api/weather"
+      ],
+      "constraints": [
+        "City name returned by OpenWeather, current temperature in °F, and weather description.",
+        "Upstream OpenWeather call must have a 5s timeout."
+      ],
+      "interfaces_provided": [],
+      "interfaces_consumed": [
+        "IOpenWeatherClient",
+        "IConfigReader"
+      ],
+      "complexity": "medium"
+    },
+    {
+      "id": "openweather_client",
+      "name": "OpenWeatherClient",
+      "type": "service",
+      "description": "Responsible for making external HTTP calls to the OpenWeather API.",
+      "channels": [
+        "GET /api/weather"
+      ],
+      "constraints": [
+        "Upstream OpenWeather call must have a 5s timeout."
+      ],
+      "interfaces_provided": [],
+      "interfaces_consumed": [
+        "IConfigReader"
+      ],
+      "complexity": "medium"
+    },
+    {
+      "id": "weather_handler",
+      "name": "WeatherHandler",
+      "type": "handler",
+      "description": "Handles the GET / endpoint request, orchestrating data fetching and response formatting.",
+      "channels": [
+        "GET /"
+      ],
+      "constraints": [
+        "GET / serves the HTML page.",
+        "A text input field for a city name (defaulting to 'New York').",
+        "200 response: {\"city\": str, \"temp_f\": number, \"description\": str}"
+      ],
+      "interfaces_provided": [],
+      "interfaces_consumed": [
+        "IWeatherService"
+      ],
+      "complexity": "medium"
+    },
+    {
+      "id": "error_middleware",
+      "name": "ErrorMiddleware",
+      "type": "middleware",
+      "description": "Catches and handles specific API errors, such as missing or empty city parameters.",
+      "channels": [
+        "GET /api/weather"
+      ],
+      "constraints": [
+        "400 error for missing or empty city parameter."
+      ],
+      "interfaces_provided": [],
+      "interfaces_consumed": [],
+      "complexity": "low"
+    },
+    {
+      "id": "config_reader",
+      "name": "ConfigReader",
+      "type": "config",
+      "description": "Reads the OpenWeather API key securely from environment variables.",
+      "channels": [],
+      "constraints": [
+        "Config must come from the env var OPENWEATHER_API_KEY and is never hard-coded.",
+        "The API key must be read from os.environ only."
+      ],
+      "interfaces_provided": [
+        "IConfigReader"
+      ],
+      "interfaces_consumed": [],
+      "complexity": "low"
+    },
+    {
+      "id": "weather_test_suite",
+      "name": "WeatherTestSuite",
+      "type": "test",
+      "description": "Contains pytest suits for testing the weather functionality, mocking external calls.",
+      "channels": [],
+      "constraints": [
+        "pytest suits Part 5",
+        "Tests must mock 'requests.get' to prevent real network calls."
+      ],
+      "interfaces_provided": [],
+      "interfaces_consumed": [],
+      "complexity": "medium"
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "weather_handler",
+      "to": "weather_service",
+      "reason": "The handler calls the service to get weather data."
+    },
+    {
+      "from": "openweather_client",
+      "to": "config_reader",
+      "reason": "The client needs the API key provided by the config reader."
+    },
+    {
+      "from": "weather_service",
+      "to": "openweather_client",
+      "reason": "The service delegates the external network call to the dedicated client."
+    },
+    {
+      "from": "error_middleware",
+      "to": "weather_handler",
+      "reason": "The middleware wraps and intercepts requests handled by the handler."
+    }
+  ]
+}
+```

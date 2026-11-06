@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "id": "P1-1",
+      "part": 1,
+      "term": "Self-attention (Q/K/V)",
+      "review": { "slideNumber": 3, "slideTitle": "Self-Attention: The Core Mechanism" },
+      "q": "In self-attention, how does a token decide how much weight to give each other token in the sequence?",
+      "options": [
+        "It counts how often each other token appears earlier in the same prompt",
+        "It looks up a fixed relevance table written by the model's designers",
+        "It takes the dot product of its Query with each Key, then applies softmax",
+        "It gives every token equal weight and lets the output layer sort out relevance"
+      ],
+      "answer": 2,
+      "explanation": "Query·Key dot products are scaled and passed through softmax to produce attention weights. Those weights blend the Value vectors into a context-aware representation of each token."
+    },
+    {
+      "id": "P1-2",
+      "part": 1,
+      "term": "Attention dilution",
+      "review": { "slideNumber": 7, "slideTitle": "Attention Dilution: The Noise Problem" },
+      "q": "You add a page of loosely related background text to a short, precise request. What does attention dilution predict happens to the request's key words?",
+      "options": [
+        "They get a smaller share of attention, because softmax spreads a fixed total across all tokens",
+        "They get more attention, because the extra background gives the model more evidence to work with",
+        "They are unaffected, because the model automatically ignores any tokens that are not relevant",
+        "They are moved to the end of the context, where the model's recall is the most reliable"
+      ],
+      "answer": 0,
+      "explanation": "Softmax weights always sum to 1. Each added noise token claims a small slice, so together they reduce the attention left for the words that carry meaning. More tokens is not more information."
+    },
+    {
+      "id": "P1-3",
+      "part": 1,
+      "term": "Context density",
+      "review": { "slideNumber": 9, "slideTitle": "Context Density: Writing Better Prompts" },
+      "q": "Part 1 defines context density as how much task-relevant information each token carries. Which goal follows from that definition?",
+      "options": [
+        "Use as few words as possible, even if some decisions are left open",
+        "Repeat the most important instruction several times for emphasis",
+        "Add polite framing so the model reads the request more generously",
+        "Use fewer words per decision resolved, with concrete, specific terms"
+      ],
+      "answer": 3,
+      "explanation": "The goal isn't fewer words; it's fewer words per decision resolved. Filler inflates the softmax denominator without adding signal, while specific tokens create sharp attention peaks that guide the model."
+    },
+    {
+      "id": "P1-4",
+      "part": 1,
+      "term": "Feature activation (vague vs. specific tokens)",
+      "review": { "slideNumber": 11, "slideTitle": "Feature Activation Landscape" },
+      "q": "In the Feature Activation Landscape, how do vague tokens and specific tokens differ?",
+      "options": [
+        "Vague tokens activate a few features strongly; specific tokens activate many weakly",
+        "Specific tokens activate a few features strongly; vague tokens activate many weakly",
+        "Both activate the same features, but specific tokens pass through fewer layers",
+        "Vague tokens are dropped at the embedding layer before any feature activates"
+      ],
+      "answer": 1,
+      "explanation": "Specific tokens form tall, narrow peaks that sharpen through the layers. Vague tokens stay broad and flat, so the model wastes attention budget on competing interpretations."
+    },
+    {
+      "id": "P1-5",
+      "part": 1,
+      "term": "Sampling defaults",
+      "review": { "slideNumber": 13, "slideTitle": "How Landscape Impacts Output" },
+      "q": "A vague prompt never states which database to use. What does a flat activation landscape push the model to do at that point?",
+      "options": [
+        "Fall back on what was most frequent in its training data, varying across runs",
+        "Stop generating and ask the user a clarifying question about the database",
+        "Pick the most suitable database after reasoning carefully about the requirements",
+        "Leave a blank placeholder in the output so that the user can fill in the choice"
+      ],
+      "answer": 0,
+      "explanation": "A flat landscape forces a fallback to training-data frequency, and the sampler can pick differently each run. Top-K and temperature limit the damage but cannot create clarity the prompt never supplied."
+    },
+    {
+      "id": "P1-6",
+      "part": 1,
+      "term": "Hallucination vs. confabulation",
+      "review": { "slideNumber": 15, "slideTitle": "Hallucination Map" },
+      "q": "On the Hallucination Map, what makes a token confabulated rather than grounded, inferred or defaulted?",
+      "options": [
+        "It was copied directly from the prompt but placed in the wrong part of the output",
+        "It follows a common training pattern, so it is plausible though nothing specified it",
+        "It was invented to fill a dimension the prompt left open, with no basis in the prompt",
+        "It was logically deduced from the prompt, even though the prompt never stated it"
+      ],
+      "answer": 2,
+      "explanation": "Confabulated tokens are inventions that fill a dimension the prompt left open. Hallucinations enter at these predictable positions, not at random. A common-pattern fill is 'defaulted'; a logical deduction is 'inferred'."
+    },
+    {
+      "id": "P1-7",
+      "part": 1,
+      "term": "Confidence ≠ correctness",
+      "review": { "slideNumber": 17, "slideTitle": "Confidence Landscape" },
+      "q": "Generated text reads as confident and authoritative. According to the Confidence Landscape, what actually signals that a token is well grounded?",
+      "options": [
+        "The sentence it appears in is fluent and grammatically correct",
+        "The token is a technical term rather than an everyday English word",
+        "The token appears several times throughout the rest of the output",
+        "Its winning candidate towers alone over much smaller runners-up"
+      ],
+      "answer": 3,
+      "explanation": "A confident tone is not evidence. Grounded tokens show a solitary tall peak; confabulated tokens show a crowd of near-equal candidates. Defaulted tokens are the subtlest risk because they still sound authoritative."
+    },
+    {
+      "id": "P1-8",
+      "part": 1,
+      "term": "Fluency ≠ reasoning",
+      "review": { "slideNumber": 19, "slideTitle": "Language vs. Thought" },
+      "q": "A model writes flawless, polished prose but makes basic reasoning errors. Which idea from Part 1 explains this?",
+      "options": [
+        "Its training data held too few examples of well-written prose",
+        "Formal competence in language is separate from functional competence",
+        "Its context window was too short to hold the full line of reasoning",
+        "Its sampling temperature was set too low for creative problem solving"
+      ],
+      "answer": 1,
+      "explanation": "LLMs have mastered formal competence, the rules and patterns of language, but functional competence (reasoning, world knowledge, social understanding) stays inconsistent. Fluent text is not deep understanding, so add scaffolds, tools and verification."
+    },
+    {
+      "id": "P2-1",
+      "part": 2,
+      "term": "Density principle",
+      "review": { "slideNumber": 4, "slideTitle": "The Density Principle" },
+      "q": "Why does 'PostgreSQL 15 with compound index on (team_id, status)' get better results than 'some kind of database'?",
+      "options": [
+        "It is shorter, and shorter prompts are always processed more accurately",
+        "It names a popular product, which the model treats as a higher priority",
+        "It uses formal wording, which makes the model take the task more seriously",
+        "It resolves the decision, so the model executes instead of inventing"
+      ],
+      "answer": 3,
+      "explanation": "Constraint-oriented tokens resolve the dimensions the model must decide. Resolved dimensions get executed; unresolved ones get invented from training defaults. Density is about resolution, not brevity."
+    },
+    {
+      "id": "P2-2",
+      "part": 2,
+      "term": "The 10 channels",
+      "review": { "slideNumber": 6, "slideTitle": "10-Channel Architecture" },
+      "q": "What do the Architecture Agent's 10 channels (Purpose, Data Model, API, Tech Stack, Auth and the rest) represent?",
+      "options": [
+        "Ten separate LLMs, each one responsible for generating a part of the code",
+        "Architectural dimensions, each with sub-dimensions a spec must resolve",
+        "Ten prompt templates that the user chooses between before starting work",
+        "Ten deployment stages that every application must pass in a strict order"
+      ],
+      "answer": 1,
+      "explanation": "Each channel is an architectural dimension with 4–5 sub-dimensions, mapping the decision surface the LLM traverses when generating code. Any sub-dimension left at 0% is filled from training defaults."
+    },
+    {
+      "id": "P2-3",
+      "part": 2,
+      "term": "Architecture Agent intake → dense spec",
+      "review": { "slideNumber": 8, "slideTitle": "The Architecture Agent" },
+      "q": "What does the Architecture Agent's structured intake produce, and when does it stop asking questions?",
+      "options": [
+        "A dense spec, one line per constraint; it stops once every channel exceeds 80%",
+        "Working application code; it stops once the generated code compiles cleanly",
+        "A prose design document; it stops after a fixed set of ten intake questions",
+        "A full test suite; it stops once the user confirms all of the tests are passing"
+      ],
+      "answer": 0,
+      "explanation": "Intake keeps targeting the lowest-resolution channel, asking focused questions until every channel exceeds 80%. It outputs a Dense Architecture Specification, not code; that spec makes code generation deterministic."
+    },
+    {
+      "id": "P2-4",
+      "part": 2,
+      "term": "Density score",
+      "review": { "slideNumber": 4, "slideTitle": "The Density Principle" },
+      "q": "How is the density score that the Architecture Agent reports defined?",
+      "options": [
+        "Total tokens in the spec divided by the number of channels it covers",
+        "The number of technical terms used, divided by the total word count",
+        "Resolved dimensions divided by the total dimensions to be resolved",
+        "The share of generated code that passes its tests on the first run"
+      ],
+      "answer": 2,
+      "explanation": "Density = resolved dimensions / total dimensions. Raising that ratio shifts the model from generating, which means guessing, to executing the spec."
+    },
+    {
+      "id": "P2-5",
+      "part": 2,
+      "term": "Vague vs. dense results",
+      "review": { "slideNumber": 10, "slideTitle": "Vague vs Dense: The Experiment" },
+      "q": "In Part 2's vague-versus-dense experiment, what was the only thing that changed between the two runs?",
+      "options": [
+        "The model, from a small local model to Claude Sonnet",
+        "The prompt: a one-line request versus the agent's dense spec",
+        "The task, switching from a simple API to a real-time application",
+        "The sampling settings, from a high temperature down to a low one"
+      ],
+      "answer": 1,
+      "explanation": "Same app, same model; only the input changed. The dense spec cut the hallucination surface sharply (85.7% reduction in the live run) and improved resolution, consistency and code quality."
+    },
+    {
+      "id": "P2-6",
+      "part": 2,
+      "term": "Token grounding categories",
+      "review": { "slideNumber": 12, "slideTitle": "Token-Level Hallucination Analysis" },
+      "q": "Part 2's token-level analysis sorts every output token into one of four categories. Which list is correct?",
+      "options": [
+        "Correct, incorrect, partially correct, and unknown",
+        "Prompt, system, tool output, and retrieved document",
+        "Noun, verb, identifier, and connective",
+        "Grounded, inferred, defaulted, and confabulated"
+      ],
+      "answer": 3,
+      "explanation": "Grounded comes directly from the spec; inferred is a reasonable deduction; defaulted is a common unspecified pattern; confabulated is invented with no spec basis. Vague output was 37.5% confabulated; dense, 0%."
+    },
+    {
+      "id": "P2-7",
+      "part": 2,
+      "term": "Run-to-run consistency",
+      "review": { "slideNumber": 14, "slideTitle": "Run-to-Run Consistency" },
+      "q": "Five runs of the same prompt are compared using Jaccard similarity. What does a low score indicate?",
+      "options": [
+        "Unresolved dimensions are being filled differently on each run",
+        "The model is being creative in ways that improve code quality",
+        "The prompt is too long and is exceeding the model's context limit",
+        "The runs used different models, so their outputs cannot be compared"
+      ],
+      "answer": 0,
+      "explanation": "Jaccard averages shared decisions over total unique decisions across run pairs. Each decision that varies is a dimension the model fills stochastically from training defaults instead of deterministically from your spec."
+    },
+    {
+      "id": "P2-8",
+      "part": 2,
+      "term": "Agentic pillars (monitoring, configurability, predictability)",
+      "review": { "slideNumber": 16, "slideTitle": "Building Stable Agentic Systems" },
+      "q": "What are the three pillars of a stable agentic system named in Part 2?",
+      "options": [
+        "Speed, scalability, and a lower cost per token",
+        "Retrieval, long-term memory, and broad tool access",
+        "Monitoring, configurability, and predictability",
+        "Autonomy, creativity, and automatic self-correction"
+      ],
+      "answer": 2,
+      "explanation": "Monitoring: know what the model decided. Configurability: change behavior without retraining. Predictability: same input, same output. One vague step introduces drift that compounds through every downstream decision."
+    },
+    {
+      "id": "P3-1",
+      "part": 3,
+      "term": "Effective vs. advertised context",
+      "review": { "slideNumber": 7, "slideTitle": "Effective vs. Advertised Context" },
+      "q": "A model advertises a 200k-token context window. What does Part 3 mean by its effective context?",
+      "options": [
+        "The full 200k, because the advertised number is a guaranteed working length",
+        "The length over which recall stays usable, often only 20–40% of the 200k",
+        "The amount left over once the system prompt is subtracted from the 200k",
+        "The length at which the provider starts charging a higher price per token"
+      ],
+      "answer": 1,
+      "explanation": "Advertised length is a maximum, not a guarantee. Effective context is where recall stays above a usable threshold, often 20–40% of advertised for high-stakes retrieval. Design for the length you can verify."
+    },
+    {
+      "id": "P3-2",
+      "part": 3,
+      "term": "Lost-in-the-middle",
+      "review": { "slideNumber": 4, "slideTitle": "Lost-in-the-Middle" },
+      "q": "A key constraint sits halfway through a long context. What does the lost-in-the-middle finding predict?",
+      "options": [
+        "It is recalled best, because the middle gets attention from both of the ends",
+        "It is recalled just as well as it would be at any other position in the input",
+        "It is recalled well only when the model has a larger number of parameters",
+        "It is recalled worse than the same fact placed near the start or the end"
+      ],
+      "answer": 3,
+      "explanation": "Liu et al. 2023 found a U-shaped curve: reliable recall near the start (primacy) and end (recency), with a sharp drop in the middle. It holds across model sizes, so place critical constraints at the edges."
+    },
+    {
+      "id": "P3-3",
+      "part": 3,
+      "term": "Context ≠ prompt",
+      "review": { "slideNumber": 9, "slideTitle": "Context ≠ Prompt" },
+      "q": "What is the difference between the prompt and the context, in Part 3's terms?",
+      "options": [
+        "They mean the same thing: the text the user types in each turn",
+        "The prompt is the system message; the context is the user's message",
+        "The prompt is this turn's text; the context is everything the model sees",
+        "The context is the model's training data, and the prompt is the live input"
+      ],
+      "answer": 2,
+      "explanation": "Context includes the system prompt, every prior turn, tool calls and outputs, attachments, retrieved documents and finally your prompt. All of it competes for the same attention budget; the user turn is often the smallest slice."
+    },
+    {
+      "id": "P3-4",
+      "part": 3,
+      "term": "Attention budget",
+      "review": { "slideNumber": 12, "slideTitle": "Context as a Budget" },
+      "q": "Why does Part 3 describe the context window as an attention budget?",
+      "options": [
+        "Softmax weights sum to exactly 1, so each addition shrinks every other share",
+        "Providers cap how many tokens a user may send in each billing period",
+        "The model reserves a fixed share of its attention for the system prompt alone",
+        "Each model has a maximum number of attention heads it can run per turn"
+      ],
+      "answer": 0,
+      "explanation": "Attention is not infinite: softmax guarantees the weights across all positions sum to exactly 1. Every token you include is a vote against every other token, so allocate the budget deliberately."
+    },
+    {
+      "id": "P3-5",
+      "part": 3,
+      "term": "Prompt vs. context engineering levers",
+      "review": { "slideNumber": 14, "slideTitle": "The Two Levers" },
+      "q": "How do prompt engineering and context engineering differ, according to Part 3?",
+      "options": [
+        "Prompt engineering suits chat apps; context engineering suits coding agents",
+        "Prompt engineering becomes unnecessary once a model's window is large enough",
+        "Context engineering edits the model's weights; prompt engineering edits text",
+        "One shapes the current turn; the other chooses what else is in the window"
+      ],
+      "answer": 3,
+      "explanation": "Prompt engineering makes each token count; context engineering decides which tokens compete at all: what to include, exclude, order and summarize. Both act on the same attention mechanism and compound when combined."
+    },
+    {
+      "id": "P3-6",
+      "part": 3,
+      "term": "Dense spec → wave plan (decompose, waves)",
+      "review": { "slideNumber": 15, "slideTitle": "From Dense Spec to Wave Plan" },
+      "q": "Your spec is already fully dense. Why does Part 3 still decompose it into a wave plan before building?",
+      "options": [
+        "To lower the density so the model has more room to make its own choices",
+        "One session holding it all hits lost-in-the-middle; scoped sessions avoid it",
+        "Because a denser prompt is the real fix, and decomposing is just a temporary stopgap",
+        "So each small piece can skip testing, since it is too simple to go wrong"
+      ],
+      "answer": 1,
+      "explanation": "Even a perfectly dense spec is too much context for one session, which hits the lost-in-the-middle wall. Decomposition keeps density high but delivers it to agent sessions each scoped to one small concern."
+    },
+    {
+      "id": "P3-7",
+      "part": 3,
+      "term": "Sealed agent sessions",
+      "review": { "slideNumber": 17, "slideTitle": "Anatomy of an Agent Session" },
+      "q": "In Part 3's anatomy of an agent session, what does it mean for a session to be sealed?",
+      "options": [
+        "It starts fresh with only its spec slice, and its output goes to the wave store",
+        "Its chat history is encrypted so that no other agent can read what it contains",
+        "It keeps one shared, growing history so later agents can see all earlier work",
+        "It is locked after its first reply, so the user cannot send any follow-up turns"
+      ],
+      "answer": 0,
+      "explanation": "A sealed session has no accumulating history. Each agent starts fresh with only the constraints it owns and hands its output to the wave store, never into another agent's chat."
+    },
+    {
+      "id": "P3-8",
+      "part": 3,
+      "term": "Session hygiene",
+      "review": { "slideNumber": 22, "slideTitle": "Recap & Bridge to Module 4" },
+      "q": "A long session has started forgetting its early constraints. Which response matches Part 3's context hygiene practices?",
+      "options": [
+        "Keep the session going and restate the full spec again in every turn",
+        "Switch to a model with a bigger advertised window and paste in more files",
+        "Prune tool outputs, pin invariants, and use short, tightly scoped sessions",
+        "Raise the sampling temperature so the model explores more interpretations"
+      ],
+      "answer": 2,
+      "explanation": "Keep contexts short, pin invariants, prune tool outputs, scope sessions and externalize what is common. Restating everything or using a bigger window only adds tokens competing for the same budget."
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+api-key-config.py
+app.py
+error-middleware.py
+healthz-handler.py
+root-handler.py
+weather-api-client.py
+weather-handler.py
+weather-service.py
+weather-test-suite.py
+import os
+
+import requests
+from flask import Blueprint, jsonify, request
+
+bp = Blueprint('items', __name__)
+
+UPSTREAM_URL = 'https://api.openweathermap.org/data/2.5/weather'
+
+
+@bp.get('/api/weather')
+def get_item():
+    city = request.args.get('city', '').strip()
+    if not city:
+        return jsonify({'error': 'city is required'}), 400
+
+    api_key = os.environ.get('OPENWEATHER_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'OPENWEATHER_API_KEY not set'}), 500
+
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'imperial'
+    }
+
+    try:
+        upstream = requests.get(UPSTREAM_URL, params=params, timeout=5)
+    except requests.RequestException:
+        return jsonify({'error': 'weather service unavailable'}), 502
+
+    if upstream.status_code == 404:
+        return jsonify({'error': 'city not found'}), 404
+    if upstream.status_code != 200:
+        return jsonify({'error': 'weather service unavailable'}), 502
+
+    data = upstream.json()
+    try:
+        city_name = data['name']
+        temp_f = data['main']['temp']
+        description = data['weather'][0]['description']
+        return jsonify({'city': city_name, 'temp_f': temp_f, 'description': description}), 200
+    except KeyError:
+        return jsonify({'error': 'weather service unavailable'}), 502
+
+
+@bp.get('/')
+def index():
+    initial_city = "New York"
+    page = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Weather</title></head>
+<body >
+  <h1>Weather lookup</h1>
+  <input id="city" type="text" value="{initial_city}">
+  <button id="go">Get weather</button>
+  <div id="result"></div>
+  <script>
+    async function lookUp() {{
+      const city = document.getElementById('city').value.trim();
+      const result = document.getElementById('result');
+      if (!city) {{
+        result.textContent = 'City name is required';
+        return;
+      }}
+      try {{
+        const res = await fetch('/api/weather?city=' + encodeURIComponent(city));
+        const data = await res.json();
+        if (res.ok) {{
+          result.innerHTML = `<strong>${data.city}</strong>: ${Math.round(data.temp_f)}&deg;F, ${data.description}`;
+        }} else if (res.status === 404) {{
+          result.textContent = 'City not found';
+        }} else if (res.status === 400) {{
+            result.textContent = data.error || 'City name is required';
+        }} else {{
+          result.textContent = data.error || 'An unknown error occurred';
+        }}
+      }} catch (e) {{
+        result.textContent = 'Could not connect to the weather service.';
+      }}
+    }}
+    document.getElementById('go').addEventListener('click', lookUp);
+    lookUp();
+  </script>
+</body >
+</html>
+"""
+    return page
+
+PAGE = """<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Items</title></head>
+<body>
+  <h1>Item lookup</h1>
+  <input id="name" type="text" value="Widget">
+  <button id="go">Look up</button>
+  <div id="result"></div>
+  <script>
+    async function lookUp() {
+      const name = document.getElementById('name').value.trim();
+      const result = document.getElementById('result');
+      const res = await fetch('/api/items?name=' + encodeURIComponent(name));
+      const data = await res.json();
+      if (res.ok) {
+        result.textContent = data.name + ': ' + data.price;
+      } else if (res.status === 404) {
+        result.textContent = 'Item not found';
+      } else {
+        result.textContent = data.error;
+      }
+    }
+    document.getElementById('go').addEventListener('click', lookUp);
+    lookUp();
+  </script>
+</body>
+</html>
+"""

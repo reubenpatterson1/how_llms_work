@@ -10,23 +10,31 @@ const STAGES = [
     sample: `# Read template (built-in fubo Application template)
 template = open('deploy_template.yaml').read()
 
-# Auto-derived from workspace + config:
+# Auto-derived from workspace + config (run bd56dacd8151):
 fields = {
-  'name':              'quote-of-the-day-d9331c',       # spec_slug-run_short
+  'name':              'app-bd56da',                     # spec_slug-run_short (no name in the package, so spec_slug fell back to 'app')
   'namespace':         'training',
-  'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c',
+  'image':             '650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:bd56da',
   'port':              3000,                             # default (port auto-detect is Node-only)
-  'host':              'quote-of-the-day-d9331c-training.tools.fubotv.net',
-  'healthcheck_path':  '/healthz',                        # scanned from generated handler
+  'host':              'app-bd56da-training.tools.fubotv.net',
+  'healthcheck_path':  '/healthz',                        # scanned from generated sources
 }
 
 rendered = render_yaml_text(template, **fields)
 # → loaded into Monaco editor, user can edit before apply
 
+# The template also points the key at the app's own Secret.
+# Only the Secret's name is rendered, never a key value:
+#   env:
+#     - name: OPENWEATHER_API_KEY
+#       valueFrom:
+#         secretKeyRef:
+#           name: app-bd56da-openweather
+#           key: OPENWEATHER_API_KEY
+#           optional: true
+
 # Note: the ECR repo ("architect-builds/app") is SHARED across every
-# build regardless of spec_slug — only the image tag is per-run-unique.
-# The K8s Application name/host still comes from spec_slug, so two
-# different apps never collide on the same Application or ingress host.`
+# build; only the image tag (bd56da) is unique to the run.`
   },
   {
     id: 'docker_build',
@@ -34,29 +42,11 @@ rendered = render_yaml_text(template, **fields)
     symbol: '◆',
     color: '#60a5fa',
     sub: '--platform=linux/amd64',
-    sample: `> docker build --platform linux/amd64 -t \\
-  650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c \\
-  /var/www/llm-course/architect/workspaces/d9331c480953/
+    sample: `> docker build --platform linux/amd64 -t 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:bd56da <workspace>
+(image built)
 
-#1 [internal] load build definition from Dockerfile
-#1 transferring dockerfile: 292B done
-#2 [internal] load metadata for docker.io/library/python:3.12-slim
-#3 [internal] load .dockerignore
-#4 [internal] load build context
-#4 transferring context: 382B done
-#5 [1/5] FROM docker.io/library/python:3.12-slim@sha256:646fb0bc...
-#6 [3/5] COPY requirements.txt ./
-#6 CACHED
-#7 [4/5] RUN pip install --no-cache-dir -r requirements.txt
-#7 CACHED
-#8 [2/5] WORKDIR /app
-#8 CACHED
-#9 [5/5] COPY src ./src
-#9 CACHED
-#10 exporting to image
-#10 writing image sha256:2fc055f523cdd3c75abbc79cfe49f6d4e9b0342ee6fe7eb8388a01d77d37185c done
-#10 naming to 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c done
-# (identical rebuild — every layer cached, hence no build time shown)`
+# That is the whole transcript the Deploy page shows for this step.
+# <workspace> is the build folder for run bd56dacd8151.`
   },
   {
     id: 'push',
@@ -65,24 +55,28 @@ rendered = render_yaml_text(template, **fields)
     color: '#a78bfa',
     sub: 'One shared repo, per-run tag',
     sample: `# Pre-flight: create the shared repo if it doesn't exist yet
-# (one-time; every future build reuses it, regardless of app name)
+# (one-time; every build reuses it, whatever the app is called)
 ensure_ecr_repository(image_tag, region, registry)
 
-> docker push 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:d9331c
+> docker push 650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app:bd56da
+ERROR: ECR auth missing or expired. Run: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 650127479436.dkr.ecr.us-east-1.amazonaws.com
+
+Original error: denied: Your authorization token has expired. Reauthenticate and try again.
+
+# The first push failed because the agent host's ECR login had expired.
+# The operator refreshed it, then clicked "2. Push to ECR (retry)":
 
 The push refers to repository [650127479436.dkr.ecr.us-east-1.amazonaws.com/architect-builds/app]
-1933659c1ae8: Layer already exists
-362546fc9bff: Layer already exists
-7cd89e51eab8: Layer already exists
-f5b5bca81f27: Layer already exists
-02bea5b709fa: Layer already exists
-4bdf3c4a59c8: Layer already exists
-eeece50a9eae: Layer already exists
-6f9432833129: Layer already exists
-d9331c: digest: sha256:94fda4b0d91aa01e7f37828947855cdd86bf6705cde2e05d7c6859a176b7aaa1 size: 1991
-
-# On auth-stale: surface copy-pasteable
-# 'aws ecr get-login-password ...' remediation`
+… (8 layers Preparing, 3 Waiting)
+340931a1d986: Layer already exists
+ec164f3644b9: Layer already exists
+674e26dfab46: Layer already exists
+504cadfc0bb6: Layer already exists
+96a69f98ae07: Layer already exists
+3dc3efdf0110: Layer already exists
+dd57f90311a2: Layer already exists
+59b3c932b8fb: Pushed
+bd56da: digest: sha256:7ddac14e4727… size: 1992`
   },
   {
     id: 'apply',
@@ -90,21 +84,25 @@ d9331c: digest: sha256:94fda4b0d91aa01e7f37828947855cdd86bf6705cde2e05d7c6859a17
     symbol: '◉',
     color: '#22d3ee',
     sub: 'fubo Application CRD',
-    sample: `> cat <<'EOF' | kubectl apply -f -
+    sample: `> kubectl apply -f <rendered.yaml>
+kubectl not available on the agent host — apply from a machine with cluster auth.
+
+# So the Deploy page shows a "Manual apply needed" panel.
+# On your laptop, in order, in ONE shell:
+
+# 1. Enter the key (hidden) and check its length: expect len=32
+stty -echo; printf "OpenWeather key: "; read -r OPENWEATHER_API_KEY; stty echo; echo; export OPENWEATHER_API_KEY; echo "len=\${#OPENWEATHER_API_KEY}"
+
+# 2. Create the app's own Secret
+AWS_PROFILE=fubo-tools kubectl --context vat-dev -n training create secret generic app-bd56da-openweather --from-literal=OPENWEATHER_API_KEY="$OPENWEATHER_API_KEY"
+
+# 3. Apply the rendered YAML (it sets namespace: training)
+cat <<'EOF' | AWS_PROFILE=fubo-tools kubectl --context vat-dev apply -f -
 [rendered.yaml content]
 EOF
 
-application.app.smo.tools.fubotv.net/quote-of-the-day-d9331c created
-
-# Operator reconciles into:
-#   Deployment    quote-of-the-day-d9331c
-#   Service       quote-of-the-day-d9331c
-#   Ingress       quote-of-the-day-d9331c (ALB target group)
-#   Route 53      quote-of-the-day-d9331c-training.tools.fubotv.net
-
-# kubectl wasn't available on the agent host for this run — the app
-# surfaced the YAML + a copy-pasteable command instead, and this apply
-# was run from a laptop with cluster auth. See next slide.`
+# Recorded for this run: the Secret holds 32 bytes, and so does the
+# OPENWEATHER_API_KEY env var inside the pod.`
   },
   {
     id: 'poll',
@@ -112,18 +110,21 @@ application.app.smo.tools.fubotv.net/quote-of-the-day-d9331c created
     symbol: '▲',
     color: '#22c55e',
     sub: 'Wait for HTTP 200',
-    sample: `# Poll up to 120s (Route53 + ALB target registration ~90s)
-while elapsed < 120s:
-  resp = GET https://quote-of-the-day-d9331c-training.tools.fubotv.net/healthz
-  if resp.status_code in (200, 302):
-    print("✓ Live at", url)
-    return
-  sleep 5s
+    sample: `# When the agent host can apply, it polls https://<host>/healthz
+# every 5s for up to 120s and stops at the first 200 or 302.
+# Here the apply ran on a laptop, so the panel gives the check instead
+# (HTTPS only: http:// returns a 404 from the shared load balancer):
+> curl -sS https://app-bd56da-training.tools.fubotv.net/healthz
+# recorded for this run: 200
 
-# This run: live on the very first poll, no retries needed
-> curl -s -o /dev/null -w "%{http_code}" https://quote-of-the-day-d9331c-training.tools.fubotv.net/healthz
-200
-# {"status":"ok"}`
+# A 200 only proves the pod is up. The real check compares the app
+# with OpenWeather itself:
+GET /api/weather?city=Chicago       → 38.3 °F, "broken clouds"
+OpenWeather (units=imperial)        → 38.08 °F, "scattered clouds"
+# Δ 0.22 °F. The descriptions differ because OpenWeather updated
+# between the two calls, which were not made at the same moment.
+GET /api/weather?city=<unknown>     → 404
+GET /api/weather (no city)          → 400`
   },
 ];
 
