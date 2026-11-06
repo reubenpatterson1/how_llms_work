@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 
 const C = {
   bg: "#0B1120",
@@ -164,11 +164,7 @@ export default function UnitTestExplorer() {
 
   const tests = activeTab === "llm" ? llmTests : completeTests;
 
-  useEffect(() => {
-    setTestStatuses(null);
-    setRunning(false);
-    setHasRun(false);
-  }, [activeTab]);
+  const selectTab = (tab) => { setActiveTab(tab); setTestStatuses(null); setRunning(false); setHasRun(false); };
 
   const runTests = useCallback(() => {
     if (running) return;
@@ -205,7 +201,6 @@ export default function UnitTestExplorer() {
 
   const llmCoverage = { tests: 3, lineCov: 100, errorPaths: 0 };
   const completeCoverage = { tests: 10, lineCov: 100, errorPaths: 7 };
-  const cov = activeTab === "llm" ? llmCoverage : completeCoverage;
 
   return (
     <div
@@ -300,7 +295,7 @@ export default function UnitTestExplorer() {
         ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => selectTab(tab.key)}
             style={{
               flex: 1,
               padding: "10px 16px",

@@ -320,7 +320,7 @@ function QuestionScreen({ q, qNum, total, selected, setSelected, revealed, onRev
   );
 }
 
-async function downloadCertPDF({ title, subtitle, name, body, fields, watermark = "LLM ENGINEERING COURSE" }) {
+async function downloadCertPDF({ title, subtitle, name, body, fields }) {
   if (!window.jspdf) { await new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); }); }
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" }); const W = 297, H = 210;
   doc.setFillColor(15,23,42); doc.rect(0,0,W,H,"F");
@@ -352,7 +352,7 @@ function Certificate({ name, score, total, sectionScores }) {
   const pct = Math.round((score / total) * 100);
   const passed = score >= 11;
   const tier = pct >= 93 ? "Distinction" : pct >= 73 ? "Pass" : "Below Threshold";
-  const id = `TLLM-${hashCode(name + score)}-${Date.now().toString(36).toUpperCase()}`;
+  const [id] = useState(() => `TLLM-${hashCode(name + score)}-${Date.now().toString(36).toUpperCase()}`);
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", padding: "40px 30px" }}>

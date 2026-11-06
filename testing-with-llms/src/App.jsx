@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import FunctionalTestViz from "./components/FunctionalTestViz";
 import UnitTestExplorer from "./components/UnitTestExplorer";
-import E2ETestRunner from "./components/E2ETestRunner";
 import HappyPathFallacy from "./components/HappyPathFallacy";
-import LoadTestDashboard from "./components/LoadTestDashboard";
+import CheckpointPipeline from "./components/CheckpointPipeline";
+import OwnershipModel from "./components/OwnershipModel";
 import TestingQuiz from "./components/TestingQuiz";
 
 const SLIDES = [
@@ -319,9 +319,9 @@ function TextSlide({ slide }) {
 const COMPONENT_MAP = {
   FunctionalTestViz,
   UnitTestExplorer,
-  E2ETestRunner,
   HappyPathFallacy,
-  LoadTestDashboard,
+  CheckpointPipeline,
+  OwnershipModel,
   TestingQuiz,
 };
 
