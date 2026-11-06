@@ -3,7 +3,7 @@
 Date: 2026-11-06. Status: draft, not committed. Requested by rpatterson@fubo.tv.
 Source facts: `.claude/weather-refresh-work/artifacts/sso-investigation.md` (cited as INV), `nginx-T.txt` in the same dir,
 `docs/superpowers/evidence/2026-10-26-weather-refresh-evidence.md` (EVID). No key or password values appear in this doc.
-Placeholders: `<COURSE_HOST>` (new public hostname, D1), `<INSTANCE_ID>`, `<SG_ID>`, `<AWS_PROFILE_443>` (laptop profile for account 443514608959).
+Placeholders: `<COURSE_HOST>` = `llm-course.tools.fubotv.net` (D1, decided), `<INSTANCE_ID>`, `<SG_ID>`, `<AWS_PROFILE_443>` (laptop profile for account 443514608959).
 Current host: `HOST=ec2-100-58-203-210.compute-1.amazonaws.com` (us-east-1, account 443514608959).
 
 ## 1. Summary and the decision it needs
@@ -12,14 +12,15 @@ The course (landing, /part1-7) and the Architect app (/architect/) are served ov
 listens on 0.0.0.0:5001. Anyone on the internet can run `docker build/push` on the host and use the shared GPU Ollama.
 Plan: Phase 0 removes the worst exposure today with no IdP work. Phases 1-3 put every path behind Google sign-in on one HTTPS
 hostname, move learners' browser progress to that hostname, and then close every other port. Default design: oauth2-proxy +
-nginx `auth_request` on the box. **Decisions needed: the public hostname/cert (D1) and your AWS rights in 443514608959 (D2).**
+nginx `auth_request` on the box. D1 (hostname `llm-course.tools.fubotv.net`), D2 (user has the AWS rights), D3, D4, D5 and D7
+are decided (section 8). **Still open: D6 (who creates the Google OAuth client) and D8 (run the 0.2 secrets check).**
 
 ## 2. Goals, non-goals, anti-goals
 
 Goals (success criteria are in section 6)
 - G1 No unauthenticated internet caller can reach Flask, the Docker build/push routes, Ollama, or the course pages.
 - G2 A signed-in @fubo.tv user can complete the full course and an intake->build->deploy run, including Socket.IO, with no new 504s.
-- G3 The only ports open to the world are 443, plus 80 only if D1 picks ACME HTTP-01 (then 80 serves only ACME and a redirect).
+- G3 The only ports open to the world are 443, plus 80, because D1 uses ACME HTTP-01 (80 serves only ACME and a redirect).
 - G4 Analytics records the signed-in email next to the existing random `user_id`.
 
 Non-goals: per-module authorization (beyond the existing Part 5 admin lock); replacing SETTINGS_PASSWORD with SSO admin roles;
@@ -122,13 +123,13 @@ Rollback: `sudo systemctl revert llm-architect.service`, then run 0.1 and restar
 - Verify the Socket.IO change: `curl -s -o /dev/null -w '%{http_code}' -H 'Origin: https://evil.example' "http://$HOST:8080/architect/socket.io/?EIO=4&transport=polling"`
   returns `400`. The same request with the allowed Origin returns `200`.
 
-**0.5 Security group (account 443514608959; needs D2 rights).**
+**0.5 Security group (account 443514608959; done by the user, who has the rights per D2).**
 - 22: limit to the instructor's current egress /32.
-- Remove world rules on 3000, 5001, 8781, 8099, 11434 (D5 defaults).
+- Remove world rules on 3000, 5001, 8781, 8099, 11434 (D5 approved).
 - Leave 80 and 8080 open. Learner VPN status is unknown, so a CIDR limit could cut off learners (A2).
 Rollback: re-add the removed rule (record each rule with `aws ec2 describe-security-groups --group-ids <SG_ID>` before editing).
 
-**0.6 Interim gate on :8080 (D7, default yes).** Add `auth_basic "LLM course"; auth_basic_user_file /etc/nginx/llm-course.htpasswd;` at
+**0.6 Interim gate on :8080 (D7: decided yes).** Add `auth_basic "LLM course"; auth_basic_user_file /etc/nginx/llm-course.htpasswd;` at
 server scope in llm-course.conf, with one shared credential. The instructor posts it in the course channel. The origin does not
 change, so progress is untouched. Browsers resend the cached credential on same-origin fetch and WebSocket requests. Trade-off:
 the credential travels over HTTP, so it is interim only and is removed in Phase 3. Rollback: delete the two lines and reload nginx.
@@ -152,14 +153,13 @@ because of its ~30s origin default and custom auth code).
 | Domain restriction | Google consent screen "Internal" only; no group support | Internal consent + `email_domains`, optional emails file |
 | Self-maintained parts | none on box | oauth2-proxy binary, certbot renew, client secret on box |
 
-Recommendation: **(b)**. It needs the fewest AWS rights, and past IAM gaps (memory: ec2-cross-account-aws-blocker) make broad rights
-unlikely. Switch to **(a)** if D2 confirms elbv2+acm+SG rights in 443514608959 and you would rather pay for an ALB than maintain
-oauth2-proxy and certbot. If (a): its listener rules use `on-unauthenticated-request=deny` (401) for the API path patterns in 1.4 and
+Recommendation and decision: **(b)**. D2 confirmed the user has elbv2/acm/SG/EIP/SSM rights in 443514608959, so (a) is available,
+but (b) stays the choice unless a blocker appears during Phase 1; then switch to **(a)**. If (a): its listener rules use `on-unauthenticated-request=deny` (401) for the API path patterns in 1.4 and
 `authenticate` (302) for the rest; the :80 listener redirects to :443. This is a directly created internet-facing ALB, not a K8s Ingress.
 If it is ever expressed as an Ingress it is external, so it needs `alb.ingress.kubernetes.io/ssl-redirect: '443'`. Internal ingresses
 never get ssl-redirect, force-ssl or TLS annotations.
 
-**1.2 Google OAuth client (whoever holds GCP OAuth admin in fubo's Google Cloud org: Workspace/GCP admin).**
+**1.2 Google OAuth client (D6 open: tentatively the group admin, who must hold GCP OAuth admin in fubo's Google Cloud org).**
 - In a GCP project: OAuth consent screen user type **Internal** (only fubo Workspace accounts can sign in); scopes `openid email profile`.
 - Credentials -> OAuth client ID -> **Web application**; redirect URI `https://<COURSE_HOST>/oauth2/callback` (b) or
   `https://<COURSE_HOST>/oauth2/idpresponse` (a). Client ID and secret are handed over via a password manager.
@@ -278,7 +278,7 @@ Do not stop/start the instance before the window closes: that changes `$HOST` an
    AWS_PROFILE for 650127479436; the ProxyCommand sets its own). Ship commands use `SSH_TARGET=ec2-user@<INSTANCE_ID>`.
 3. `DecomposeWavePlan3D.jsx:6` becomes `const PROD_HOST = '<COURSE_HOST>'`; :14 uses `https://${PROD_HOST}/architect/decompose`.
 4. (b) only: allocate an Elastic IP, associate it, and change `<COURSE_HOST>` to an A record. The origin is unchanged; no progress impact.
-5. Employee portal (D5 default): add the `/employee/` and `/manager/` locations from flask-app.conf, with their 300s timeouts and
+5. Employee portal (D5 approved): add the `/employee/` and `/manager/` locations from flask-app.conf, with their 300s timeouts and
    `client_max_body_size 500M`, to the 443 server. The :80 server keeps only the ACME location plus
    `location / { return 301 https://<COURSE_HOST>$request_uri; }`.
 6. Delete the :8080 server block and htpasswd. SG: remove 8080, 3000, 5001 now; remove 22 after one week of SSM-only use.
@@ -286,8 +286,8 @@ Do not stop/start the instance before the window closes: that changes `$HOST` an
 Rollback per item: re-add the SG rule or restore the file from `deploy/nginx/`.
 
 ## 5. Identity and authorization model
-5.1 Who: every account in the fubo.tv Google Workspace (Internal consent screen + `email_domains`). For a subset, (b) adds
-`authenticated_emails_file=/etc/oauth2-proxy/allowed-emails.txt`, maintained by the instructor. Non-fubo learners cannot sign in (D3).
+5.1 Who: every account in the fubo.tv Google Workspace (Internal consent screen + `email_domains`). No allowlist (D3 decided).
+If a subset is ever needed, (b) adds `authenticated_emails_file=/etc/oauth2-proxy/allowed-emails.txt`. Non-fubo learners cannot sign in.
 5.2 Identity flow: Google -> oauth2-proxy cookie -> nginx `$llm_email` -> `X-Forwarded-Email` -> `users.email` in analytics.db.
 Under (a): ALB -> `x-amzn-oidc-data` -> verified in Flask. The client `user_id` stays a random ID for history continuity.
 5.3 Admin vs learner: both must pass SSO. Admin additionally needs SETTINGS_PASSWORD (unchanged). Part 5 lock semantics are unchanged.
@@ -297,7 +297,7 @@ Under (a): ALB -> `x-amzn-oidc-data` -> verified in Flask. The client `user_id` 
 
 ## 6. Test plan (all must pass; run from the laptop unless noted)
 - T1 Ports: `for p in 22 3000 5001 8080 8099 8781 11434; do nc -z -w5 $TARGET $p && echo "$p OPEN" || echo "$p closed"; done`.
-  `TARGET=$HOST` (and `<COURSE_HOST>` once it exists). After Phase 0: 5001, 3000, 8099, 8781 closed. After Phase 3: all closed; 443 open; 80 per D1.
+  `TARGET=$HOST` (and `<COURSE_HOST>` once it exists). After Phase 0: 5001, 3000, 8099, 8781 closed. After Phase 3: all closed; 443 open; 80 open (HTTP-01, D1).
 - T2 Unauthenticated: `curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://<COURSE_HOST>/architect/build/start`
   returns `401`. Same for `/api/analytics/event`, `/architect/api/send`, `/architect/deploy/image-push`.
   `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://<COURSE_HOST>/part1/` returns `302`, with Location containing `/oauth2/start` or `accounts.google.com`.
@@ -334,33 +334,38 @@ Under (a): ALB -> `x-amzn-oidc-data` -> verified in Flask. The client `user_id` 
 | ALB 60s idle default (option a) brings back 504s | T7 required before cutover |
 | oauth2-proxy down = full outage on 443 | `Restart=always`; rollback: :8080 still works until Phase 3 |
 | Learners not migrated in window | Announce twice; instructor can tell learners `?nogate` (flow-through.js:48) |
-| Employee portal users lack fubo Google accounts | D5 confirmation before Phase 3 step 5 |
+| Employee portal users lack fubo Google accounts | D5 approved; announce to portal users before Phase 3 step 5 |
 
-## 8. Decisions needed from the user (ordered by plan impact)
-Already answered: IdP = Google Workspace. Learner VPN = unknown, so nothing depends on VPN and 0.7 runs as a check. You own every app on
-the host (80, 3000, 8781, 8099).
-- **D1 Public hostname + certificate.** Default: `llm-course.tools.fubotv.net` (suggested; the zone owner is unknown), public DNS,
-  Let's Encrypt HTTP-01. If the zone owner can give DNS API access, use DNS-01 and close 80 entirely. If no public name can be
-  created, SSO cannot be done (Google needs an HTTPS redirect URI on a stable host). Who controls the tools.fubotv.net zone?
-- **D2 Your AWS rights in 443514608959** (SG edit, Elastic IP, elbv2/acm, `ssm:StartSession`). With SG+EIP+SSM only: option (b).
-  With elbv2+acm too: (a) is available. Without SG rights: Phase 0.5, all of Phase 3, and the EIP go to the platform team.
-  Without SSM: port 22 stays open at the instructor /32.
-- **D3 Who may sign in.** Default: all fubo.tv Workspace accounts. Group/subset: an allowlist file under (b); not supported by
-  (a) without app code. External (non-fubo) learners: the consent screen must be External plus an allowlist, which needs more
-  review; this is the largest change.
-- **D4 Progress migration.** Default B (fragment handoff, 4-week window). A = accept and announce the loss (skips Phase 2 code).
-  C = server-side progress (adds about 2 days; still needs B for import).
-- **D5 Confirm per-port defaults.** 80 employee/manager: behind Google on 443 (every portal user then needs a fubo Google login;
-  the :80 URL breaks). 3000 Express: close (anything calling it breaks). 8781 claude usage: close, SSM port-forward (its managed
-  config is untouched). 8099 incident dashboard: close, SSM port-forward (behind Google later needs a rebuild with a base path).
-- **D6 Who creates the Google OAuth client** (needs GCP OAuth admin in fubo's Google Cloud org). Blocks Phase 1.
-- **D7 Interim basic auth on :8080 (0.6).** Default yes. No: Docker build/push stays internet-open until Phase 2 cutover.
-- **D8 SETTINGS_PASSWORD/FLASK_SECRET status.** Not a choice; run 0.2. If either is missing, rotation (0.2) is mandatory before 0.4.
+## 8. Decisions (recorded 2026-11-06)
+Already answered before this round: IdP = Google Workspace. Learner VPN = unknown, so nothing depends on VPN and 0.7 runs as a
+check. You own every app on the host (80, 3000, 8781, 8099).
+- **D1 Public hostname + certificate. DECIDED:** `<COURSE_HOST>` = `llm-course.tools.fubotv.net` (the suggested default), public DNS,
+  Let's Encrypt HTTP-01 (spec default; DNS-01 not pursued, so after Phase 3 port 80 stays open and serves only ACME and the
+  redirect). A group admin controls the relevant DNS and Google admin tasks and will create the record. The exact owner of the
+  `tools.fubotv.net` zone is still to be confirmed when the record is requested. Checked 2026-11-06 from the laptop: `tools.fubotv.net` is a delegated Route 53 zone
+  (awsdns name servers, account unknown), `llm-course.tools.fubotv.net` does not resolve yet, and there are no CAA records on
+  `llm-course.tools.fubotv.net`, `tools.fubotv.net` or `fubotv.net`, so Let's Encrypt is not blocked by CAA.
+- **D2 AWS rights in 443514608959. DECIDED:** the user has the rights (security groups, Elastic IP, load balancer/certificates,
+  SSM) and has done these actions before. The user does Phase 0.5, all of Phase 3 and the Elastic IP; there is no platform-team
+  handoff. Rights no longer force the option choice in 1.1: keep the default **(b) oauth2-proxy + nginx `auth_request`** unless a
+  blocker appears during Phase 1; (a) stays the fallback.
+- **D3 Who may sign in. DECIDED:** any fubo.tv Workspace account. Consent screen **Internal**, `email_domains=["fubo.tv"]`, no
+  allowlist file (the optional `authenticated_emails_file` in 5.1 is not used).
+- **D4 Progress migration. DECIDED:** keep learner progress: option B (fragment handoff across origins) with the default 4-week
+  window.
+- **D5 Per-port defaults. DECIDED (all four approved):** 80 employee/manager portal goes behind Google sign-in on 443 (every portal
+  user then needs a fubo Google login; the :80 URL breaks). 3000 Express: close. 8781 claude usage: close, reach via SSM
+  port-forward. 8099 incident dashboard: close, reach via SSM port-forward.
+- **D6 Who creates the Google OAuth client. OPEN.** Tentatively the group admin (same person as D1). Needs GCP OAuth admin in fubo's
+  Google Cloud org. Blocks Phase 1.
+- **D7 Interim basic auth on :8080 (0.6). DECIDED:** yes, one shared credential on :8080 in Phase 0.
+- **D8 SETTINGS_PASSWORD/FLASK_SECRET status. OPEN.** Not a choice; the 0.2 check has not been run yet. If either is missing,
+  rotation (0.2) is mandatory before 0.4.
 
 ## 9. Effort and ownership
 | Phase | Effort | Who must act |
 |---|---|---|
-| 0 | ~0.5 day | User (SSH, systemd drop-in, env file, SG if D2 allows; else platform team); code-executor for 0.3/0.4 code + tests; instructor confirms locks/provider and posts the interim credential |
-| 1 | 1.5-2 days (b) / 2-3 days (a) | GCP/Workspace admin (OAuth client); DNS zone owner (record); user (certbot, oauth2-proxy, nginx; ALB+ACM if (a)); code-executor (1.6, 1.7); 2 pilot learners |
+| 0 | ~0.5 day | User (SSH, systemd drop-in, env file, SG: user has rights per D2); code-executor for 0.3/0.4 code + tests; instructor confirms locks/provider and posts the interim credential |
+| 1 | 1.5-2 days (b) / 2-3 days (a) | group admin (OAuth client, D6 tentative; DNS record, D1); user (certbot, oauth2-proxy, nginx; ALB+ACM if (a)); code-executor (1.6, 1.7); 2 pilot learners |
 | 2 | ~1 day + 4-week window | code-executor (handoff files, tests); user (nginx swap, deploy landing); instructor (announcements, support) |
-| 3 | ~0.5 day | user (SSM, SG, EIP); platform team if D2 lacks rights; code-executor (script + jsx edits) |
+| 3 | ~0.5 day | user (SSM, SG, EIP; rights confirmed per D2); code-executor (script + jsx edits) |
