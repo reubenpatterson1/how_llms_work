@@ -460,6 +460,14 @@ Goal (user, 2026-11-05): a student creates and publishes an app using only the s
 - Honest limits: results vary by run (runs 2 and 5 correct, runs 3 and 4 each had a page defect); build still sometimes needs one UI retry; intake says "ready" early (density disagrees between pages), drops some answers (e.g. `requests`, upstream URL), adds unrequested N/A bullets; Build page says "no source" after Decompose (student re-uploads the package); the key-entry line in the panel shows "(expect len=32)" inline.
 - Empty Secret gotcha (see 2.4-gotcha-2): verify `len=32` in the same shell before `create secret`.
 
+## Stage 0b static check: shared OIDC role trust (2026-11-06, read-only, no repo created)
+
+User declined creating the throwaway spike repo. The role trust policy answers the trust question directly (`aws iam get-role --role-name Github-Actions-OIDC-Policy`, profile fubo-tools, account 650127479436):
+- Statement count 1, `sts:AssumeRoleWithWebIdentity`, federated provider token.actions.githubusercontent.com, `aud = sts.amazonaws.com`, and `sub` matched with StringLike against an ALLOWLIST of 27 patterns: `repo:fubotv/smo-*:*`, `repo:fubotv/vat-*:*`, `repo:fubotv/skynet-*:*`, `repo:fubotv/smo-ai-*:*`, plus named repos (alarm-mcp, ateme-mcp, zixi-mcp, npaw-mcp, genisys-mcp, student-agent, vod-preflight, and others) and two ids for repos outside the plain `fubotv/` form.
+- It does NOT trust "any repo in the fubotv org". A learner repo named `llm-wx-<handle>` matches none of the patterns, so its workflow could not assume this role. Names starting `vat-`, `smo-` or `skynet-` would match.
+- The role is broad (attached `github-actions-deploy-policy` and `AWSCodeArtifactAdminAccess`; inline `ECR-Push-Policy`, `LambdaInvokePolicy`, `SecretsManager-EnsureEnvSecret`). Allowing every learner repo to assume it would grant platform-CI privileges to every learner workflow.
+- Classification: SPIKE would be FAIL(trust-policy) for `llm-wx-*`. Stage 3b and Stage 4 (workflow that deploys from a learner repo) are blocked until the user chooses: (1) a dedicated narrow training role trusting only the learner repo pattern with ECR push to `architect-builds/app` only, (2) name learner repos with a trusted prefix and accept the broad role (not recommended), or (3) no live workflow in the course (design-only Part 5).
+
 ## Publishes
 
 (pending)
