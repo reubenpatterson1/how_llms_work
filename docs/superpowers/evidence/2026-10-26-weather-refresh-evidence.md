@@ -441,6 +441,17 @@ tool "ok":false only because it expects counter == "N / N" (22 / 22) vs Part tot
 - The dashboard screenshot (shots/run-2/architect-dashboard.png) shows 'Channels resolved 0/10' and density 71.
 - The upstream call omits units=imperial and converts Kelvin to Fahrenheit in code (spec deviation).
 
+## Student-path validation (stock UI, no custom edits)
+
+Goal (user, 2026-11-05): a student creates and publishes an app using only the stock tools. Runs 3-5 drove the real UI in a fresh browser; the only operator steps are the ECR refresh (EC2) and the learner's laptop Secret + apply commands shown in the Deploy panel.
+
+- run 3 | app-2e583c | Pipeline OK, API OK (Chicago 52.92). FAIL: `/` returned 500 (JS template literal `${data.city}` inside a Python f-string -> NameError). Also: stale cached deploy.js showed the old panel (server sends `Cache-Control: public, immutable, max-age=604800`); one build attempt reported "complete" with a SyntaxError component. Fixes: 5be5f6c (f-string/JS check + prompt rule), 76b58ad and 617b3ef (failed-build banner, single guarded Deploy link, `?v=` cache-bust), f79cd3e (stock Secret env, panel Secret/apply/verify commands with `AWS_PROFILE=fubo-tools --context vat-dev`, Continue-to-Build link).
+- run 4 | app-3b755d | Pipeline OK, page loaded (200) but showed 12 F where API said 53.11: generated page JS did `(temp_f-32)*5/9` and labelled F. FAIL on correctness. Fix: 4c7736f (handler rule: show API values as returned, no unit conversion). One build retry (weather-test-suite rejected for the word "placeholder" in an HTML attribute).
+- run 5 | app-bd56da | PASS. Build first try (9 components, 105.8s), exactly one Continue-to-Deploy link, Secret 32 bytes in Secret and pod, `/healthz` 200, Chicago API 38.3 vs OpenWeather imperial 38.08 (delta 0.22 F; description differs "broken clouds" vs "scattered clouds" because OpenWeather updated between non-simultaneous calls), 404 for unknown city, 400 for no city, browser page shows `City: Chicago, Temperature: 38.3F, Description: broken clouds` (user-reported).
+- Not exercised in run 5: the red failed-build banner (seen in run 4; link hiding verified only by text tests and the single-link observation).
+- Honest limits: results vary by run (runs 2 and 5 correct, runs 3 and 4 each had a page defect); build still sometimes needs one UI retry; intake says "ready" early (density disagrees between pages), drops some answers (e.g. `requests`, upstream URL), adds unrequested N/A bullets; Build page says "no source" after Decompose (student re-uploads the package); the key-entry line in the panel shows "(expect len=32)" inline.
+- Empty Secret gotcha (see 2.4-gotcha-2): verify `len=32` in the same shell before `create secret`.
+
 ## Publishes
 
 (pending)
