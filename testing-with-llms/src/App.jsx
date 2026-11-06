@@ -257,6 +257,9 @@ function TextSlide({ slide }) {
             {slide.body}
           </p>
         )}
+        {slide.code && (
+          <pre data-testid="slide-code" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, lineHeight: 1.5, color: C.text, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 20px", margin: "0 0 24px 0", whiteSpace: "pre", overflowX: "auto" }}>{slide.code}</pre>
+        )}
         {slide.bullets && (
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px 0" }}>
             {slide.bullets.map((b, i) => (
