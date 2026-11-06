@@ -11,36 +11,58 @@ import decomposeWavePlanImg from './assets/screenshots/decompose-wave-plan.png';
 import buildUiImg from './assets/screenshots/build-ui.png';
 import deployUiImg from './assets/screenshots/deploy-ui.png';
 import deployManualApplyImg from './assets/screenshots/deploy-manual-apply.png';
-import quoteAppLiveImg from './assets/screenshots/quote-app-live.png';
+import weatherAppLiveImg from './assets/screenshots/weather-app-live.png';
 import './index.css';
 import './App.css';
 
-const SAMPLE_SPEC_HIGHLIGHT = `# Dense Architecture Specification — Team Task Tracker (MVP)
-# Density Score: 0.540
+const SAMPLE_SPEC_HIGHLIGHT = `# Dense Architecture Specification
+# Density Score: 0.436
 
 ## Purpose
-- Objective: Ship a team task tracker for engineering teams
-- Success Criteria: P95 page load under 800ms
+# Resolution: 75.0%
+
+- A weather page to retrieve current weather information.
+- students trying a demo
+- Success means real current weather for any valid city.
+- single weather page plus the weather API and health check (in scope)
+- login, accounts, saved data (out of scope for PoC)
 
 ## Data Model
-- Entities: User, Team, Task, Comment (with full attribute lists)
-- Relationships: User belongs to Team; Task belongs to Team + assignee
-- Constraints: User.email unique; Task.status in {todo,doing,done,blocked}
+# Resolution: 78.0%
+
+- City Name (returned by OpenWeather), current temperature in °F, and weather description.
+- No persistence required for the PoC phase
 
 ## API
-- GET /api/teams/:teamId/tasks
-- POST /api/teams/:teamId/tasks
-- PATCH /api/tasks/:id
-- POST /api/tasks/:id/comments
+# Resolution: 66.0%
+
+- GET /api/weather?city= is the main endpoint.
+- GET / serves the single-page HTML with a city input defaulting to New York and a 'Get weather' button.
+- GET /healthz returns 200.
+- Success response: JSON {"city": str, "temp_f": number, "description": str} with status 200.
 
 ## Tech Stack
-- TypeScript 5.4, Hono on Bun, PostgreSQL 15 + Drizzle, Redis 7
+# Resolution: 80.0%
 
-## Auth
-- JWT RS256, RBAC owner/admin/member, 15m access + 30d refresh
+- Python 3.12
+- Flask
+- Not required / out of scope (user marked N/A)
+- Not required / out of scope (user marked N/A)
+- Not required / out of scope (user marked N/A)
 
-## Deployment
-- fly.io 2 regions, GitHub Actions, preview-per-PR + staging + prod`;
+## Error Handling
+# Resolution: 22.5%
+
+- 400: {"error": "city is required"} if city is missing or empty.
+- 404: {"error": "city not found"} when OpenWeather returns 404.
+- 502: {"error": "weather service unavailable"} on any other upstream failure or a timeout.
+- 500: {"error": "OPENWEATHER_API_KEY not set"} if the env var is absent.
+
+## Security
+# Resolution: 20.0%
+
+- Config comes from the env var OPENWEATHER_API_KEY, which is never hard-coded
+- The key must be read from os.environ only.`;
 
 const SLIDES = [
   { id: 's0a', type: 'text', title: 'The Deployment Stack: What You Are Actually Doing',
@@ -63,108 +85,107 @@ const SLIDES = [
     caption: 'The Architecture Agent runs structured Q&A across 10 channels. Output: a dense spec with constraints traceable to every decision. (Modules 1-2 cover this in depth.)' },
 
   { id: 's4b', type: 'codeblock', title: 'The Dense Spec That Comes Out',
-    intro: 'Worked example: a team task tracker for engineering sprints. 4 entities, 4 endpoints, JWT auth, fly.io deploy. This is the input the Decompose agent will turn into a wave plan.',
+    intro: 'Worked example: a Hello World weather page. Type a city, and the page shows the current temperature in °F and the description from the OpenWeather API. Below is an excerpt of the real dense spec from run 5 (app app-bd56da), produced by the stock Architect intake on Ollama gemma4:e4b. Some lines and the Auth, Deployment, Performance and flat-constraint sections are left out. Read the spec before you decompose it, because intake says "ready" early: it announced "All channels resolved" at 78% density, but this spec scores 0.436 (44%) and still lists 9 unresolved channels. The spec also has real defects. requests is missing from Tech Stack. Three "Not required / out of scope (user marked N/A)" bullets were added that the user never marked. The API line lost its <name> and reads GET /api/weather?city=.',
     code: SAMPLE_SPEC_HIGHLIGHT },
 
   { id: 's4c', type: 'image', title: 'Decompose: Load the Spec',
     image: decomposeSpecLoadedImg,
-    caption: 'Paste the dense spec into the Decompose page (skip re-running intake). Status flips to "using upload" — Run Decompose now uses your pasted content.' },
+    caption: 'The Decompose page picks up the spec from your intake session; the "using session" badge says so. You can instead upload or paste a spec.md from an earlier intake, and the badge then changes to "using upload". Check the phase selector before you click Run Decompose: in run 5 it showed MVP even though intake ran in PoC.' },
 
-  { id: 's4d', type: 'image', title: 'Decompose Output: 15 Components, 3 Waves, 73% Time Saved',
+  { id: 's4d', type: 'image', title: 'Decompose Output: 9 Components, 2 Waves, 78% Time Saved',
     image: decomposeWavePlanImg,
-    caption: 'Wave 0: 6 interface definitions (4 entity models + 2 configs) — fully parallel. Wave 1: services that depend on configs. Wave 2: handlers + middleware. Right side: machine-readable interface contracts and the dependency graph.' },
+    caption: 'Wave 0 has 7 components, all built in parallel: WeatherDataModel, WeatherService, HealthzHandler, APIConfig, ErrorHandlingMiddleware, RateLimitMiddleware and WeatherTestSuite. Wave 1 has 2 components, WeatherHandler and RootPageHandler, and they wait for Wave 0. The dependency graph on the right shows why: weather-handler depends on weather-service, error-middleware and rate-limit-middleware, and root-page-handler depends on error-middleware. Every component is rated medium (20 min), so the estimate is 180 min built one after another and 40 min built in waves. Read the plan before you build. Nobody asked for RateLimitMiddleware; decompose attached it to the 5s-timeout constraint. The second wave always gets the fixed label "Foundation (Models + Config)", so that label appears here even though this wave holds the handlers. The phase selector shows MVP even though intake ran in PoC.' },
 
   { id: 's4', type: 'codeblock', title: 'The Build Package That Comes Out',
-    intro: 'The decompose run produces a full build package — 4 parts, ~500 lines for this MVP. Excerpt below shows the structure: spec recap, wave plan, interface contracts (with Owner + Types), and per-component build prompts (the actual LLM payload).',
-    code: `# Build Package — MVP
-# 15 components · 3 waves · 7× parallelism · 73% time savings
+    intro: 'The decompose run produces a build package, one YAML file (build-package-mvp.yaml, 209 lines for these 9 components). It has four parts: metadata (the numbers on the Decompose page), the spec again channel by channel, the rules, and a dag with one entry per component. Each entry holds the component\'s wave, its complexity, the constraints that apply to it, what it consumes, and the prompt the Build Agent will send. An excerpt is below. Two notes. The file says phase: mvp even though intake ran in PoC, because the Decompose page\'s phase selector showed MVP. And for Python builds the Build Agent removes the "Depends on (import, do not implement)" line: the app shell loads each generated file on its own, so one file cannot import another.',
+    code: `# Build Package — YAML DAG Format
+# Generated by Architecture Agent → Decomposition Agent
 
-═══ Part 1: Dense Architecture Specification ═════════════════════
-(spec.md verbatim — Purpose, Data Model, API, Tech Stack, Auth,
- Deployment, Performance, All Constraints, Implementation Rules)
+metadata:
+  phase: mvp
+  total_components: 9
+  total_waves: 2
+  max_parallelism: 7
+  time_savings_percent: 78
+  estimated_sequential_minutes: 180
+  estimated_parallel_minutes: 40
 
-═══ Part 2: Wave Plan ════════════════════════════════════════════
+spec:
+  purpose:
+    - "A weather page to retrieve current weather information."
+    … (the dense spec again, channel by channel)
+  api:
+    - "GET /api/weather?city=<name> is the main endpoint."
+    …
 
-## Wave 0: Interface Definitions  (6 components, 6× parallel)
-- UserModel, TeamModel, TaskModel, CommentModel  [data_model]
-- DatabaseConfig                                 [tech_stack]
-- DeploymentConfig                               [deployment]
+rules:
+  - "Every architectural decision MUST trace to a constraint in spec"
+  - "If a dimension has no constraint, ASK — do not invent"
 
-## Wave 1: Foundation             (2 components, 2× parallel; deps: Wave 0)
-- CacheService  [tech_stack, performance]
-- AuthService   [auth]
+dag:
+  healthz-handler:
+    name: HealthzHandler
+    type: handler
+    wave: 0
+    complexity: medium
+    constraints:
+      - "GET /healthz returns 200."
+    prompt: |
+      Build a handler component named \`HealthzHandler\`.
+      Purpose: Handles the GET /healthz endpoint to check service availability..
 
-## Wave 2: Services               (7 components, 7× parallel; deps: Wave 1)
-- AuthMiddleware, TeamHandler, TaskListHandler, TaskCreateHandler,
-  TaskUpdateHandler, TaskHandler, CommentHandler
+      Constraints from the architecture spec:
+      - GET /healthz returns 200.
 
-═══ Part 3: Interface Contracts ══════════════════════════════════
+  weather-handler:
+    name: WeatherHandler
+    type: handler
+    wave: 1
+    complexity: medium
+    consumes:
+      - WeatherService
+    constraints:
+      - "Endpoint triggered by submitting a city name ('Get weather' button)."
+      - …
+    prompt: |
+      Build a handler component named \`WeatherHandler\`.
+      Purpose: Handles the GET /api/weather endpoint request, orchestrating data fetching and error responses..
 
-### IAuthService
-Owner: AuthService
-Types: AuthCredentials, AuthToken, TokenPayload
-\`\`\`
-authenticate(credentials: AuthCredentials) -> AuthToken
-validate_token(token: str) -> TokenPayload
-authorize(user_id: str, permission: str) -> bool
-\`\`\`
-(plus IUserRepository, ITeamRepository, ITaskRepository,
- ICommentRepository, ICacheService — each with Owner, Types, methods)
+      Constraints from the architecture spec:
+      - Endpoint triggered by submitting a city name ('Get weather' button).
+      - Success response: JSON {"city": str, "temp_f": number, "description": str} with status 200.
 
-═══ Part 4: Component Build Prompts ══════════════════════════════
-(Execute in wave order. Components within a wave run in parallel.)
+      Depends on (import, do not implement): WeatherService
 
-#### AuthService
-Build a service component named \`AuthService\`.
-Role / Purpose: Authentication and token management.
-
-Constraints from the architecture spec:
-- Method: JWT with RS256 signing
-- Authorization: RBAC with roles owner, admin, member
-- Session: access token 15m, refresh token 30d sliding
-
-Must implement: IAuthService
-Methods for IAuthService:
-  - authenticate(credentials: AuthCredentials) -> AuthToken
-  - validate_token(token: str) -> TokenPayload
-  - authorize(user_id: str, permission: str) -> bool
-
-#### AuthMiddleware
-Build a middleware component named \`AuthMiddleware\`.
-Role / Purpose: Request authentication and authorization middleware.
-
-Depends on (import, do not implement): IAuthService
-Constraints: (same auth constraints as above)
-
-… one prompt per component, all 15 in this build package.` },
+… 9 entries in all: 7 in wave 0, 2 in wave 1.` },
 
   { id: 's5', type: 'component', title: "The Build Agent's Pipeline",
     component: 'BuildFlow' },
 
   { id: 's6', type: 'image', title: 'The Build UI in Action',
     image: buildUiImg,
-    caption: 'Live screenshot: 4 components built across 2 waves in 32.9s on local Ollama gemma3:12b. Wave 0 (weather-service, health-handler) ran in parallel; Wave 1 (weather-handler, app-server) followed. "Continue to Deploy →" appears when complete.' },
+    caption: 'Live screenshot (run 5): 9 components built across 2 waves in 105.8s on Ollama gemma4:e4b, every one on the first attempt. Wave 0\'s 7 components ran in parallel; the slowest was weather-data-model at 64.3s. Wave 1 (weather-handler 41.6s, root-page-handler 18.2s) started only after Wave 0 finished. When the build completes, exactly one "Continue to Deploy →" link appears. Results vary by run, and a build may need one rebuild: in run 4 a component was rejected and had to be retried. When any component fails, the Build page is coded to show a red failure banner and hide the Deploy link. One more stock-UI step: after Decompose, the Build page opens with "no source", so you upload the build package you downloaded.' },
 
   { id: 's7', type: 'component', title: 'The Deploy Agent\'s Pipeline',
     component: 'DeployFlow' },
 
   { id: 's8', type: 'image', title: 'The Deploy UI in Action',
     image: deployUiImg,
-    caption: 'Live screenshot: rendered fubo Application manifest for the "Quote of the Day" app (run d9331c480953) in Monaco editor, "Will deploy to" card showing the target URL with copy button, three sequential action buttons, and a custom-template upload card on the right.' },
+    caption: 'Live screenshot (run 5, bd56dacd8151): the stock Deploy page rendered the fubo Application manifest for app-bd56da. It shows image architect-builds/app:bd56da, containerPort 3000, healthcheck /healthz and host app-bd56da-training.tools.fubotv.net. The env block points OPENWEATHER_API_KEY at a secretKeyRef to the app\'s own Secret: name app-bd56da-openweather, key OPENWEATHER_API_KEY, optional: true. The YAML names the Secret and contains no key value. Because of optional: true, the pod starts even when the Secret is missing; the app just has no key. In this worked example the instructor created that Secret by hand, from a laptop (next slide). The Deploy page itself says nothing about the Secret before you apply; the reminder appears only in the handoff panel.' },
 
   { id: 's8b', type: 'image', title: 'The Real Handoff',
     image: deployManualApplyImg,
-    caption: 'This agent host has no kubectl, so instead of applying directly, it hands back the exact rendered YAML and a copy-pasteable apply command. For this split-host setup — agent and cluster access on different machines — that\'s the correct, by-design outcome, not a failure.' },
+    caption: 'The agent host has no kubectl, so after Build Image and Push to ECR it stops at a "Manual apply needed" panel. You run everything on it from your laptop, in order, in one shell. (1) A hidden prompt reads your OpenWeather key and prints its length; expect len=32. (2) AWS_PROFILE=fubo-tools kubectl --context vat-dev -n training create secret generic app-bd56da-openweather creates the app\'s own Secret from that key. (3) The rendered YAML is piped into AWS_PROFILE=fubo-tools kubectl --context vat-dev apply -f -, and the YAML itself sets namespace: training. (4) curl -sS https://app-bd56da-training.tools.fubotv.net/healthz checks the app. The panel adds one warning: HTTPS only, because http:// returns a 404 from the shared load balancer. Each command sets the profile and context itself, so your default kubeconfig context does not matter. When the agent and cluster access are on different machines, this handoff is the expected result, not a failure.' },
 
-  { id: 's8c', type: 'image', title: 'The Real Result',
-    image: quoteAppLiveImg,
-    caption: 'The pod really is live and responding — a real HTTP 200 from the deployed container. The response itself is a generic placeholder (`{"result":"value"}`), not an actual quote: the LLM-generated /quote handler for this run was a functional stub rather than a fully realized feature. That\'s an honest, unedited limitation of this specific build, not a deployment failure.' },
+  { id: 's8c', type: 'image', title: 'The Real Result: Live Weather, Checked Against OpenWeather',
+    image: weatherAppLiveImg,
+    caption: 'The live app at https://app-bd56da-training.tools.fubotv.net/. The page shows city, temperature in °F and description. This screenshot was taken later than the numbers below, so it shows 39.6 °F and "scattered clouds": the weather moved. A 200 only proves the pod is up, so the result was checked against OpenWeather directly. The app\'s GET /api/weather?city=Chicago returned 38.3 °F and "broken clouds". OpenWeather\'s own imperial reading was 38.08 °F, a difference of 0.22 °F. OpenWeather\'s description read "scattered clouds" because its data updated between the two calls, which were not made at the same moment. An unknown city returns 404 and a missing city returns 400. Results vary by run. In run 4 the model wrote page JavaScript that converted the already-Fahrenheit value a second time, so the page showed 12 °F while the API said 53.11, even though the pipeline and the page load both succeeded. Always check the page against the API.' },
 
   { id: 's9', type: 'text', title: 'What Gets Generated',
-    body: 'Per component: one source file (.js or .py). Per project: package.json or requirements.txt, Dockerfile, .env.example, index.html shell if frontend. The build agent writes everything to a versioned workspace folder.' },
+    body: 'Per component: one source file (.js or .py). Per project: package.json or requirements.txt, Dockerfile, .env.example, _package.yaml and an app.py shim. The build agent writes everything to a versioned workspace folder.' },
 
-  { id: 's10', type: 'text', title: 'Foreshadowing: That .env.example',
-    body: "We're emitting an OPENWEATHER_API_KEY= placeholder, which means the real key has to come from somewhere. That somewhere — secrets and config management — is its own module. For now: the .env.example exists so a developer knows what to fill in." },
+  { id: 's10', type: 'text', title: 'Payoff: Where OPENWEATHER_API_KEY Comes From',
+    body: "The .env.example lists OPENWEATHER_API_KEY= with no value. Here is where the value comes from in the worked example.\n\n1. The code reads the key from the environment. The spec requires os.environ (\"The key must be read from os.environ only.\"), and the build rules tell every Python file to read environment variables at request time and never log, return or render a secret.\n2. .env.example, which Assemble writes for every build, documents the variable so a developer knows it exists.\n3. The value reaches the pod from the app's own cluster Secret, app-bd56da-openweather. The rendered YAML only names that Secret (secretKeyRef, key OPENWEATHER_API_KEY), so the key is never in the code, the image or the YAML.\n4. In this worked example the instructor created that Secret by hand, from a laptop, using the command in the Deploy panel. The instructor checked len=32 in the same shell first, because a Secret created from an unset variable is silently empty.\n\nThat Secret belongs to the instructor's app. In the follow-along it is replaced: each learner's app gets its own Secret holding the learner's own key." },
 
   { id: 's11', type: 'text', title: 'The Deploy Step',
     body: 'Take the deploy YAML template, fill in auto-derived fields (image, port, healthcheck path, ingress host), let the user customize the rest, then build → push → apply.' },
@@ -173,10 +194,10 @@ Constraints: (same auth constraints as above)
     body: 'fubo Application CRD: apiVersion app.smo.tools.fubotv.net/v1alpha1. Key fields: image, replicas, resources, ports, healthcheck (must match what your app actually serves), ingress host (must be unique).' },
 
   { id: 's13', type: 'text', title: 'Image Build & Push',
-    body: 'docker build → docker tag → docker push to ECR. The agent expects you to have a fresh ECR docker login (12hr TTL). On auth error it surfaces the exact "aws ecr get-login-password" command to copy-paste.' },
+    body: 'docker build → docker tag → docker push to ECR. The ECR login token on the build host (12hr TTL) is refreshed by the operator (the instructor), not by the student. On auth error the agent surfaces the exact "aws ecr get-login-password" command.' },
 
   { id: 's14', type: 'text', title: 'Live URL',
-    body: 'After kubectl apply, the agent polls the ingress until it serves HTTP 200 — typically ~90s for first deploy as Route 53 + ALB target registration settle. Then the URL is clickable.' },
+    body: 'On this platform the apply is a manual step shown in the Deploy panel: run the shown commands on your laptop with AWS_PROFILE=fubo-tools and --context vat-dev. The "poll" button only works over https pages, so verify with the curl line instead of relying on ~90s polling.' },
 
   { id: 's15', type: 'text', title: 'Live Walkthrough',
     body: 'Switch to architect tool now → walk Stages 1-3 with the HelloWorld spec.' },

@@ -386,7 +386,15 @@ Under .claude/weather-refresh-work/artifacts/run-2/:
 
 ## Stage 3a checks
 
-(pending)
+- `cd module4 && npm run lint && npm run build`: lint exit 0 (eslint, no findings); build exit 0 (vite, built in 60ms).
+- Node slide-id/assessment check: `{"total":15,"per":{"A":5,"B":5,"C":5},"bad":[],"slides":26}`
+- Stale-content grep (index.html shell, no Deploy link, always succeeds, 38.3°F, fresh ECR docker login, polls the ingress) over module4/src: no output.
+- 32-hex grep over module4/src and this evidence dir: none.
+- Click-through (preview port 4176, run by the controller): `{"ok":true,"slides":26,"counter":"26 / 26","errors":[],"progress":{"__v":2,"part4":true}}`
+- Landing e2e: 7 passed, via cached Chrome for Testing (the repo Playwright config expects a missing headless shell; a scratch config was used).
+- deploy-landing/index.html: one-line change, slides 18 -> 26.
+- Unlock-gate files untouched.
+- weather-app-live.png was a temporary run-2 stand-in and has been REPLACED with the user's run-5 page capture (2026-11-06 10:37, 'City: Chicago, Temperature: 39.6F, Description: scattered clouds'; taken later than the 38.3 F check, caption says so); Opus review verdict PASS-WITH-NOTES, notes fixed except the screenshot and s15 (3b).
 
 ## Stage 3b rehearsal
 
